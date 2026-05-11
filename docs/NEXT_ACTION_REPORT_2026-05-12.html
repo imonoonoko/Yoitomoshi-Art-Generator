@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yoitomoshi Art Generator 次作業優先度レポート 2026-05-12</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0c10;
+      --panel: #14161c;
+      --panel2: #1a1d25;
+      --line: #303541;
+      --ink: #f4f5f8;
+      --muted: #a6adbb;
+      --subtle: #768092;
+      --accent: #7c8cff;
+      --ok: #5fc37e;
+      --warn: #e0b34d;
+      --bad: #e26b6b;
+      --info: #66b7e8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.7 "Segoe UI", system-ui, sans-serif;
+    }
+    a { color: var(--accent); }
+    code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #0f1117;
+      color: #d9ddff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 28px; }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: #101219;
+    }
+    .eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.25; }
+    h1 { margin-top: 8px; font-size: 34px; }
+    h2 { margin-bottom: 12px; font-size: 20px; }
+    h3 { font-size: 16px; }
+    p { margin: 8px 0 0; }
+    .lead { max-width: 900px; color: var(--muted); font-size: 16px; }
+    .grid { display: grid; gap: 14px; }
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      margin-top: 18px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+    .card.flat { margin-top: 0; background: var(--panel2); }
+    .pill, .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border-radius: 999px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .pill { padding: 4px 9px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+    .tag { padding: 2px 7px; font-size: 11px; }
+    .ok { color: var(--ok); border-color: rgba(95, 195, 126, .45); }
+    .warn { color: var(--warn); border-color: rgba(224, 179, 77, .45); }
+    .bad { color: var(--bad); border-color: rgba(226, 107, 107, .45); }
+    .info { color: var(--info); border-color: rgba(102, 183, 232, .45); }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 8px;
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+    th { color: var(--muted); background: #101219; font-size: 12px; }
+    tr:last-child td { border-bottom: 0; }
+    ol, ul { margin: 8px 0 0; padding-left: 22px; }
+    li + li { margin-top: 6px; }
+    .priority {
+      display: grid;
+      grid-template-columns: 86px minmax(0, 1fr);
+      gap: 14px;
+      padding: 14px 0;
+      border-top: 1px solid var(--line);
+    }
+    .priority:first-of-type { border-top: 0; padding-top: 0; }
+    .rank {
+      align-self: start;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      text-align: center;
+      background: #101219;
+    }
+    .rank strong { display: block; font-size: 22px; }
+    .rank span { display: block; color: var(--subtle); font-size: 11px; }
+    .why { color: var(--muted); }
+    .done { color: var(--ok); }
+    .next { color: var(--warn); }
+    .small { color: var(--subtle); font-size: 12px; }
+    @media (max-width: 860px) {
+      .wrap { padding: 18px; }
+      h1 { font-size: 26px; }
+      .cols-2, .cols-3 { grid-template-columns: 1fr; }
+      .priority { grid-template-columns: 1fr; }
+      .rank { width: 100px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="eyebrow">Next Action Report</div>
+      <h1>次にするべき事 — 優先度順 全体レポート</h1>
+      <p class="lead">
+        2026-05-12 時点の実装・QA・GitHub公開状況を前提に、次に進める作業を優先度順に整理した。
+        結論は、追加機能より先に「実素材QAで保存・復元・比較の証跡を固める」こと。
+      </p>
+      <div class="meta">
+        <span class="pill ok">GitHub private synced</span>
+        <span class="pill ok">ControlNet API QA PASS</span>
+        <span class="pill ok">typecheck/build PASS</span>
+        <span class="pill warn">Upscale比較QA 未完了</span>
+        <span class="pill warn">Library復旧 実データ未実行</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <h2>一番先にやること</h2>
+      <div class="grid cols-3">
+        <div class="card flat">
+          <h3><span class="tag warn">NEXT</span> Upscale比較保存の実素材QA</h3>
+          <p>Tile ControlNet ON/OFF と denoise 0.25 / 0.35 / 0.45 を同一素材で並べ、drift / seam / detail の判断基準を保存する。</p>
+        </div>
+        <div class="card flat">
+          <h3><span class="tag info">理由</span> 制作品質に直結</h3>
+          <p>ControlNet APIは通った。次に残っている最大の品質リスクは、Upscale時に構図・衣装・境界が崩れるかどうか。</p>
+        </div>
+        <div class="card flat">
+          <h3><span class="tag ok">完了条件</span> 比較1セット保存</h3>
+          <p><code>userdata/upscale-comparisons/</code> に比較結果が作成され、採用基準がレポートに残る。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>優先順位</h2>
+
+      <div class="priority">
+        <div class="rank"><strong>P0-1</strong><span>最優先</span></div>
+        <div>
+          <h3>Upscale比較保存の実素材QA</h3>
+          <p class="why">実装済みだが、実画像での比較保存と判断基準がまだない。制作結果の品質に一番効く。</p>
+          <ul>
+            <li>同一履歴PNGをUpscaleへ投入する。</li>
+            <li>Tile ControlNet OFF/ON と denoise 0.25 / 0.35 / 0.45 の候補を生成する。</li>
+            <li>上下分裂、衣装drift、顔/手のdetail、tile seamを見て採用基準を保存する。</li>
+          </ul>
+          <p><span class="done">完了条件:</span> 比較保存ディレクトリ、判断基準、次回推奨denoiseが残っている。</p>
+        </div>
+      </div>
+
+      <div class="priority">
+        <div class="rank"><strong>P0-2</strong><span>安全性</span></div>
+        <div>
+          <h3>Workspace参照保存のエンドツーエンドQA</h3>
+          <p class="why"><code>embed</code> / <code>references</code> / <code>settings-only</code> の挙動は実装済み。次は、実素材と欠落参照で復元体験を確認する。</p>
+          <ul>
+            <li>外部画像を参照保存して復元する。</li>
+            <li>参照先を一時的に移動し、欠落警告が出ることを確認する。</li>
+            <li>設定復元自体が画像欠落で止まらないことを確認する。</li>
+          </ul>
+          <p><span class="done">完了条件:</span> 画像あり/画像欠落の2ケースで、復元結果と警告文が記録されている。</p>
+        </div>
+      </div>
+
+      <div class="priority">
+        <div class="rank"><strong>P0-3</strong><span>データ保守</span></div>
+        <div>
+          <h3>Model Library復旧の実データQA</h3>
+          <p class="why">復旧処理は入っているが、19GB規模の既存ライブラリでSHA queueやmetadata/preview再取得の負荷をまだ見ていない。</p>
+          <ul>
+            <li>ToolsのModel Library復旧を1回実行する。</li>
+            <li>stale running job、metadata/preview取得、SHA未計算queueの結果を記録する。</li>
+            <li>UIが固まる場合は、進捗表示・停止・queue上限を追加する。</li>
+          </ul>
+          <p><span class="done">完了条件:</span> 復旧結果件数、所要時間、UI負荷、追加修正の要否が記録されている。</p>
+        </div>
+      </div>
+
+      <div class="priority">
+        <div class="rank"><strong>P1</strong><span>UI確認</span></div>
+        <div>
+          <h3>ControlNet Builder UIで長時間preprocessorを確認</h3>
+          <p class="why">API QAはPASS済み。ただし <code>openpose_full</code> と <code>depth_midas</code> は初回ロード込みで約66〜70秒かかったため、UI上の待機表示を確認する必要がある。</p>
+          <ul>
+            <li>Builder UIから画像を落とし、OpenPose/Depthを実行する。</li>
+            <li>実行中ボタンdisable、toast、プレビュー表示が破綻しないか見る。</li>
+            <li>必要ならキャンセル、長時間警告、所要時間表示を追加する。</li>
+          </ul>
+          <p><span class="done">完了条件:</span> Builder UIからの実行結果と、長時間処理時のUX判断が残っている。</p>
+        </div>
+      </div>
+
+      <div class="priority">
+        <div class="rank"><strong>P1</strong><span>翻訳</span></div>
+        <div>
+          <h3>ru/ptの未翻訳キー補完</h3>
+          <p class="why">英語フォールバックにより日本語混入は抑えたが、Tools/Library/Merger/Converter系に未翻訳キーが残っている。</p>
+          <ul>
+            <li>残り約104キーをru/ptへ追加する。</li>
+            <li>言語切替で主要タブにキー文字列や日本語が出ないことを確認する。</li>
+          </ul>
+          <p><span class="done">完了条件:</span> ja/en/ru/ptのキー差分が0、または意図的な英語フォールバックだけに限定されている。</p>
+        </div>
+      </div>
+
+      <div class="priority">
+        <div class="rank"><strong>P2</strong><span>機能磨き</span></div>
+        <div>
+          <h3>Workspace共有性と比較結果ビュー</h3>
+          <p class="why">制作を続けるほど、保存済みWorkspaceやUpscale比較結果を後から見返す導線が必要になる。</p>
+          <ul>
+            <li>Workspace参照の相対パス化、欠落参照の差し替えUIを検討する。</li>
+            <li>保存済みUpscale比較の一覧/再表示/採用ボタンをToolsへ追加する。</li>
+          </ul>
+          <p><span class="done">完了条件:</span> 保存した比較やWorkspaceを、後から迷わず再利用できる。</p>
+        </div>
+      </div>
+
+      <div class="priority">
+        <div class="rank"><strong>P2</strong><span>保留解除</span></div>
+        <div>
+          <h3>Format Converter実変換QA</h3>
+          <p class="why">変換対象checkpoint系 <code>.ckpt/.pt/.pth</code> が現環境にないため保留中。対象ファイルが入ったら一度だけ安全確認する。</p>
+          <ul>
+            <li><code>models/Stable-diffusion/</code> 配下の対象ファイルだけ変換する。</li>
+            <li>一時ファイルcleanup、変換後Inspector、上書き防止を確認する。</li>
+          </ul>
+          <p><span class="done">完了条件:</span> 変換成功または対象なしの判断が明文化されている。</p>
+        </div>
+      </div>
+
+      <div class="priority">
+        <div class="rank"><strong>P3</strong><span>後続</span></div>
+        <div>
+          <h3>Inpaint mask編集強化と公開運用</h3>
+          <p class="why">現状のマスクは基本描画まで。制作効率を上げるには、編集履歴、反転、ぼかしプレビューが必要。</p>
+          <ul>
+            <li>消しゴム、マスク反転、ぼかしプレビュー、Undo/Redoを追加する。</li>
+            <li>GitHub private repoの共有ルール、README導線、リリース手順を整える。</li>
+          </ul>
+          <p><span class="done">完了条件:</span> マスク編集が実用レベルになり、private repo共有時に迷わない。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>現在の状態</h2>
+      <table>
+        <thead>
+          <tr><th>領域</th><th>状態</th><th>判断</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GitHub</td>
+            <td><span class="tag ok">PRIVATE synced</span></td>
+            <td><code>imonoonoko/Yoitomoshi-Art-Generator</code> の <code>main</code> と同期済み。</td>
+          </tr>
+          <tr>
+            <td>ControlNet</td>
+            <td><span class="tag ok">API QA PASS</span></td>
+            <td>4種類のpreprocessor実行に成功。UI長時間表示は次に確認。</td>
+          </tr>
+          <tr>
+            <td>Workspace</td>
+            <td><span class="tag ok">実装済み</span></td>
+            <td><code>references</code> と欠落参照警告まで追加済み。実素材E2E QAが次。</td>
+          </tr>
+          <tr>
+            <td>Upscale</td>
+            <td><span class="tag warn">比較QA待ち</span></td>
+            <td>比較保存は実装済み。採用基準が未確定。</td>
+          </tr>
+          <tr>
+            <td>Model Library</td>
+            <td><span class="tag warn">実データQA待ち</span></td>
+            <td>復旧処理は実装済み。大きいライブラリでの負荷確認が未実施。</td>
+          </tr>
+          <tr>
+            <td>Build</td>
+            <td><span class="tag ok">PASS</span></td>
+            <td><code>postcss.config.js</code> warningは解消済み。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>今はやらないこと</h2>
+      <ul>
+        <li>新しい大機能追加。保存・復元・比較・復旧の実QAが先。</li>
+        <li>Forge/ControlNetの常時ロード停止。現状はTile Upscaleや通常ControlNet導線への影響が大きい。</li>
+        <li>Format Converterの無理な実変換。対象checkpointファイルが入ってから実施する。</li>
+        <li>public公開。private repoで実QAと共有範囲を固めてから判断する。</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>参照</h2>
+      <table>
+        <tbody>
+          <tr><td>全体精査</td><td><a href="PROJECT_REVIEW_2026-05-12.html">PROJECT_REVIEW_2026-05-12.html</a></td></tr>
+          <tr><td>ロードマップ</td><td><a href="ROADMAP.md">ROADMAP.md</a></td></tr>
+          <tr><td>ControlNet QA</td><td><a href="QA_CONTROLNET_2026-05-12.md">QA_CONTROLNET_2026-05-12.md</a></td></tr>
+          <tr><td>構造整理</td><td><a href="PROJECT_STRUCTURE.md">PROJECT_STRUCTURE.md</a></td></tr>
+          <tr><td>PixAI調査</td><td><a href="PIXAI_RESEARCH_REPORT_2026-05-12.html">PIXAI_RESEARCH_REPORT_2026-05-12.html</a></td></tr>
+        </tbody>
+      </table>
+      <p class="small">このレポートは、次の作業順を決めるための運用メモ。実装の一次情報は各ソースファイルとロードマップを正とする。</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -8,6 +8,7 @@
 
 - [`SESSION_HANDOFF_2026-05-11.md`](SESSION_HANDOFF_2026-05-11.md): 最新の実装ログ。Phase 8 と i18n フェーズ 2 の進捗はこれを正とする。
 - [`PROJECT_REPORT.md`](PROJECT_REPORT.md): 設計思想、技術選定、調査ログの長期保管場所。一部の Phase 記述は古い。
+- [`NEXT_ACTION_REPORT_2026-05-12.html`](NEXT_ACTION_REPORT_2026-05-12.html): 次にやる作業を優先度順に整理した運用レポート。
 - [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md): GitHub に載せる範囲、`runtime/`、`userdata/`、Electron profile、将来の model-library/download/workspace 領域の整理ルール。
 - [`../README.md`](../README.md) / `README.{en,ru,pt}.md` / `はじめに.txt`: 利用者向けの起動・運用説明。
 

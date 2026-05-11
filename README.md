@@ -9,6 +9,7 @@
 ## 関連ドキュメント
 
 - [全体精査レポート 2026-05-12](docs/PROJECT_REVIEW_2026-05-12.html)
+- [次作業優先度レポート 2026-05-12](docs/NEXT_ACTION_REPORT_2026-05-12.html)
 - [ロードマップ](docs/ROADMAP.md)
 - [ファイル / フォルダ構造](docs/PROJECT_STRUCTURE.md)
 
