@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yoitomoshi Art Generator 総合レビュー 2026-05-11</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101114;
+      --panel: #181a1f;
+      --panel-2: #20232a;
+      --text: #eef1f6;
+      --muted: #aeb6c6;
+      --line: #303540;
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #fbbf24;
+      --danger: #fb7185;
+      --ok: #34d399;
+      --code: #0b0c0f;
+      --shadow: 0 18px 50px rgba(0, 0, 0, .28);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.65;
+    }
+    a { color: var(--accent-2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header {
+      padding: 48px 28px 28px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #15171d 0%, #101114 100%);
+    }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    h1 { margin: 0 0 12px; font-size: clamp(28px, 4vw, 46px); line-height: 1.15; letter-spacing: 0; }
+    h2 { margin: 42px 0 14px; font-size: 24px; letter-spacing: 0; }
+    h3 { margin: 24px 0 10px; font-size: 18px; letter-spacing: 0; }
+    p { margin: 0 0 12px; }
+    ul, ol { padding-left: 1.35rem; }
+    li { margin: 6px 0; }
+    code {
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 1px 5px;
+      color: #e5e7eb;
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: .92em;
+    }
+    pre {
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      overflow: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 22px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px 12px; vertical-align: top; }
+    th { text-align: left; background: var(--panel-2); color: #f8fafc; }
+    tr:last-child td { border-bottom: 0; }
+    .lead { max-width: 920px; color: var(--muted); font-size: 16px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.03);
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .grid { display: grid; gap: 14px; }
+    .grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+    .score {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .score strong { font-size: 24px; color: var(--accent); }
+    .muted { color: var(--muted); }
+    .tag {
+      display: inline-block;
+      border-radius: 5px;
+      padding: 1px 7px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+    .p1 { color: #2b0a12; background: var(--danger); }
+    .p2 { color: #271b04; background: var(--warn); }
+    .p3 { color: #041b2a; background: var(--accent-2); }
+    .ok { color: #052015; background: var(--ok); }
+    .finding {
+      border-left: 4px solid var(--danger);
+      padding: 12px 14px;
+      background: rgba(251, 113, 133, .08);
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0;
+    }
+    .finding.medium {
+      border-left-color: var(--warn);
+      background: rgba(251, 191, 36, .08);
+    }
+    .finding.low {
+      border-left-color: var(--accent-2);
+      background: rgba(125, 211, 252, .08);
+    }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .flow div {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 82px;
+    }
+    .flow span { display: block; color: var(--accent); font-weight: 700; margin-bottom: 4px; }
+    .small { font-size: 13px; }
+    footer { border-top: 1px solid var(--line); color: var(--muted); padding: 22px 28px 40px; }
+    @media (max-width: 860px) {
+      .grid.cols-3, .grid.cols-2, .flow { grid-template-columns: 1fr; }
+      main { padding: 20px; }
+      header { padding: 34px 20px 24px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Yoitomoshi Art Generator 総合レビュー</h1>
+    <p class="lead">
+      Electron + React で Forge を API 専用起動し、Civitai 連携、LoRA、ControlNet、Upscale、Tools をまとめる個人制作向けAIアート生成環境の
+      コードレビュー、プロジェクト評価、改善ロードマップ、外部ソース整理です。
+    </p>
+    <div class="meta">
+      <span class="pill">作成日: 2026-05-11</span>
+      <span class="pill">対象: C:\宵灯工房アート\Yoitomoshi-Art-Generator</span>
+      <span class="pill">検証: typecheck / build / npm audit</span>
+      <span class="pill">外部調査: GitHub / Electron / Civitai / Hugging Face</span>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>結論</h2>
+      <div class="grid cols-3">
+        <div class="card">
+          <div class="score"><span>総合評価</span><strong>7.3 / 10</strong></div>
+          <p class="muted small">個人用途の生成ワークフローとしては実用域。次は運用安全性と自動検証を固める段階。</p>
+        </div>
+        <div class="card">
+          <div class="score"><span>最大リスク</span><strong>P1</strong></div>
+          <p class="muted small">Electronのユーザープロファイル、APIキー、IPC境界、Git管理外状態が同じ方向のリスクを作っている。</p>
+        </div>
+        <div class="card">
+          <div class="score"><span>次の一手</span><strong>基盤整備</strong></div>
+          <p class="muted small">Toolsの新機能前に、キャッシュ隔離、秘密情報、IPC検証、GitHub連携を先に直すべき。</p>
+        </div>
+      </div>
+      <p>
+        機能面はかなり進んでいます。ForgeをGradioではなくAPI専用で扱う方針、ControlNet TileをUpscaleに閉じ込める設計、ADetailerのpayload問題を現実のForge挙動に合わせて回避している点は強いです。
+        ただし、現在のままGitHubに載せる、または長期運用するには、プロジェクトルート汚染と秘密情報の扱いが危険です。
+      </p>
+    </section>
+
+    <section>
+      <h2>検証結果</h2>
+      <table>
+        <thead><tr><th>項目</th><th>結果</th><th>メモ</th></tr></thead>
+        <tbody>
+          <tr><td><code>npm run typecheck</code></td><td><span class="tag ok">PASS</span></td><td>Node / Web の TypeScript strict チェック通過。</td></tr>
+          <tr><td><code>npm run build</code></td><td><span class="tag ok">PASS</span></td><td>ビルド成功。警告は PostCSS config の module type と <code>png-metadata.ts</code> の dynamic/static import 重複。</td></tr>
+          <tr><td><code>npm audit --omit=dev</code></td><td><span class="tag ok">PASS</span></td><td>prod依存の既知脆弱性は0件。</td></tr>
+          <tr><td><code>git status --short</code></td><td><span class="tag p1">FAIL</span></td><td><code>.git</code> が存在せず、現在のローカルはGitリポジトリではない。</td></tr>
+          <tr><td>プロセス確認</td><td><span class="tag ok">OK</span></td><td>Electron / Forge Python は未残留。Node系はCodex/npx由来のみ確認。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>構造把握</h2>
+      <div class="flow">
+        <div><span>Electron Main</span><code>electron/main.ts</code><br>Forge起動、Storage、IPC登録。</div>
+        <div><span>Preload</span><code>electron/preload.ts</code><br><code>window.api</code> でrendererへ限定公開。</div>
+        <div><span>Renderer</span><code>src/App.tsx</code><br>React UI、Zustand state、各ワークスペース。</div>
+        <div><span>Forge Runtime</span><code>runtime/forge</code><br>約32.81GB。モデルとPython環境を同梱。</div>
+        <div><span>User Data</span><code>userdata</code><br>設定、履歴、Civitai cache、生成画像。</div>
+      </div>
+      <table>
+        <thead><tr><th>領域</th><th>確認値</th><th>評価</th></tr></thead>
+        <tbody>
+          <tr><td><code>runtime</code></td><td>約32.81GB</td><td>個人ポータブル運用として妥当。ただしGit管理からは完全除外必須。</td></tr>
+          <tr><td><code>node_modules</code></td><td>約633MB</td><td>通常のElectron開発サイズ。Git除外済み。</td></tr>
+          <tr><td><code>Cache</code></td><td>約216MB</td><td>プロジェクトルートにChromium cacheが出ている。設計修正対象。</td></tr>
+          <tr><td><code>userdata</code></td><td>約50MB</td><td>履歴と設定が入る。APIキーを含むため取り扱い注意。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>コードレビュー所見</h2>
+
+      <div class="finding">
+        <h3><span class="tag p1">P1</span> Electron userData をプロジェクトルートにしている</h3>
+        <p>
+          <code>electron/main.ts:31</code> で <code>app.setPath('userData', projectRoot)</code> を設定しているため、
+          <code>Cache</code>、<code>Code Cache</code>、<code>GPUCache</code>、<code>Local Storage</code>、<code>Network</code>、<code>Preferences</code> などがルート直下に生成されています。
+          ポータブル方針自体は正しいですが、Electronのプロファイルとアプリのユーザーデータを同じ階層に置くのは事故りやすいです。
+        </p>
+        <p><strong>改善:</strong> Electron profile は <code>userdata/electron-profile</code> 等へ隔離し、Storageのrootは <code>userdata</code> を明示的に使う。合わせて既存のroot直下キャッシュを移動または削除対象にする。</p>
+      </div>
+
+      <div class="finding">
+        <h3><span class="tag p1">P1</span> Civitai APIキーの保存方式</h3>
+        <p>
+          初回レビュー時点では <code>userdata/settings.json</code> にAPIキーが入っていました。値はこのレポートには記載しません。
+          2026-05-11の整理で <code>settings.json</code> から <code>secrets.local.json</code> へ分離し、設定ファイル上は <code>civitaiApiKey: null</code> になりました。
+        </p>
+        <p><strong>残リスク:</strong> 初回移行値は <code>plain:</code> base64 fallback です。Electron <code>safeStorage</code> が使える環境では次回保存時に暗号化形式へ更新されます。<code>userdata/</code> は引き続きGit禁止です。</p>
+      </div>
+
+      <div class="finding">
+        <h3><span class="tag p1">P1</span> IPC入力検証が機能ごとに薄い</h3>
+        <p>
+          初回レビュー時点では <code>toolsInspectModel</code>、<code>storageSetSettings</code>、<code>openExternal</code>、<code>civitaiDownload</code> の入力検証が薄い状態でした。
+          2026-05-11の境界強化で、モデル検査はユーザー選択済みファイルまたはForgeモデル配下、外部URLは <code>https</code> + 許可ドメイン、設定保存はForge実体と型検証、Civitai downloadはURL/filename/hash検証へ変更済みです。
+          txt2img / img2img / extras / interrogate payloadも、文字列長、画像base64サイズ、steps / cfg / size / seed / batch / denoise などを検証してからForgeへ渡すようにしました。
+        </p>
+        <p><strong>残リスク:</strong> manifest normalizeは追加済みです。次は設定変更時のUI側警告、payload契約テスト、既存モデルへのmetadata再取得が残っています。</p>
+      </div>
+
+      <div class="finding medium">
+        <h3><span class="tag p2">P2</span> Electron security は基本は良いが詰めが残る</h3>
+        <p>
+          <code>nodeIntegration: false</code>、<code>contextIsolation: true</code> は良い設定です。一方、<code>electron/main.ts:97</code> で <code>sandbox: false</code>、
+          <code>ipc-handlers.ts:822</code> で任意URLを <code>shell.openExternal</code> に渡せる設計です。外部ページを直接読み込んではいないため緊急度はP1より下ですが、Electron公式のセキュリティ推奨に照らすと改善余地があります。
+        </p>
+        <p><strong>改善:</strong> <code>will-navigate</code> を拒否、外部リンクは <code>https:</code> のみかつ <code>civitai.com</code> などのallowlistへ限定、renderer sandboxを有効化できるか検証する。</p>
+      </div>
+
+      <div class="finding medium">
+        <h3><span class="tag p2">P2</span> 自動テスト不足に対して中核payloadが複雑</h3>
+        <p>
+          <code>src/lib/extension-payload.ts</code> はADetailer、ControlNet、MultiDiffusion、Ultimate SD Upscaleのwire formatを集中管理しており、壊れると生成全体が失敗します。
+          コメントで経緯はよく残っていますが、positional argsはGitHub側の拡張更新で壊れやすい領域です。
+        </p>
+        <p><strong>改善:</strong> まずVitest等で <code>buildAlwaysOnScripts()</code> のスナップショット/契約テストを作る。ADetailer最小dict、ControlNet unit、Upscale Diffusion、Ultimate script_args 18要素を固定化する。</p>
+      </div>
+
+      <div class="finding medium">
+        <h3><span class="tag p2">P2</span> 大きいファイルが分割時期に来ている</h3>
+        <p>
+          主な大物は <code>src/lib/i18n.ts</code> 2391行、<code>electron/civitai-api.ts</code> 1024行、<code>src/components/UpscaleWorkspace.tsx</code> 959行、
+          <code>src/components/PromptLibrary.tsx</code> 873行、<code>electron/ipc-handlers.ts</code> 778行です。今は動いていますが、次にToolsやInpaintを足すと変更衝突とレビュー負荷が上がります。
+        </p>
+        <p><strong>改善:</strong> 機能単位で <code>electron/ipc/*</code>、<code>src/features/upscale/*</code>、<code>src/i18n/*.ts</code> へ分割する。分割はテスト追加と同時に小さく行う。</p>
+      </div>
+
+      <div class="finding low">
+        <h3><span class="tag p3">P3</span> ビルド警告とGit前提の弱さ</h3>
+        <p>
+          <code>postcss.config.js</code> のmodule type警告、<code>png-metadata.ts</code> のdynamic/static import警告は動作阻害ではありません。
+          ただしローカルがGitリポジトリでないため、差分管理、GitHub Issues/PR、リリースタグが使えません。
+        </p>
+        <p><strong>改善:</strong> <code>git init</code> 前に <code>.gitignore</code> を拡張し、<code>runtime/</code>、Electron profile、cache類、<code>userdata/</code>、生成物を除外する。</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>強み</h2>
+      <ul>
+        <li>ForgeをGradio UIではなくAPI専用で扱う方向は正しい。Electron UIを主導権にでき、個人制作向けの導線を作りやすい。</li>
+        <li>Forge終了時のプロセスツリー停止、stale pid cleanup、API readiness polling は実運用上の問題に寄り添っている。</li>
+        <li>Civitai hash lookup、community mining、LoRA/VAE推奨、履歴再利用は「素材制作の反復」に直結している。</li>
+        <li>ControlNet Tileを通常ControlNetと分離し、Upscale専用payloadにしている点は副作用が少ない。</li>
+        <li><code>safetensors</code> ヘッダのみを読んでModel Health Scanする設計は、大容量モデルを扱うアプリとして効率が良い。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>評価スコア</h2>
+      <table>
+        <thead><tr><th>観点</th><th>点数</th><th>評価</th></tr></thead>
+        <tbody>
+          <tr><td>プロダクト適合</td><td>8.5 / 10</td><td>個人ゲーム素材制作向けに、生成・履歴・再利用・Civitai連携が噛み合っている。</td></tr>
+          <tr><td>アーキテクチャ</td><td>8.0 / 10</td><td>Main/Preload/Rendererの分離は良い。IPC境界、portable userdata、manifest normalize、Model Library土台が前進。次は機能分割。</td></tr>
+          <tr><td>保守性</td><td>6.8 / 10</td><td>型は強いが大ファイル化が進行。テスト不在のため変更リスクが増えている。</td></tr>
+          <tr><td>運用安全性</td><td>7.6 / 10</td><td>プロセス停止、秘密情報分離、cache隔離、再開可能download、ジョブ再開/破棄UI、manifest normalizeは改善済み。</td></tr>
+          <tr><td>UI/UX</td><td>8.0 / 10</td><td>タブ構成と作業導線は実用的。ToolsとUpscaleは次に比較・診断の見せ方を強化したい。</td></tr>
+          <tr><td>テスト容易性</td><td>5.5 / 10</td><td>型チェックは通るが、payload契約、IPC、Electron実UIの自動検証がない。</td></tr>
+          <tr><td>セキュリティ</td><td>6.8 / 10</td><td>外部URL、設定、file path、生成payloadの検証を追加済み。sandboxとmanifest検証は継続課題。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>改善ロードマップ</h2>
+      <ol>
+        <li><strong>P0: Git/GitHub移行前の掃除。</strong> <code>.gitignore</code> を拡張し、cache類、<code>runtime/</code>、<code>userdata/</code>、<code>out/</code>、<code>dist/</code>、ログ、Electron profileを除外。必要ならGitHub private repoを作成。</li>
+        <li><strong>P1: Electron profileの隔離。</strong> <code>app.setPath('userData')</code> を <code>userdata/electron-profile</code> に変更し、アプリ設定rootとChromium profileを分離。</li>
+        <li><strong>P1: 秘密情報の移動。</strong> Civitai APIキーは <code>settings.json</code> から分離済み。次はUIで「保存場所と漏洩注意」を表示する。</li>
+        <li><strong>P1: IPCスキーマ検証。</strong> 設定保存、外部URL、ダウンロードURL、ファイルパス、Forge path、生成payload、manifest normalizeは実装済み。</li>
+        <li><strong>P1.5: Stability Matrix 参考機能の土台。</strong> Model Library index、DownloadJob manifest、Civitai downloadのHTTP Range再開、再開/破棄UI、metadata/preview保存、Hugging Face検索は初期実装済み。</li>
+        <li><strong>P2: 中核payloadの契約テスト。</strong> <code>extension-payload.ts</code>、<code>safetensors-inspect.ts</code>、<code>upscale-suggest.ts</code> から始める。</li>
+        <li><strong>P2: Stability Matrix 参考のModel Browser。</strong> Civitai / Hugging Face検索、種別別の自動配置、metadata/preview保存、pause/resume downloadを独自実装する。AGPL-3.0のためコードやUI資産はコピーしない。</li>
+        <li><strong>P2: Tools Format Converter。</strong> <code>.ckpt → .safetensors</code> を上書き禁止・一時ファイル・Health Scan連動で実装。</li>
+        <li><strong>P2: Model Merger設計。</strong> ForgeのPython側 <code>modules/extras.py::run_modelmerger</code> 相当をブリッジし、TS側はジョブ管理とUIに徹する。</li>
+        <li><strong>P3: Upscale比較レポート。</strong> denoise 0.25 / 0.35 / 0.45 とTile ControlNet ON/OFFを並べて保存し、目視比較を履歴に残す。</li>
+        <li><strong>P3: 履歴高度化。</strong> model / LoRA / sampler / 日付フィルタと、2件のprompt diffを追加。</li>
+        <li><strong>P3: 実UI smoke test。</strong> Electron CDPまたはPlaywrightで起動、Tools表示、設定モーダル、Upscaleタブ表示まで自動確認。</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>外部情報ソースと判断</h2>
+      <table>
+        <thead><tr><th>ソース</th><th>このプロジェクトへの意味</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><a href="https://github.com/LykosAI/StabilityMatrix">Stability Matrix GitHub</a></td>
+            <td>package manager、shared model directory、Civitai/Hugging Face model browser、pause/resume download、workspace保存の参考。AGPL-3.0のため実装は独自に行う。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/lllyasviel/stable-diffusion-webui-forge">Stable Diffusion WebUI Forge GitHub</a></td>
+            <td>Forge同梱・API専用起動・拡張互換の基準。現方針はForgeをバックエンドとして扱う方向に合っている。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/lllyasviel/stable-diffusion-webui-forge/blob/main/CHANGELOG.md">Forge CHANGELOG</a></td>
+            <td><code>--nowebui</code>、LoRA/metadata、API周辺の変化を追う場所。拡張payloadの破壊的変更を確認する監視対象。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/API">AUTOMATIC1111 API Wiki</a></td>
+            <td><code>/sdapi/v1/txt2img</code>、<code>/img2img</code>、<code>/options</code>、<code>override_settings</code> の互換性確認。Forge API利用の土台。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/Mikubill/sd-webui-controlnet/wiki/API">sd-webui-controlnet API Wiki</a></td>
+            <td>ControlNetは専用 <code>/controlnet/txt2img</code> ではなく <code>/sdapi/v1/txt2img</code> / <code>img2img</code> に載せる方針。現実装と一致。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/Bing-su/adetailer/wiki/REST-API">ADetailer REST API Wiki</a></td>
+            <td>最小dict payloadが公式Wiki上でも示されている。現実装のdicts-only回避策は妥当だが契約テストで守るべき。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/Coyote-A/ultimate-upscale-for-automatic1111">Ultimate SD Upscale GitHub</a></td>
+            <td>タイルサイズ、padding、mask blur、denoise 0.3-0.5帯の運用根拠。現Upscale既定値のレビューソース。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/pkuliyi2015/multidiffusion-upscaler-for-automatic1111">MultiDiffusion Upscaler GitHub</a></td>
+            <td>低VRAMで大画像・img2img upscalingを行うためのTiled Diffusion/VAEの根拠。8GB VRAM方針と相性が良い。</td>
+          </tr>
+          <tr>
+            <td><a href="https://huggingface.co/xinsir/controlnet-tile-sdxl-1.0">xinsir ControlNet Tile SDXL</a></td>
+            <td>SDXL Tile ControlNetモデルの配置・用途確認。Upscale時の構造保持モデルとして継続採用候補。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/safetensors/safetensors">safetensors GitHub</a></td>
+            <td>8バイトheader length + JSON header + <code>__metadata__</code> という形式に基づき、ヘッダだけ読むModel Inspector/Health Scanは妥当。</td>
+          </tr>
+          <tr>
+            <td><a href="https://www.electronjs.org/docs/latest/tutorial/security">Electron Security</a></td>
+            <td>contextIsolation、sandbox、navigation、外部URL処理の見直し根拠。現状は基本線は良いがallowlistが必要。</td>
+          </tr>
+          <tr>
+            <td><a href="https://www.electronjs.org/ja/docs/latest/api/app">Electron app API</a></td>
+            <td><code>app.getPath</code> / <code>app.setPath</code> の扱い確認。userDataをプロジェクトルートにする現実装の副作用を整理する根拠。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/civitai/civitai/wiki/REST-API-Reference">Civitai REST API Reference</a></td>
+            <td>現Wikiはdeveloper portalへ移行案内中。Civitai連携は定期的に公式docsを再確認し、非公式スクレイピングに寄せない。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/Physton/sd-webui-prompt-all-in-one">Physton prompt-all-in-one</a></td>
+            <td>同梱prompt libraryの由来。ライセンス表記継続と更新元確認が必要。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>GitHub運用への提案</h2>
+      <p>
+        まずはprivate repositoryで十分です。公開・配布ではなく個人開発の履歴とバックアップが目的なので、巨大なForge runtimeと生成履歴をGitに入れない設計を徹底します。
+      </p>
+      <pre><code># 推奨 .gitignore 追加候補
+runtime/
+userdata/
+out/
+dist/
+output/
+Cache/
+Code Cache/
+GPUCache/
+Local Storage/
+Session Storage/
+Network/
+blob_storage/
+DawnGraphiteCache/
+DawnWebGPUCache/
+Shared Dictionary/
+DevToolsActivePort
+Preferences
+Local State
+SharedStorage
+*.log</code></pre>
+      <p>
+        その後、ソース、README、docs、resourcesのライセンス表記、起動スクリプト、package lockだけを初回コミットするのが安全です。
+      </p>
+    </section>
+
+    <section>
+      <h2>次に実装するなら</h2>
+      <p>
+        P0/P1の基盤整備は初期完了しました。次の実作業は <strong>Stability Matrix参考の管理機能を実用段階へ進めること</strong> です。
+        まずDownload ManagerとModel Libraryを固めると、Format ConverterやModel Mergerを追加する前に、大容量ファイル操作の履歴・検証・復旧ルートを確保できます。
+      </p>
+      <ol>
+        <li>独自 <code>.yoitoart</code> workspaceを定義し、prompt / model / LoRA / ControlNet / upscale設定を保存・復元する。</li>
+        <li>Model Libraryの既存登録に対してmetadata/preview再取得を追加する。</li>
+        <li>DownloadJobの未完了ジョブを起動時に検出し、再開/破棄を選べる通知を出す。</li>
+        <li><code>extension-payload.ts</code> の契約テストを追加し、ControlNet / ADetailer / Ultimate script_argsの更新リスクを下げる。</li>
+        <li>その後にFormat Converter / Model Mergerへ進む。</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer>
+    <p>Generated for Yoitomoshi Art Generator on 2026-05-11. このレポートはローカルコード確認、ビルド検証、公式/GitHub系ソース調査に基づく。</p>
+  </footer>
+</body>
+</html>

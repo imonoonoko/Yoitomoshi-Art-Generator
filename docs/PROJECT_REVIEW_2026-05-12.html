@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yoitomoshi Art Generator 全体精査レポート 2026-05-12</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0d10;
+      --panel: #13171d;
+      --panel-2: #181d25;
+      --line: #2a313c;
+      --ink: #edf2f7;
+      --muted: #9ca8b8;
+      --soft: #c8d2df;
+      --accent: #7c8cff;
+      --accent-2: #5fd0b5;
+      --warn: #f2bf63;
+      --bad: #ef7b7b;
+      --ok: #61d394;
+      --shadow: 0 18px 50px rgba(0, 0, 0, .28);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.65;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: rgba(255, 255, 255, .04);
+      padding: .1rem .35rem;
+      color: #dbe5ff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: .92em;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #141924 0%, #0d1015 100%);
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    .hero { padding: 36px 28px 34px; }
+    .eyebrow {
+      color: var(--accent-2);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { line-height: 1.25; margin: 0; }
+    h1 { margin-top: 10px; font-size: clamp(30px, 5vw, 52px); letter-spacing: 0; }
+    h2 { margin-bottom: 14px; font-size: 22px; }
+    h3 { font-size: 15px; }
+    p { margin: .55rem 0 0; color: var(--soft); }
+    .lead { max-width: 840px; color: #d8e0ec; font-size: 16px; }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .04);
+      padding: 5px 10px;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .pill.ok { border-color: rgba(97, 211, 148, .55); color: var(--ok); }
+    .pill.warn { border-color: rgba(242, 191, 99, .55); color: var(--warn); }
+    main { padding: 28px 0 60px; }
+    section { margin-top: 18px; }
+    .grid { display: grid; gap: 14px; }
+    .grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+    .card.flat { box-shadow: none; background: var(--panel-2); }
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .035);
+      padding: 14px;
+      min-height: 96px;
+    }
+    .stat .label { color: var(--muted); font-size: 12px; }
+    .stat .value { margin-top: 4px; font-size: 26px; font-weight: 800; color: var(--ink); }
+    .stat .note { margin-top: 2px; font-size: 12px; color: var(--muted); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px 12px; vertical-align: top; }
+    th { color: var(--muted); text-align: left; font-size: 12px; background: rgba(255, 255, 255, .035); }
+    tr:last-child td { border-bottom: 0; }
+    .tag {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .tag.ok { background: rgba(97, 211, 148, .12); color: var(--ok); }
+    .tag.warn { background: rgba(242, 191, 99, .14); color: var(--warn); }
+    .tag.bad { background: rgba(239, 123, 123, .13); color: var(--bad); }
+    .tag.info { background: rgba(124, 140, 255, .14); color: #aeb8ff; }
+    ul { margin: .6rem 0 0; padding-left: 1.1rem; color: var(--soft); }
+    li { margin: .32rem 0; }
+    .timeline { display: grid; gap: 10px; }
+    .step {
+      display: grid;
+      grid-template-columns: 84px 1fr;
+      gap: 12px;
+      border-left: 2px solid var(--accent);
+      padding: 3px 0 10px 12px;
+    }
+    .step .phase { color: var(--accent-2); font-size: 12px; font-weight: 800; }
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    figure {
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #080a0d;
+    }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #06070a;
+    }
+    figcaption {
+      border-top: 1px solid var(--line);
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .risk {
+      border-left: 3px solid var(--warn);
+      padding-left: 12px;
+    }
+    .risk.bad { border-left-color: var(--bad); }
+    .risk.ok { border-left-color: var(--ok); }
+    .small { color: var(--muted); font-size: 12px; }
+    @media (max-width: 900px) {
+      .grid.cols-2, .grid.cols-3, .grid.cols-4, .gallery { grid-template-columns: 1fr; }
+      .wrap { padding: 18px; }
+      .step { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap hero">
+      <div class="eyebrow">Project Audit Report</div>
+      <h1>Yoitomoshi Art Generator 全体精査</h1>
+      <p class="lead">
+        2026-05-12 追補時点のローカル状態、実装済み機能、検証ログ、残リスクを再点検したHTMLレポート。
+        結論として、ControlNet入力生成、Workspace参照保存、Download/Library復旧、Upscale比較保存まで実装済み。次の焦点は実素材QAとGitHub公開範囲の確定である。
+      </p>
+      <div class="meta">
+        <span class="pill ok">typecheck PASS</span>
+        <span class="pill ok">build PASS</span>
+        <span class="pill ok">Electron UI QA PASS</span>
+        <span class="pill ok">Git initialized</span>
+        <span class="pill">cwd: C:\宵灯工房アート\Yoitomoshi-Art-Generator</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="grid cols-4">
+      <div class="stat">
+        <div class="label">Renderer loaded 平均</div>
+        <div class="value">243.8 ms</div>
+        <div class="note">直近8サンプル。228-259 ms。</div>
+      </div>
+      <div class="stat">
+        <div class="label">Forge ready 平均</div>
+        <div class="value">15.97 s</div>
+        <div class="note">直近8サンプル。15.05-17.39 s。</div>
+      </div>
+      <div class="stat">
+        <div class="label">Renderer main chunk</div>
+        <div class="value">1.09 MB</div>
+        <div class="note">lazy chunk分割後の最新build。</div>
+      </div>
+      <div class="stat">
+        <div class="label">Model assets</div>
+        <div class="value">19.79 GB</div>
+        <div class="note">Checkpoint/LoRA/ControlNet合計。</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>総合判定</h2>
+      <div class="grid cols-3">
+        <div class="risk ok">
+          <h3><span class="tag ok">OK</span> 制作用の中核導線</h3>
+          <p>txt2img/img2img、Prompt Library、LoRA、履歴、Upscale、Tools、Workspace保存はアプリ内導線として揃っている。Forge API専用起動も安定している。</p>
+        </div>
+        <div class="risk ok">
+          <h3><span class="tag ok">OK</span> ControlNet Builderの実用化</h3>
+          <p>役割カードが2列表示になり、Tileは配置済みモデルを検出して <code>使用可</code> 表示。実UIクリックで Unit 1 への適用トーストを確認済み。</p>
+        </div>
+        <div class="risk">
+          <h3><span class="tag ok">OK</span> 追補実装</h3>
+          <p>画像ドロップからpreprocessor実行、Workspace参照復元、Library復旧、Upscale比較保存まで追加済み。残る中心は実素材での確認。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>検証サマリー</h2>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>結果</th><th>証跡</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>TypeScript</td>
+            <td><span class="tag ok">PASS</span></td>
+            <td><code>npm run typecheck</code> が node/web とも成功。</td>
+          </tr>
+          <tr>
+            <td>Production build</td>
+            <td><span class="tag ok">PASS</span></td>
+            <td><code>npm run build</code> 成功。main 180.38 kB、preload 13.07 kB、renderer main 1,085.64 kB。</td>
+          </tr>
+          <tr>
+            <td>Electron UI QA</td>
+            <td><span class="tag ok">PASS</span></td>
+            <td>remote debugging経由で Toolsタブ、Workspace保存モード、ControlNet Builder Tileクリックを実行。ページ例外/Log errorなし。</td>
+          </tr>
+          <tr>
+            <td>Workspace API</td>
+            <td><span class="tag ok">PASS</span></td>
+            <td><code>settings-only</code> は画像なし、<code>embed</code> はdata URL保持。save/load/delete成功。</td>
+          </tr>
+          <tr>
+            <td>Model Merger</td>
+            <td><span class="tag ok">PASS</span></td>
+            <td>実サイズ一時マージを約18.7秒で完了。約2.13 GB出力、header確認、cleanup成功。ログ: <code>userdata/validation-model-merger-real.out.log</code></td>
+          </tr>
+          <tr>
+            <td>Format Converter</td>
+            <td><span class="tag warn">保留</span></td>
+            <td><code>models/Stable-diffusion</code> 配下に checkpoint系 <code>.ckpt/.pt/.pth</code> がないため実変換対象なし。対象範囲は安全のためStable-diffusion配下に制限済み。</td>
+          </tr>
+          <tr>
+            <td>Process cleanup</td>
+            <td><span class="tag ok">OK</span></td>
+            <td>精査時点で Electron / Forge Python の残プロセスなし。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>アーキテクチャ精査</h2>
+      <div class="grid cols-2">
+        <div>
+          <h3>構成</h3>
+          <table>
+            <tbody>
+              <tr><td><code>electron/</code></td><td>main/preload/Forge管理/IPC/Storage。ファイル境界とURL allowlistをここで制御。</td></tr>
+              <tr><td><code>src/</code></td><td>React renderer。4タブ構成、Prompt/Preview/SidePanel/Tools/Upscale。</td></tr>
+              <tr><td><code>resources/</code></td><td>プロンプトライブラリ等の静的資産。</td></tr>
+              <tr><td><code>runtime/forge/</code></td><td>Forge本体、Python、拡張、モデル実体。Git管理対象外。</td></tr>
+              <tr><td><code>userdata/</code></td><td>設定、履歴、Civitai cache、Download/Model Library、Workspace、起動診断。Git管理対象外。</td></tr>
+              <tr><td><code>output/</code></td><td>QAスクリーンショット等の一時証跡。Git管理対象外。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>ソース規模</h3>
+          <table>
+            <tbody>
+              <tr><td><code>.tsx</code></td><td>38 files</td></tr>
+              <tr><td><code>.ts</code></td><td>26 files</td></tr>
+              <tr><td><code>.md</code></td><td>4 files under docs scan</td></tr>
+              <tr><td><code>.html</code></td><td>3 existing docs HTML reports before this file</td></tr>
+              <tr><td>Git</td><td><span class="tag ok">READY</span> 巨大/秘密データを除外した最小コミット対象。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>機能別精査</h2>
+      <div class="timeline">
+        <div class="step">
+          <div class="phase">生成</div>
+          <div>
+            <h3>txt2img / img2img</h3>
+            <p>モデル選択、VAE、sampler/scheduler、seed、LoRA、Prompt Helper、Prompt Library、履歴復元が揃っている。Generateボタンはタブ状態を明示し、txt2img/img2img以外では誤生成しない設計。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="phase">ControlNet</div>
+          <div>
+            <h3>Builder + 通常Panel</h3>
+            <p>Builderは役割別プリセット、画像ドロップ、preprocessor実行、source / preprocessedプレビュー、Unit 1反映まで対応。通常ControlNet Panelは最大3ユニットを維持。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="phase">Upscale</div>
+          <div>
+            <h3>Simple / Diffusion / Ultimate</h3>
+            <p>Tile ControlNet専用トグル、metadata-driven suggestion、Tile ON/OFF × denoise 0.25/0.35/0.45 の比較生成、判断基準付き保存に対応。残る確認は実画像での採用基準確定。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="phase">Tools</div>
+          <div>
+            <h3>Workspace / Startup / Library / Merger / Converter</h3>
+            <p>Toolsは開閉式で重い処理を遅延。Workspace保存は embed / references / settings-only、Model Libraryは復旧、Health、Merger、Converterの導線がある。Converterは対象ファイル待ち。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>ローカル実行環境</h2>
+      <div class="grid cols-2">
+        <div class="card flat">
+          <h3>設定</h3>
+          <table>
+            <tbody>
+              <tr><td>Forge path</td><td><code>runtime\forge</code></td></tr>
+              <tr><td>Port</td><td><code>7860</code></td></tr>
+              <tr><td>Auto start</td><td><code>true</code></td></tr>
+              <tr><td>UI language</td><td><code>ja</code></td></tr>
+              <tr><td>Extra args</td><td><code>--cuda-malloc</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card flat">
+          <h3>モデル配置</h3>
+          <table>
+            <tbody>
+              <tr><td>Checkpoints</td><td>4 files / 16.90 GB</td></tr>
+              <tr><td>LoRA</td><td>5 files / 0.56 GB</td></tr>
+              <tr><td>VAE</td><td>0 files / Automatic運用</td></tr>
+              <tr><td>ControlNet</td><td>1 file / 2.33 GB</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>起動・軽量化の評価</h2>
+      <p>
+        rendererは直近8サンプル平均243.8 msで、ここは十分軽い。Forge readyは平均15.97秒で、現在の主要コストはPython/Torch/ControlNet初期化側。
+        <code>--cuda-malloc</code> は採用済みで、txt2img最小生成とTile ControlNet付きimg2imgでも成功している。
+      </p>
+      <table>
+        <thead>
+          <tr><th>指標</th><th>最小</th><th>平均</th><th>最大</th><th>判断</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>rendererLoadedMs</td><td>228 ms</td><td>243.8 ms</td><td>259 ms</td><td><span class="tag ok">十分軽い</span></td></tr>
+          <tr><td>forgeReadyMs</td><td>15.05 s</td><td>15.97 s</td><td>17.39 s</td><td><span class="tag info">Forge側が支配的</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>UI QA 証跡</h2>
+      <div class="gallery">
+        <figure>
+          <img src="../output/ui-qa/12-workspace-settings-only.png" alt="Workspace settings-only mode selected" />
+          <figcaption>Toolsタブ。Workspace保存で「設定だけ保存」を選択。起動診断も同画面で確認可能。</figcaption>
+        </figure>
+        <figure>
+          <img src="../output/ui-qa/14-controlnet-builder-tile-click.png" alt="ControlNet Builder Tile preset clicked" />
+          <figcaption>ControlNet Builder。Tileが「使用可」になり、クリック後に適用トーストが表示された状態。</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2026-05-12 追補実装</h2>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>状態</th><th>内容</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ControlNet入力生成</td>
+            <td><span class="tag ok">実装済み</span></td>
+            <td>画像ドロップ、preprocessor実行、結果プレビュー、ControlNet Unit 1への反映を1本化。</td>
+          </tr>
+          <tr>
+            <td>Workspace参照保存</td>
+            <td><span class="tag ok">実装済み</span></td>
+            <td>履歴IDと外部画像パス参照を保存し、埋め込みなしでも復元できる <code>references</code> モードを追加。</td>
+          </tr>
+          <tr>
+            <td>Download/Library復旧</td>
+            <td><span class="tag ok">実装済み</span></td>
+            <td>stale running job整理、metadata/preview再取得、SHA未計算モデルのバックグラウンドqueue化をToolsに追加。</td>
+          </tr>
+          <tr>
+            <td>Upscale実画像比較</td>
+            <td><span class="tag ok">実装済み</span></td>
+            <td>Tile ControlNet ON/OFFとdenoise差分を比較し、判断基準と候補画像を <code>userdata/upscale-comparisons/</code> に保存。</td>
+          </tr>
+          <tr>
+            <td>Git公開準備</td>
+            <td><span class="tag ok">準備済み</span></td>
+            <td>README、ロードマップ、HTMLレポート、構造ドキュメントのリンクと実装状態を整理。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>リスク台帳</h2>
+      <div class="grid cols-2">
+        <div class="risk">
+          <h3><span class="tag warn">P0</span> GitHub公開範囲の未確定</h3>
+          <p>巨大/秘密データを除外したローカル初期コミット対象は整理済み。GitHubへpushするには、リポジトリ名と public/private の判断を確定する必要がある。</p>
+        </div>
+        <div class="risk">
+          <h3><span class="tag warn">P1</span> 実素材QAが未完了</h3>
+          <p>ControlNet preprocessor、Workspace参照復元、Upscale比較保存は実装済み。次は実素材と実モデルでの目視確認が必要。</p>
+        </div>
+        <div class="risk">
+          <h3><span class="tag warn">P1</span> 参照先がないWorkspace</h3>
+          <p><code>references</code> モードは軽いが、外部画像パスが移動・削除されると復元できない。共有向けには欠落時の説明表示を厚くする余地がある。</p>
+        </div>
+        <div class="risk">
+          <h3><span class="tag warn">P2</span> Library復旧の負荷確認</h3>
+          <p>SHA未計算のバックグラウンドqueueは実装済み。19GB規模ライブラリで一度実行し、UI応答とI/O負荷を確認する。</p>
+        </div>
+        <div class="risk">
+          <h3><span class="tag warn">P2</span> Format Converterの実変換未確認</h3>
+          <p>変換対象checkpointがないため保留。対象ファイルが入った時点で、変換後Inspectorとcleanupを実機確認する。</p>
+        </div>
+        <div class="risk">
+          <h3><span class="tag warn">P3</span> 古い文言の整理</h3>
+          <p>i18n辞書に「coming soon」系の古いtab placeholderが残っているが、現UIでは主要タブは実装済み。混乱防止のため後で文言を整理する。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>次にやる順番</h2>
+      <ol>
+        <li><strong>実素材QA。</strong> ControlNet preprocessor、Workspace参照復元、Upscale比較保存を同一素材で確認する。</li>
+        <li><strong>Library復旧の実行確認。</strong> Model Library復旧を既存ライブラリで1回走らせ、metadata/preview取得とSHA queue負荷を見る。</li>
+        <li><strong>公開先の確定。</strong> GitHubリポジトリ名と public/private を決め、<code>gh repo create</code> または既存remoteへ接続する。</li>
+        <li><strong>公開前レビュー。</strong> README、HTMLレポート、ロードマップのリンクと、Git除外対象を再確認してpushする。</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>参照ファイル</h2>
+      <table>
+        <tbody>
+          <tr><td>README</td><td><a href="../README.md">README.md</a></td></tr>
+          <tr><td>ロードマップ</td><td><a href="ROADMAP.md">docs/ROADMAP.md</a></td></tr>
+          <tr><td>構造整理</td><td><a href="PROJECT_STRUCTURE.md">docs/PROJECT_STRUCTURE.md</a></td></tr>
+          <tr><td>前回レビュー</td><td><a href="PROJECT_REVIEW_2026-05-11.html">docs/PROJECT_REVIEW_2026-05-11.html</a></td></tr>
+          <tr><td>PixAI調査</td><td><a href="PIXAI_RESEARCH_REPORT_2026-05-12.html">docs/PIXAI_RESEARCH_REPORT_2026-05-12.html</a></td></tr>
+          <tr><td>UI QA画像</td><td><code>output/ui-qa/</code></td></tr>
+          <tr><td>実機検証ログ</td><td><code>userdata/validation-*.log</code></td></tr>
+        </tbody>
+      </table>
+      <p class="small">このHTMLはローカルの現状態を読むためのレビュー成果物であり、<code>runtime/</code> や <code>userdata/</code> の実体ファイルをGitに入れる意図はない。</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PixAI Research Report - Yoitomoshi Art Generator</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f3ee;
+      --panel: #fffdf9;
+      --ink: #24211d;
+      --muted: #6f675f;
+      --line: #ddd3c8;
+      --accent: #8b2f3f;
+      --accent-2: #2f6f73;
+      --warn: #926514;
+      --good: #2f7045;
+      --code: #f1e8dd;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+      line-height: 1.65;
+    }
+    header {
+      padding: 56px min(7vw, 72px) 32px;
+      background: #2a2622;
+      color: #fffaf2;
+    }
+    header p { max-width: 980px; color: #e6d8ca; }
+    main { padding: 32px min(7vw, 72px) 72px; }
+    h1, h2, h3 { line-height: 1.25; margin: 0 0 14px; }
+    h1 { font-size: clamp(30px, 5vw, 54px); letter-spacing: 0; }
+    h2 { margin-top: 42px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+    h3 { margin-top: 24px; color: var(--accent); }
+    p { margin: 0 0 14px; }
+    a { color: #0e5f72; }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .pill {
+      display: inline-flex;
+      border: 1px solid rgba(255,255,255,.28);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: #f4e7da;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 1px 0 rgba(0,0,0,.03);
+    }
+    .card h3 { margin-top: 0; }
+    .tag {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      margin: 0 4px 4px 0;
+      background: var(--code);
+      color: #4d443b;
+    }
+    .tag.good { background: #dfeedd; color: var(--good); }
+    .tag.warn { background: #f3e7c7; color: var(--warn); }
+    .tag.risk { background: #f1d8d7; color: var(--accent); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 14px 0 28px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+    th { background: #eee4d8; color: #302920; }
+    tr:last-child td { border-bottom: 0; }
+    code {
+      background: var(--code);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: .92em;
+    }
+    .note {
+      border-left: 4px solid var(--accent-2);
+      background: #eef6f5;
+      padding: 12px 14px;
+      margin: 14px 0;
+    }
+    .warning {
+      border-left: 4px solid var(--warn);
+      background: #fff6df;
+      padding: 12px 14px;
+      margin: 14px 0;
+    }
+    .small { color: var(--muted); font-size: 13px; }
+    ol, ul { padding-left: 1.4rem; }
+    li { margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PixAI Research Report</h1>
+    <p>PixAIの一次情報から二次情報までを調査し、Yoitomoshi Art Generatorへ吸収できるワークフロー、UI、機能設計、リスクを整理した実装判断用レポート。</p>
+    <div class="meta">
+      <span class="pill">作成日: 2026-05-12</span>
+      <span class="pill">対象: PixAI / Yoitomoshi Art Generator</span>
+      <span class="pill">調査方針: 一次情報優先、二次情報は補助扱い</span>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. 結論</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>最も吸収価値が高い要素</h3>
+          <p>PixAIの強みは、個別機能の数よりも「生成前、生成中、生成後、再編集、モデル探索、学習、共有」が一つの創作ループとしてつながっている点にある。</p>
+          <span class="tag good">結果アクション</span>
+          <span class="tag good">設定テンプレート</span>
+          <span class="tag good">自然文補助</span>
+          <span class="tag good">Market連携</span>
+          <span class="tag good">ControlNet導線</span>
+        </div>
+        <div class="card">
+          <h3>Yoitomoshiで先にやるべきこと</h3>
+          <p>PixAIのクラウド機能を再現するより、ローカルForgeの強みを活かし、生成結果カードから次の操作へ進む導線を整えるのが最短で効果が出る。</p>
+          <span class="tag good">Variation</span>
+          <span class="tag good">Use as Base Image</span>
+          <span class="tag good">Enhance/Upscale</span>
+          <span class="tag good">Recipe保存</span>
+        </div>
+        <div class="card">
+          <h3>コピーしないもの</h3>
+          <p>PixAIのUIデザイン、商用導線、クレジット制、独自モデル、コミュニティ運用はコピー対象ではない。採用するのは概念とユーザー導線だけ。</p>
+          <span class="tag risk">UI資産コピー禁止</span>
+          <span class="tag risk">商用導線は対象外</span>
+          <span class="tag risk">API依存は任意機能扱い</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. 調査ソースの分類</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>分類</th>
+            <th>情報源</th>
+            <th>信頼度</th>
+            <th>使い方</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>一次情報</td>
+            <td>PixAI Help Center、PixAI Blog、PixAI Platform API Docs、PixAI公式ページ、Google Play掲載情報、公式Content Guidelines</td>
+            <td>高</td>
+            <td>機能の存在、公式の意図、制約、料金・API・ポリシーの根拠に使う。</td>
+          </tr>
+          <tr>
+            <td>準一次情報</td>
+            <td>PressAdvantage上のMewtant/PixAI発表</td>
+            <td>中</td>
+            <td>企業向け展開、モデル更新方針、ブランド文脈の補助情報として扱う。</td>
+          </tr>
+          <tr>
+            <td>二次情報</td>
+            <td>第三者レビュー記事、Google Playレビュー、ユーザー投稿</td>
+            <td>低から中</td>
+            <td>摩擦点、利用者視点、競合比較の仮説に使う。実装判断は一次情報で裏取りする。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>3. PixAIの機能構造</h2>
+      <h3>3.1 生成パネル</h3>
+      <p>PixAI公式ヘルプでは、プロンプトはタグ/短文をカンマ区切りで書くのが基本とされ、Autocomplete、強調記法、Note、Prompt Helper、Image to Promptが生成前の補助として並ぶ。Noteはプロンプト、ネガティブ、モデル、サイズ、sampling steps/methods、base imageをテンプレートとして保存する機能と説明されている。</p>
+      <p>Yoitomoshiへの示唆: 現在のWorkspace保存を「生成レシピ」として前面に出し、テンプレート名、説明、タグ、サムネイル、モデル互換性、再現性チェックを持たせる。</p>
+
+      <h3>3.2 自然文入力とPrompt Helper</h3>
+      <p>PixAIは自然文で書いた内容をPrompt Helperで生成向けに変換する導線を持ち、多言語対応を打ち出している。Platform API v2にも <code>promptHelper</code> パラメータがあり、生成時に自動補助を有効/無効化する設計になっている。</p>
+      <p>Yoitomoshiへの示唆: 外部AI APIを前提にせず、まずは既存Prompt Library、履歴、Civitai metadata、LoRA trigger wordsからローカル補助を作る。将来、任意の外部LLM連携を追加できる余地を残す。</p>
+
+      <h3>3.3 生成結果アクション</h3>
+      <p>PixAIの生成結果には、Animate、Describe、Delete、Variation、Edit、Use as Base Image、Download、Enhance、Publish、Favoriteが並ぶ。特にVariationは、現在画像をbase imageにし、同じprompt/settingsから3枚の別案を出すワークフローとして説明されている。</p>
+      <p>Yoitomoshiへの示唆: 生成結果カードの主要アクションを、アイコンだけでなく用途別に整理する。既存の「img2imgへ送る」「Upscaleへ送る」「Variation比較」を、PixAI型の結果後ワークフローとして統合する。</p>
+
+      <h3>3.4 編集、Inpaint、Outpaint、Enhance</h3>
+      <p>PixAIは参照画像、Paint、Image Edit、Inpaint、Outpaint、Enhanceを生成パネルからつなげている。Edit Proの記事では、自然言語指示、複数画像入力、構図維持、キャラクター一貫性が強調されている。</p>
+      <p>Yoitomoshiへの示唆: いきなり高機能AI編集を作るより、既存img2img/Inpaint/Tile Upscaleを「選択範囲を直す」「背景を足す」「高解像度化する」の3つの明確な導線へ整理する。</p>
+
+      <h3>3.5 Model / LoRA Market</h3>
+      <p>PixAIのModel Marketは、キーワード、タグ、Base Model、Source、Category、Submission Timeで絞り込み、モデル/LoRA詳細から「Use this model/LoRA」で生成ページへつなぐ。選んだモデルは生成設定のデフォルトになり、LoRAはタスクに追加される。</p>
+      <p>Yoitomoshiへの示唆: Civitai/Hugging Face検索結果に「このモデルで生成」「LoRAを追加」「互換base model警告」「お気に入りモデルリスト」を追加する。ファイルを落とすだけでなく、生成状態へ直接つなげる。</p>
+
+      <h3>3.6 LoRA Training</h3>
+      <p>PixAI公式のLoRA Training Guideは、解像度、明瞭な特徴、ウォーターマーク除去、サイズ正規化、データセット枚数、base model互換、trigger wordsの設計を重視している。特に「base model compatibility」と「trigger wordsは恒久特徴に絞る」という考え方はローカル運用にも有効。</p>
+      <p>Yoitomoshiへの示唆: LoRA学習そのものをすぐ実装しなくても、LoRA管理画面に「base model」「trigger words」「推奨weight」「用途: character/style/pose/outfit/detail」を持たせるだけで運用品質が上がる。</p>
+
+      <h3>3.7 ControlNet / Composition</h3>
+      <p>PixAI公式ヘルプではControlNetを、アップロード画像からフレームや形を得て生成へ反映する機能として説明している。Compositionはキャンバスの各領域に何が現れるかを指定する機能だが、SDXLモデルでは利用不可と注記されている。XLモデルの公式ヘルプでも、通常LoRAとXL LoRAの非互換、ControlNet/Composition/Outpaintingの一部非対応が説明されている。</p>
+      <p>Yoitomoshiへの示唆: ControlNetを「技術パネル」ではなく、ポーズ、線画、Depth、Tile、Referenceといった役割別カードへ変換する。SDXL/SD1.5互換性はUIで明示する。</p>
+
+      <h3>3.8 API / Platform</h3>
+      <p>PixAI PlatformはREST API、API key、task status、webhookを提供する。v2の画像生成APIは、<code>modelVersionId</code>、<code>prompt</code>、<code>negativePrompt</code>、<code>aspectRatio</code>、<code>mode</code>、<code>style</code>、<code>loras</code>、<code>seed</code>、<code>promptHelper</code>、<code>callbackUrl</code>などを扱う。</p>
+      <p>Yoitomoshiへの示唆: PixAI APIを必須化しない。ローカルForgeを主軸にしつつ、将来の任意クラウドバックエンド抽象化の参考に留める。</p>
+    </section>
+
+    <section>
+      <h2>4. 二次情報から見える摩擦点</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>観測</th>
+            <th>根拠</th>
+            <th>Yoitomoshiでの対応</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>機能が多いほど、モデル互換・ControlNet互換・SDXL制約が混乱源になる。</td>
+            <td>第三者レビューはXL制約、Composition/ControlNetの互換性、モバイル機能差を摩擦点として挙げている。</td>
+            <td>モデル選択時に「このLoRA/ControlNetは互換」「不明」「非互換」を表示し、失敗前に止める。</td>
+          </tr>
+          <tr>
+            <td>クレジット制は便利さとコスト不透明感が同居する。</td>
+            <td>PixAI MembershipはTurbo、Video、Flow Edit、LoRA training、追加creditを売りにする一方、第三者レビューは行動ごとの費用把握の難しさを指摘。</td>
+            <td>ローカルアプリでは「VRAM/所要時間/ディスク/モデルサイズ」をコストとして見える化する。クラウド費用ではなくPC負荷の透明化が価値になる。</td>
+          </tr>
+          <tr>
+            <td>モバイルや初心者には「ファイルを移動しなくてよい」ことが大きい。</td>
+            <td>Google Play掲載はModel Market、編集、LoRA training、ControlNet、Hi-Res Upscaling、日次credit、コミュニティを訴求している。</td>
+            <td>YoitomoshiはModel LibraryとDownload Managerを強化し、Civitai/HFから正しいForgeフォルダへ自動配置する価値を前面に出す。</td>
+          </tr>
+          <tr>
+            <td>ユーザーは高品質化に敏感だが、アップスケール/Enhanceのコストや失敗も気にする。</td>
+            <td>PixAI公式とレビューではEnhance/HiRes/Videoが重要機能として扱われ、ユーザーコメントには高画質化のcredit負担への言及もある。</td>
+            <td>Upscaleはdenoise比較、Tile ControlNet、低負荷設定、プレビュー比較を明確に出す。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>5. Yoitomoshiへ吸収する実装候補</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>優先</th>
+            <th>候補</th>
+            <th>内容</th>
+            <th>実装難度</th>
+            <th>理由</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>P1</td>
+            <td>生成結果カード再設計</td>
+            <td>Variation / Use as Base Image / Enhance / Edit / Recipe Save / Download / Favoriteを同じカード上に整理。</td>
+            <td>中</td>
+            <td>既存機能をつなぎ直すだけで、PixAI的な創作ループに近づく。</td>
+          </tr>
+          <tr>
+            <td>P1</td>
+            <td>生成レシピ強化</td>
+            <td><code>.yoitoart</code>をNote相当に育て、設定テンプレート、サムネイル、タグ、モデル互換性、入力画像参照を保存。</td>
+            <td>中</td>
+            <td>再現性と初心者導線の両方に効く。</td>
+          </tr>
+          <tr>
+            <td>P1</td>
+            <td>Marketから生成へ直結</td>
+            <td>Civitai/HF検索結果に「このモデルで生成」「LoRAを追加」「お気に入り」「base model警告」を追加。</td>
+            <td>中</td>
+            <td>PixAIのMarket体験に最も近い。既存Civitai基盤を活かせる。</td>
+          </tr>
+          <tr>
+            <td>P2</td>
+            <td>ローカルPrompt Helper</td>
+            <td>自然文をタグ候補、ネガティブ候補、LoRA候補、ControlNet候補へ分解。外部APIなしから開始。</td>
+            <td>中から大</td>
+            <td>PixAIの初心者向け強みをローカルで再現できる。</td>
+          </tr>
+          <tr>
+            <td>P2</td>
+            <td>ControlNet Builder</td>
+            <td>ポーズ/線画/depth/tile/referenceの役割カードと互換性警告を追加。</td>
+            <td>中</td>
+            <td>既存ControlNetパネルを初心者に見える形へ変換する。</td>
+          </tr>
+          <tr>
+            <td>P2</td>
+            <td>LoRA metadata管理</td>
+            <td>base model、trigger words、用途、推奨weight、互換性、サムネイルをModel Libraryへ持たせる。</td>
+            <td>中</td>
+            <td>LoRA Trainingそのものより先に、運用管理の質を上げられる。</td>
+          </tr>
+          <tr>
+            <td>P3</td>
+            <td>Image-to-Video連携</td>
+            <td>ローカル動画生成または外部ツール連携の研究項目として扱う。</td>
+            <td>大</td>
+            <td>PixAIの差別化要素だが、ローカルForge本体からは距離がある。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>6. 直近スプリント提案</h2>
+      <ol>
+        <li><strong>PreviewPanel結果アクション整理:</strong> 既存のimg2img直送、Upscale直送、保存、履歴、Variationを1つの結果アクション列として再配置する。</li>
+        <li><strong>Recipe Saveボタン:</strong> 現在画像と現在設定をまとめてWorkspace/Recipeへ保存するボタンを生成結果カードに追加する。</li>
+        <li><strong>Use as Base Imageの明文化:</strong> ボタン名とツールチップを明確にし、img2img入力へ送った後のタブ遷移を自然にする。</li>
+        <li><strong>Enhance/Upscale導線:</strong> 生成結果からUpscaleタブへ送る際、Tile ControlNet推奨、denoise比較、倍率プリセットを同時に提案する。</li>
+        <li><strong>Favorite/Statusラベル:</strong> 履歴に「お気に入り」「採用候補」「没」「素材化済み」を付ける最小実装を追加する。</li>
+      </ol>
+      <div class="note">
+        <strong>判断:</strong> PixAIの研究から、次の実装は「新しい巨大機能」よりも、既にある生成・履歴・img2img・Upscale・Workspaceを結果カード中心につなぎ直す方が効果的。
+      </div>
+    </section>
+
+    <section>
+      <h2>7. リスクと注意点</h2>
+      <ul>
+        <li><strong>ポリシー:</strong> PixAI公式ガイドラインはNormal/Sensitive分類、AI moderation、未成年関連の厳格な禁止、公開制限を持つ。Yoitomoshiはローカルアプリでも、少なくとも外部投稿やモデル配布機能を追加する時はルール設計が必要。</li>
+        <li><strong>互換性:</strong> SDXL、XL LoRA、通常LoRA、ControlNet、Compositionの互換性は混乱しやすい。PixAIも制限を明記しているため、Yoitomoshiは事前警告を強くする。</li>
+        <li><strong>API依存:</strong> PixAI Platform APIは便利だが、Yoitomoshiの中核はローカルForge。クラウドAPI連携は任意機能に留める。</li>
+        <li><strong>UIコピー:</strong> PixAIの画面や文言をコピーせず、概念をYoitomoshiの既存UIに合わせて再設計する。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>8. ソース一覧</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>種別</th>
+            <th>リンク</th>
+            <th>主に確認した内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>一次</td>
+            <td><a href="https://support.pixai.art/en/articles/11822691-generation">PixAI Help Center: Generation</a></td>
+            <td>Prompt、Note、Prompt Helper、Image to Prompt、img2img、Inpaint、Outpaint、Booster、Variation、Enhance、ControlNet、Composition、Advanced settings。</td>
+          </tr>
+          <tr>
+            <td>一次</td>
+            <td><a href="https://support.pixai.art/en/articles/11822884-model-market">PixAI Help Center: Model Market</a></td>
+            <td>Model/LoRA検索、フィルタ、Use Model/LoRA、LoRA training、Upload Models/LoRAs。</td>
+          </tr>
+          <tr>
+            <td>一次</td>
+            <td><a href="https://blog.pixai.art/en/how-to-use-pixai-guide/">PixAI Beginner Guide 2026</a></td>
+            <td>生成パネル、LoRA、Edit/Enhance、Image-to-Video、Mio.2、初心者フロー。</td>
+          </tr>
+          <tr>
+            <td>一次</td>
+            <td><a href="https://blog.pixai.art/en/train-lora-on-pixai/">PixAI LoRA Training Guide</a></td>
+            <td>データセット品質、枚数、base model互換、trigger words、LoRA運用ルール。</td>
+          </tr>
+          <tr>
+            <td>一次</td>
+            <td><a href="https://support.pixai.art/en/articles/9291328-xl-models-on-pixai">XL Models on PixAI</a></td>
+            <td>SDXL/XL LoRA互換性、ControlNet/Composition/Outpainting制限、XL用画像サイズ。</td>
+          </tr>
+          <tr>
+            <td>一次</td>
+            <td><a href="https://platform.pixai.art/en/docs/api-v2/image/createImage">PixAI Platform API v2: Create Image</a></td>
+            <td>modelVersionId、prompt、negativePrompt、aspectRatio、mode、style、loras、seed、promptHelper、callbackUrl。</td>
+          </tr>
+          <tr>
+            <td>一次</td>
+            <td><a href="https://platform.pixai.art/docs/faq">PixAI Platform FAQ</a></td>
+            <td>API key取得、メンテナンス通知、API生成画像の公開履歴扱い、サポート言語。</td>
+          </tr>
+          <tr>
+            <td>一次</td>
+            <td><a href="https://blog.pixai.art/en/pixai-membership/">PixAI Membership Guide 2026</a></td>
+            <td>Turbo Mode、Video Suite、Flow Edit/Ref Pro、LoRA training、モデル管理、credit構造。</td>
+          </tr>
+          <tr>
+            <td>一次</td>
+            <td><a href="https://support.pixai.art/en/articles/11822901-content-guidelines">PixAI Content Guidelines</a></td>
+            <td>Normal/Sensitive分類、AI moderation、appeal、公開制限、禁止領域。</td>
+          </tr>
+          <tr>
+            <td>一次/ストア</td>
+            <td><a href="https://play.google.com/store/apps/details?hl=en&id=io.mewtant.pixaiart&listing=pixaiweb">Google Play: PixAI App</a></td>
+            <td>モバイル訴求、Model Market、編集、LoRA training、ControlNet、Hi-Res Upscaling、Animate、レビュー傾向。</td>
+          </tr>
+          <tr>
+            <td>二次</td>
+            <td><a href="https://skywork.ai/blog/pixai-art-review-2025-ai-anime-generator/">Skywork Review 2025</a></td>
+            <td>第三者視点の摩擦点: XL制約、credit透明性、mobile parity、policy boundaries。</td>
+          </tr>
+          <tr>
+            <td>準一次</td>
+            <td><a href="https://pressadvantage.com/pdf/76599-mewtant-inc-s-pixai-unveils-revolutionary-ai-art-generator-for-anime-creators-and-businesses/">Mewtant/PixAI Press Release</a></td>
+            <td>Haruka v2、企業向けAPI、Anime creator/business向け方向性。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

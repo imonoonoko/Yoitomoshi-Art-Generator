@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+
+# build outputs
+out/
+dist/
+.vite/
+
+# local runtime and generated artifacts
+runtime/
+userdata/
+output/
+
+# logs and OS noise
+*.log
+.DS_Store
+
+# Electron / Chromium profile artifacts.
+# The app now stores these under userdata/electron-profile, but keep the root
+# entries ignored so old launches cannot accidentally pollute a future repo.
+blob_storage/
+Cache/
+Code Cache/
+DawnGraphiteCache/
+DawnWebGPUCache/
+GPUCache/
+Local Storage/
+Network/
+Session Storage/
+Shared Dictionary/
+DevToolsActivePort
+Local State
+Preferences
+SharedStorage
