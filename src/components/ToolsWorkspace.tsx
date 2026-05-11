@@ -186,12 +186,13 @@ function WorkspaceCard(): JSX.Element {
       const snap = workspace.snapshot
       const s = useStore.getState()
       const refs = snap.imageReferences
+      const missingReferences: string[] = []
       const [inputRef, lastRef, upscaleInputRef, upscaleOutputRef, controlnetRefs] = await Promise.all([
-        snap.inputImageDataUrl ? Promise.resolve(snap.inputImageDataUrl) : resolveImageReference(refs?.inputImage),
-        snap.lastImageDataUrl ? Promise.resolve(snap.lastImageDataUrl) : resolveImageReference(refs?.lastImage),
-        snap.upscaleInputImageDataUrl ? Promise.resolve(snap.upscaleInputImageDataUrl) : resolveImageReference(refs?.upscaleInputImage),
-        snap.upscaleOutputImageDataUrl ? Promise.resolve(snap.upscaleOutputImageDataUrl) : resolveImageReference(refs?.upscaleOutputImage),
-        Promise.all((refs?.controlnetUnits ?? []).map((ref) => resolveImageReference(ref)))
+        snap.inputImageDataUrl ? Promise.resolve(snap.inputImageDataUrl) : resolveImageReference(refs?.inputImage, 'inputImage', missingReferences),
+        snap.lastImageDataUrl ? Promise.resolve(snap.lastImageDataUrl) : resolveImageReference(refs?.lastImage, 'lastImage', missingReferences),
+        snap.upscaleInputImageDataUrl ? Promise.resolve(snap.upscaleInputImageDataUrl) : resolveImageReference(refs?.upscaleInputImage, 'upscaleInputImage', missingReferences),
+        snap.upscaleOutputImageDataUrl ? Promise.resolve(snap.upscaleOutputImageDataUrl) : resolveImageReference(refs?.upscaleOutputImage, 'upscaleOutputImage', missingReferences),
+        Promise.all((refs?.controlnetUnits ?? []).map((ref, index) => resolveImageReference(ref, `controlnet-${index + 1}`, missingReferences)))
       ])
       const rawControlnet = snap.controlnet as Partial<typeof s.controlnet> & { units?: typeof s.controlnet.units }
       const restoredControlnet = {
@@ -230,7 +231,11 @@ function WorkspaceCard(): JSX.Element {
       s.patchAdetailer(snap.adetailer as Partial<typeof s.adetailer>)
       s.patchDynThres(snap.dynThres as Partial<typeof s.dynThres>)
       s.patchFreeu(snap.freeu as Partial<typeof s.freeu>)
-      toast.success(tStatic('tools.workspace.restored'))
+      if (missingReferences.length > 0) {
+        toast(tStatic('tools.workspace.referencesMissing', { count: missingReferences.length }), { icon: '!' })
+      } else {
+        toast.success(tStatic('tools.workspace.restored'))
+      }
     } catch (e) {
       toast.error(tStatic('tools.workspace.restoreFailed', { message: (e as Error).message }))
     } finally {
@@ -393,9 +398,20 @@ function fileRef(path: string | null | undefined, filename?: string | null): Wor
   return path ? { kind: 'file', path, filename } : null
 }
 
-async function resolveImageReference(ref: WorkspaceImageReference | null | undefined): Promise<string | null> {
+async function resolveImageReference(
+  ref: WorkspaceImageReference | null | undefined,
+  label: string,
+  missingReferences: string[]
+): Promise<string | null> {
   if (!ref) return null
-  return api.storage.resolveImageReference(ref).catch(() => null)
+  try {
+    const image = await api.storage.resolveImageReference(ref)
+    if (!image) missingReferences.push(label)
+    return image
+  } catch {
+    missingReferences.push(label)
+    return null
+  }
 }
 
 function imageFilePath(ref: WorkspaceImageReference | null | undefined): string | null {
