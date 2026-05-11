@@ -416,7 +416,7 @@
           <tr>
             <td>ControlNet入力生成</td>
             <td><span class="tag ok">実装済み</span></td>
-            <td>画像ドロップ、preprocessor実行、結果プレビュー、ControlNet Unit 1への反映を1本化。</td>
+            <td>画像ドロップ、preprocessor実行、結果プレビュー、ControlNet Unit 1への反映を1本化。2026-05-12追補QAで <code>tile_resample</code> / <code>openpose_full</code> / <code>lineart_standard</code> / <code>depth_midas</code> の実API実行もPASS。</td>
           </tr>
           <tr>
             <td>Workspace参照保存</td>
@@ -475,7 +475,7 @@
     <section class="card">
       <h2>次にやる順番</h2>
       <ol>
-        <li><strong>実素材QA。</strong> ControlNet preprocessor、Workspace参照復元、Upscale比較保存を同一素材で確認する。</li>
+        <li><strong>実素材QA。</strong> ControlNet preprocessorはAPI確認済み。次はBuilder UI上の長時間実行表示、Workspace参照復元、Upscale比較保存を同一素材で確認する。</li>
         <li><strong>Library復旧の実行確認。</strong> Model Library復旧を既存ライブラリで1回走らせ、metadata/preview取得とSHA queue負荷を見る。</li>
         <li><strong>公開先の確定。</strong> GitHubリポジトリ名と public/private を決め、<code>gh repo create</code> または既存remoteへ接続する。</li>
         <li><strong>公開前レビュー。</strong> README、HTMLレポート、ロードマップのリンクと、Git除外対象を再確認してpushする。</li>
@@ -489,6 +489,7 @@
           <tr><td>README</td><td><a href="../README.md">README.md</a></td></tr>
           <tr><td>ロードマップ</td><td><a href="ROADMAP.md">docs/ROADMAP.md</a></td></tr>
           <tr><td>構造整理</td><td><a href="PROJECT_STRUCTURE.md">docs/PROJECT_STRUCTURE.md</a></td></tr>
+          <tr><td>ControlNet QA</td><td><a href="QA_CONTROLNET_2026-05-12.md">docs/QA_CONTROLNET_2026-05-12.md</a></td></tr>
           <tr><td>前回レビュー</td><td><a href="PROJECT_REVIEW_2026-05-11.html">docs/PROJECT_REVIEW_2026-05-11.html</a></td></tr>
           <tr><td>PixAI調査</td><td><a href="PIXAI_RESEARCH_REPORT_2026-05-12.html">docs/PIXAI_RESEARCH_REPORT_2026-05-12.html</a></td></tr>
           <tr><td>UI QA画像</td><td><code>output/ui-qa/</code></td></tr>

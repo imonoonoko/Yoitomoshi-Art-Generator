@@ -61,7 +61,8 @@
 
 1. **実素材QA — ControlNet入力生成**
    - 画像ドロップ、preprocessor実行、結果プレビュー、ControlNet Unit 1反映は実装済み。
-   - 次は pose / lineart / depth の実モデルを配置した環境で、`/controlnet/detect` の出力が想定どおりUnit画像へ反映されるか確認する。
+   - 2026-05-12 QAで `tile_resample` / `openpose_full` / `lineart_standard (from white bg & black line)` / `depth_midas` の `/controlnet/detect` 実行はPASS。証跡: [`QA_CONTROLNET_2026-05-12.md`](QA_CONTROLNET_2026-05-12.md)。
+   - 次は Builder UI上で長時間preprocessor中の表示を確認し、pose / lineart / depth 用ControlNet model追加後に実生成で確認する。
 
 2. **実素材QA — Workspace参照保存**
    - `.yoitoart` は `embed` / `references` / `settings-only` を選べる。
