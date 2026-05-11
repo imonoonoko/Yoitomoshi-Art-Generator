@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, BoxSelect, CheckCircle2, Crosshair, Layers3, Play, ScanLine, Search, Sparkles, Upload, Wand2, X } from 'lucide-react'
+import { AlertTriangle, BoxSelect, CheckCircle2, Clock3, Crosshair, Layers3, Play, ScanLine, Search, Sparkles, Upload, Wand2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore, type ControlNetUnitState } from '@/lib/store'
 import { useT, t as tStatic } from '@/lib/i18n'
@@ -44,7 +44,7 @@ const ROLE_PRESETS: RolePreset[] = [
   {
     id: 'depth',
     icon: <Layers3 className="h-3.5 w-3.5" />,
-    moduleCandidates: ['depth_anything', 'depth_midas', 'depth_zoe'],
+    moduleCandidates: ['depth_midas', 'depth_anything', 'depth_zoe'],
     modelKeywords: ['depth'],
     fallbackModel: 'None',
     weight: 0.75,
@@ -73,6 +73,8 @@ const ROLE_PRESETS: RolePreset[] = [
   }
 ]
 
+const DETECT_PROCESSOR_RES = 512
+
 export function ControlNetBuilderPanel(): JSX.Element {
   const controlnet = useStore((s) => s.controlnet)
   const status = useStore((s) => s.forgeStatus)
@@ -91,6 +93,8 @@ export function ControlNetBuilderPanel(): JSX.Element {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [previewModule, setPreviewModule] = useState<string | null>(null)
   const [detecting, setDetecting] = useState(false)
+  const [detectStartedAt, setDetectStartedAt] = useState<number | null>(null)
+  const [detectNow, setDetectNow] = useState(Date.now())
 
   useEffect(() => {
     if (status.kind !== 'ready') return
@@ -105,6 +109,13 @@ export function ControlNetBuilderPanel(): JSX.Element {
     })().catch(() => undefined)
     return () => { cancelled = true }
   }, [status.kind, models.length, modules.length, setControlnetCatalogs])
+
+  useEffect(() => {
+    if (!detecting || !detectStartedAt) return
+    setDetectNow(Date.now())
+    const interval = window.setInterval(() => setDetectNow(Date.now()), 1000)
+    return () => window.clearInterval(interval)
+  }, [detecting, detectStartedAt])
 
   function applyPreset(preset: RolePreset): void {
     setSelectedRole(preset.id)
@@ -159,6 +170,9 @@ export function ControlNetBuilderPanel(): JSX.Element {
     }
     const preset = ROLE_PRESETS.find((item) => item.id === selectedRole) ?? ROLE_PRESETS[0]
     const resolved = resolvePreset(preset, modules, models)
+    const startedAt = Date.now()
+    setDetectStartedAt(startedAt)
+    setDetectNow(startedAt)
     setDetecting(true)
     try {
       if (resolved.module === 'None' || preset.id === 'reference') {
@@ -168,7 +182,7 @@ export function ControlNetBuilderPanel(): JSX.Element {
         const detected = await api.forge.controlnetDetect({
           image: sourceImage,
           module: resolved.module,
-          processorRes: -1,
+          processorRes: DETECT_PROCESSOR_RES,
           thresholdA: -1,
           thresholdB: -1,
           resizeMode: preset.id === 'pose' ? 1 : 0
@@ -181,6 +195,7 @@ export function ControlNetBuilderPanel(): JSX.Element {
       toast.error(tStatic('cnBuilder.detectFailed', { message: (e as Error).message }))
     } finally {
       setDetecting(false)
+      setDetectStartedAt(null)
     }
   }
 
@@ -213,6 +228,10 @@ export function ControlNetBuilderPanel(): JSX.Element {
     })
     toast.success(tStatic('cnBuilder.previewApplied', { role: tStatic(`cnBuilder.role.${preset.id}`) }))
   }
+
+  const detectElapsedSeconds = detecting && detectStartedAt
+    ? Math.max(0, Math.floor((detectNow - detectStartedAt) / 1000))
+    : null
 
   return (
     <CollapsiblePanel
@@ -325,8 +344,18 @@ export function ControlNetBuilderPanel(): JSX.Element {
         <div className="space-y-2 rounded-md border border-line bg-bg-2/50 p-2">
           <div className="grid grid-cols-2 gap-2">
             <PreviewThumb label={t('cnBuilder.sourceImage')} image={sourceImage} />
-            <PreviewThumb label={t('cnBuilder.detectedImage')} image={previewImage} empty={detecting ? t('cnBuilder.detecting') : t('cnBuilder.previewPending')} />
+            <PreviewThumb
+              label={t('cnBuilder.detectedImage')}
+              image={previewImage}
+              empty={detecting ? t('cnBuilder.detectingWithSeconds', { seconds: detectElapsedSeconds ?? 0 }) : t('cnBuilder.previewPending')}
+            />
           </div>
+          {detectElapsedSeconds !== null && (
+            <div className="flex items-center justify-center gap-1 rounded bg-bg-3 px-2 py-1 text-[10px] text-ink-3">
+              <Clock3 className="h-3 w-3 text-accent" />
+              <span>{t('cnBuilder.detectElapsed', { seconds: detectElapsedSeconds })}</span>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -335,7 +364,7 @@ export function ControlNetBuilderPanel(): JSX.Element {
               onClick={() => { void runPreprocessor() }}
             >
               <Wand2 className={cn('h-3.5 w-3.5', detecting && 'animate-pulse')} />
-              {detecting ? t('cnBuilder.detecting') : t('cnBuilder.runDetect')}
+              {detecting ? t('cnBuilder.detectingWithSeconds', { seconds: detectElapsedSeconds ?? 0 }) : t('cnBuilder.runDetect')}
             </button>
             <button
               type="button"

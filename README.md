@@ -12,6 +12,12 @@
 - [次作業優先度レポート 2026-05-12](docs/NEXT_ACTION_REPORT_2026-05-12.html)
 - [ロードマップ](docs/ROADMAP.md)
 - [ファイル / フォルダ構造](docs/PROJECT_STRUCTURE.md)
+- QA証跡:
+  [ControlNet API](docs/QA_CONTROLNET_2026-05-12.md) /
+  [ControlNet UI](docs/QA_CONTROLNET_UI_2026-05-12.md) /
+  [Workspace復元](docs/QA_WORKSPACE_RESTORE_2026-05-12.md) /
+  [Model Library復旧](docs/QA_MODEL_LIBRARY_RECOVERY_2026-05-12.md) /
+  [Upscale比較](docs/QA_UPSCALE_COMPARISON_2026-05-12.md)
 
 ## 起動 — 3 ステップ
 

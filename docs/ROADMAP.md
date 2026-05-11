@@ -63,20 +63,25 @@
 1. **実素材QA — ControlNet入力生成**
    - 画像ドロップ、preprocessor実行、結果プレビュー、ControlNet Unit 1反映は実装済み。
    - 2026-05-12 QAで `tile_resample` / `openpose_full` / `lineart_standard (from white bg & black line)` / `depth_midas` の `/controlnet/detect` 実行はPASS。証跡: [`QA_CONTROLNET_2026-05-12.md`](QA_CONTROLNET_2026-05-12.md)。
-   - 次は Builder UI上で長時間preprocessor中の表示を確認し、pose / lineart / depth 用ControlNet model追加後に実生成で確認する。
+   - 2026-05-12 UI QAで画像ドロップ、Depth preprocessor実行、経過秒表示、結果プレビュー、Unit 1反映をPASS。証跡: [`QA_CONTROLNET_UI_2026-05-12.md`](QA_CONTROLNET_UI_2026-05-12.md)。
+   - UI QA中に `depth_anything` が150秒超で戻らないケースを確認したため、標準Depthは実績のある `depth_midas` を優先し、detect時の `processorRes` を512に固定した。
+   - 次は pose / lineart / depth 用ControlNet model追加後に実生成で確認する。
 
 2. **実素材QA — Workspace参照保存**
    - `.yoitoart` は `embed` / `references` / `settings-only` を選べる。
    - `references` では履歴IDと外部画像パスを保存し、復元時にIPC経由で履歴PNGまたは許可画像ファイルをdata URLへ戻す。
-   - 次は外部素材を別ドライブへ置いた時のパス切れ表示と、共有用Workspaceでは参照先がない場合の説明文を整える。
+   - 2026-05-12 QAで3モードの保存/読込、履歴ID参照復元、外部ファイル参照復元、欠落参照検出をPASS。証跡: [`QA_WORKSPACE_RESTORE_2026-05-12.md`](QA_WORKSPACE_RESTORE_2026-05-12.md)。
+   - 次は欠落参照の差し替えUIと、プロジェクトフォルダ内素材の相対パス化を検討する。
 
 3. **実データQA — Download / Library復旧**
    - ToolsのModel Libraryに復旧ボタンを追加済み。stale running jobの整理、metadata/preview再取得、SHA未計算のバックグラウンドqueue化まで入っている。
-   - 次は既存の19GB規模ライブラリで復旧を1回走らせ、hash queueがUI操作を阻害しないか見る。
+   - 2026-05-12 QAで約21.3GB / 12件の既存ライブラリ復旧をPASS。metadata/previewを1件再取得し、SHA未計算11件のqueue完了後に整合性Issue 0。証跡: [`QA_MODEL_LIBRARY_RECOVERY_2026-05-12.md`](QA_MODEL_LIBRARY_RECOVERY_2026-05-12.md)。
+   - 次は実際の中断Download jobが発生した時点で、`running -> failed` と `completed補正` の2ケースを確認する。
 
 4. **実素材QA — Upscale比較保存**
    - Diffusion比較は Tile ControlNet OFF/ON と denoise 0.25 / 0.35 / 0.45 の候補生成を同一素材で並べ、判断基準と候補画像を `userdata/upscale-comparisons/` に保存できる。
-   - 次は採用基準を実画像で確認し、drift / seam / detail の判定文をプロジェクト標準として固める。
+   - 2026-05-12 QAで同一素材の6候補比較を保存済み。証跡: [`QA_UPSCALE_COMPARISON_2026-05-12.md`](QA_UPSCALE_COMPARISON_2026-05-12.md)。
+   - 標準候補は `Tile ON / denoise 0.25`。顔やポーズ保持を最優先する素材では `Tile OFF / denoise 0.25` も確認する。`denoise 0.45` はdetail確認用で、人物素材の既定値にはしない。
 
 5. **公開準備**
    - `runtime/`、`userdata/`、`output/`、`node_modules/`、ビルド成果物はGit除外を維持する。
@@ -153,10 +158,10 @@
 
 残タスク更新:
 
-- ControlNet入力生成はUI/IPC実装まで完了。pose / lineart / depth モデルが揃った環境でpreprocessor実出力の目視QAが必要。
-- Workspace参照保存は実装済み。参照先が存在しない共有Workspaceの説明表示と、相対パス化の是非は後続で検討する。
-- Model Library復旧は実装済み。既存の大きいライブラリで復旧ボタンを実行し、SHA queueの負荷とmetadata取得結果を確認する。
-- Upscale比較保存は実装済み。実素材で比較結果を1セット保存し、drift / seam / detail の採用基準を確定する。
+- ControlNet入力生成はUI/IPC実装とUI QAまで完了。pose / lineart / depth モデルが揃った環境で、preprocessor結果をControlNet modelに渡す実生成QAが必要。
+- Workspace参照保存は実素材QA済み。参照先が存在しない共有Workspaceの差し替えUIと、相対パス化の是非は後続で検討する。
+- Model Library復旧は実データQA済み。既存の約21.3GBライブラリで復旧ボタンを実行し、SHA queueがUI操作を阻害しないこととmetadata/preview再取得を確認した。
+- Upscale比較保存は実素材QA済み。比較結果を1セット保存し、drift / seam / detail の採用基準と推奨denoiseを確定した。
 - Format Converter は `.ckpt/.pt/.pth` の checkpoint 実ファイルが環境にないため、次に該当ファイルが `webui/models/Stable-diffusion/` に入った時点で実変換を1回確認する。
 
 以下は2026-05-11に完了済み。
@@ -169,7 +174,7 @@
    - 実装済み: `jobs.json` と `index.json` 読み込み時に schema normalize を行い、壊れたmanifestで起動不能にならないよう補正。
    - 実装済み: Civitai検索結果から source URL、model/version id、creator、base model、expected SHA-256、thumbnail preview cacheを Model Library に保存。
    - 実装済み: Hugging Face model browserをCivitai検索モーダルにprovider切替として追加。`huggingface.co/api/models` を利用し、Checkpoint / LoRA / VAE / ControlNet などの配置先を明示してダウンロードする。
-   - 残: アプリ再起動時に未完了ジョブを自動検出して「再開/破棄」選択を出す。既存登録済みモデルへのmetadata/preview再取得。
+   - 2026-05-12追補: Tools の復旧処理でstale running job整理、metadata/preview再取得、SHA queue化を追加し、実データQAも完了。
 
 1. **P0.6 — Git/GitHub 移行前の安全整備**
    - `.gitignore` を拡張し、`runtime/`, `userdata/`, Electron cache 類, `out/`, `dist/`, `output/` を確実に除外した。
@@ -189,7 +194,7 @@
    - Model Browser: Civitai / Hugging Face から検索し、モデル種別に応じて Checkpoint / LoRA / VAE / ControlNet へ自動配置する。
    - 実装済み: Download Manager の初期manifestとして `userdata/downloads/jobs.json` を追加。Civitai download は `.partial` を保持し、再実行時にHTTP Rangeで継続する。
    - 実装済み: Shared Model Library の初期indexとして `userdata/model-library/index.json` を追加。Tools からモデル数、容量、種別別集計、最近のDownloadJobを確認できる。
-   - 残: 未完了ジョブの再開/破棄UI、metadata/preview保存、Hugging Face検索、アプリ再起動後の自動再開選択。
+   - 2026-05-12追補: 未完了ジョブ整理、metadata/preview保存、Hugging Face検索、復旧処理まで実装済み。自動再開選択は今後のUX改善候補。
    - Package / Launcher 管理: Forge の起動引数プリセット、環境変数、依存修復、拡張 enable/disable/update を Tools 内に集約する。
    - Workspace 保存: Stability Matrix の `.smproj` に相当する独自 `.yoitoart` を作り、prompt / params / LoRA / ControlNet / input image 参照 / upscale 設定を保存・復元する。
    - まずは Forge 1系統に限定する。ComfyUI / InvokeAI 等の複数 package 管理は後続で、現時点では採用しない。

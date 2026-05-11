@@ -181,7 +181,7 @@
       <h1>Yoitomoshi Art Generator 全体精査</h1>
       <p class="lead">
         2026-05-12 追補時点のローカル状態、実装済み機能、検証ログ、残リスクを再点検したHTMLレポート。
-        結論として、ControlNet入力生成、Workspace参照保存、Download/Library復旧、Upscale比較保存まで実装済み。次の焦点は実素材QAとGitHub公開範囲の確定である。
+        結論として、ControlNet入力生成、Workspace参照保存、Download/Library復旧、Upscale比較保存まで実装と実QAを完了。次の焦点は対応ControlNet model追加後の実生成、共有性の磨き込み、保存済み比較ビューである。
       </p>
       <div class="meta">
         <span class="pill ok">typecheck PASS</span>
@@ -212,8 +212,8 @@
       </div>
       <div class="stat">
         <div class="label">Model assets</div>
-        <div class="value">19.79 GB</div>
-        <div class="note">Checkpoint/LoRA/ControlNet合計。</div>
+        <div class="value">21.33 GB</div>
+        <div class="note">Model Library復旧後の12件合計。</div>
       </div>
     </section>
 
@@ -230,7 +230,7 @@
         </div>
         <div class="risk">
           <h3><span class="tag ok">OK</span> 追補実装</h3>
-          <p>画像ドロップからpreprocessor実行、Workspace参照復元、Library復旧、Upscale比較保存まで追加済み。残る中心は実素材での確認。</p>
+          <p>画像ドロップからpreprocessor実行、Workspace参照復元、Library復旧、Upscale比較保存まで実装し、2026-05-12の実QAで証跡を保存済み。</p>
         </div>
       </div>
     </section>
@@ -415,23 +415,23 @@
         <tbody>
           <tr>
             <td>ControlNet入力生成</td>
-            <td><span class="tag ok">実装済み</span></td>
-            <td>画像ドロップ、preprocessor実行、結果プレビュー、ControlNet Unit 1への反映を1本化。2026-05-12追補QAで <code>tile_resample</code> / <code>openpose_full</code> / <code>lineart_standard</code> / <code>depth_midas</code> の実API実行もPASS。</td>
+            <td><span class="tag ok">QA済み</span></td>
+            <td>画像ドロップ、preprocessor実行、結果プレビュー、ControlNet Unit 1への反映を1本化。API QAとBuilder UI QAの両方でPASS。</td>
           </tr>
           <tr>
             <td>Workspace参照保存</td>
-            <td><span class="tag ok">実装済み</span></td>
-            <td>履歴IDと外部画像パス参照を保存し、埋め込みなしでも復元できる <code>references</code> モードを追加。</td>
+            <td><span class="tag ok">QA済み</span></td>
+            <td>履歴IDと外部画像パス参照を保存し、埋め込みなしでも復元できる <code>references</code> モードを実APIで確認。</td>
           </tr>
           <tr>
             <td>Download/Library復旧</td>
-            <td><span class="tag ok">実装済み</span></td>
-            <td>stale running job整理、metadata/preview再取得、SHA未計算モデルのバックグラウンドqueue化をToolsに追加。</td>
+            <td><span class="tag ok">QA済み</span></td>
+            <td>約21.3GB / 12件のModel Libraryで復旧を実行。metadata/preview再取得、SHA queue完了、整合性Issue 0を確認。</td>
           </tr>
           <tr>
             <td>Upscale実画像比較</td>
-            <td><span class="tag ok">実装済み</span></td>
-            <td>Tile ControlNet ON/OFFとdenoise差分を比較し、判断基準と候補画像を <code>userdata/upscale-comparisons/</code> に保存。</td>
+            <td><span class="tag ok">QA済み</span></td>
+            <td>Tile ControlNet ON/OFFとdenoise差分6候補を比較保存。標準候補は <code>Tile ON / denoise 0.25</code>。</td>
           </tr>
           <tr>
             <td>Git公開準備</td>
@@ -445,21 +445,21 @@
     <section class="card">
       <h2>リスク台帳</h2>
       <div class="grid cols-2">
-        <div class="risk">
-          <h3><span class="tag warn">P0</span> GitHub公開範囲の未確定</h3>
-          <p>巨大/秘密データを除外したローカル初期コミット対象は整理済み。GitHubへpushするには、リポジトリ名と public/private の判断を確定する必要がある。</p>
+        <div class="risk ok">
+          <h3><span class="tag ok">OK</span> GitHub公開範囲</h3>
+          <p>巨大/秘密データを除外したprivate repository運用に整理済み。push前はREADMEとQAリンクだけを同期対象にする。</p>
         </div>
         <div class="risk">
-          <h3><span class="tag warn">P1</span> 実素材QAが未完了</h3>
-          <p>ControlNet preprocessor、Workspace参照復元、Upscale比較保存は実装済み。次は実素材と実モデルでの目視確認が必要。</p>
+          <h3><span class="tag warn">P1</span> 追加ControlNet model実生成</h3>
+          <p>preprocessorとUnit 1反映はQA済み。pose / lineart / depth 用ControlNet model追加後に、生成payloadでの実出力確認が必要。</p>
         </div>
         <div class="risk">
           <h3><span class="tag warn">P1</span> 参照先がないWorkspace</h3>
           <p><code>references</code> モードは軽いが、外部画像パスが移動・削除されると復元できない。共有向けには欠落時の説明表示を厚くする余地がある。</p>
         </div>
-        <div class="risk">
-          <h3><span class="tag warn">P2</span> Library復旧の負荷確認</h3>
-          <p>SHA未計算のバックグラウンドqueueは実装済み。19GB規模ライブラリで一度実行し、UI応答とI/O負荷を確認する。</p>
+        <div class="risk ok">
+          <h3><span class="tag ok">OK</span> Library復旧の負荷確認</h3>
+          <p>約21.3GBの既存ライブラリで復旧を実行し、hash queue中でもModel Library一覧が即時応答することを確認した。</p>
         </div>
         <div class="risk">
           <h3><span class="tag warn">P2</span> Format Converterの実変換未確認</h3>
@@ -475,10 +475,10 @@
     <section class="card">
       <h2>次にやる順番</h2>
       <ol>
-        <li><strong>実素材QA。</strong> ControlNet preprocessorはAPI確認済み。次はBuilder UI上の長時間実行表示、Workspace参照復元、Upscale比較保存を同一素材で確認する。</li>
-        <li><strong>Library復旧の実行確認。</strong> Model Library復旧を既存ライブラリで1回走らせ、metadata/preview取得とSHA queue負荷を見る。</li>
-        <li><strong>公開先の確定。</strong> GitHubリポジトリ名と public/private を決め、<code>gh repo create</code> または既存remoteへ接続する。</li>
-        <li><strong>公開前レビュー。</strong> README、HTMLレポート、ロードマップのリンクと、Git除外対象を再確認してpushする。</li>
+        <li><strong>追加ControlNet model後の実生成QA。</strong> pose / lineart / depth の対応modelを配置した後、preprocessor結果を実生成payloadへ渡して破綻しないか確認する。</li>
+        <li><strong>Workspace共有性。</strong> 欠落参照の差し替えUIと、プロジェクト内素材の相対パス保存を検討する。</li>
+        <li><strong>保存済みUpscale比較ビュー。</strong> <code>userdata/upscale-comparisons/</code> の一覧、再表示、候補採用ボタンをToolsへ追加する。</li>
+        <li><strong>翻訳残り。</strong> ru/ptのTools系未翻訳キーを補完し、主要タブでキー文字列が出ない状態へ寄せる。</li>
       </ol>
     </section>
 
@@ -491,6 +491,10 @@
           <tr><td>ロードマップ</td><td><a href="ROADMAP.md">docs/ROADMAP.md</a></td></tr>
           <tr><td>構造整理</td><td><a href="PROJECT_STRUCTURE.md">docs/PROJECT_STRUCTURE.md</a></td></tr>
           <tr><td>ControlNet QA</td><td><a href="QA_CONTROLNET_2026-05-12.md">docs/QA_CONTROLNET_2026-05-12.md</a></td></tr>
+          <tr><td>ControlNet UI QA</td><td><a href="QA_CONTROLNET_UI_2026-05-12.md">docs/QA_CONTROLNET_UI_2026-05-12.md</a></td></tr>
+          <tr><td>Workspace復元QA</td><td><a href="QA_WORKSPACE_RESTORE_2026-05-12.md">docs/QA_WORKSPACE_RESTORE_2026-05-12.md</a></td></tr>
+          <tr><td>Model Library復旧QA</td><td><a href="QA_MODEL_LIBRARY_RECOVERY_2026-05-12.md">docs/QA_MODEL_LIBRARY_RECOVERY_2026-05-12.md</a></td></tr>
+          <tr><td>Upscale比較QA</td><td><a href="QA_UPSCALE_COMPARISON_2026-05-12.md">docs/QA_UPSCALE_COMPARISON_2026-05-12.md</a></td></tr>
           <tr><td>前回レビュー</td><td><a href="PROJECT_REVIEW_2026-05-11.html">docs/PROJECT_REVIEW_2026-05-11.html</a></td></tr>
           <tr><td>PixAI調査</td><td><a href="PIXAI_RESEARCH_REPORT_2026-05-12.html">docs/PIXAI_RESEARCH_REPORT_2026-05-12.html</a></td></tr>
           <tr><td>UI QA画像</td><td><code>output/ui-qa/</code></td></tr>

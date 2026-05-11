@@ -134,33 +134,35 @@
       <h1>次にするべき事 — 優先度順 全体レポート</h1>
       <p class="lead">
         2026-05-12 時点の実装・QA・GitHub公開状況を前提に、次に進める作業を優先度順に整理した。
-        結論は、追加機能より先に「実素材QAで保存・復元・比較の証跡を固める」こと。
+        追補後の結論は、ControlNet入力生成、Workspace復元、Model Library復旧、Upscale比較の実QAを完了し、次は追加ControlNet modelでの実生成と共有性の磨き込みへ進むこと。
       </p>
       <div class="meta">
         <span class="pill ok">GitHub private synced</span>
         <span class="pill ok">ControlNet API QA PASS</span>
+        <span class="pill ok">ControlNet UI QA PASS</span>
         <span class="pill ok">typecheck/build PASS</span>
-        <span class="pill warn">Upscale比較QA 未完了</span>
-        <span class="pill warn">Library復旧 実データ未実行</span>
+        <span class="pill ok">Upscale比較QA PASS</span>
+        <span class="pill ok">Workspace復元QA PASS</span>
+        <span class="pill ok">Library復旧QA PASS</span>
       </div>
     </div>
   </header>
 
   <main class="wrap">
     <section class="card">
-      <h2>一番先にやること</h2>
+      <h2>現在の到達点</h2>
       <div class="grid cols-3">
         <div class="card flat">
-          <h3><span class="tag warn">NEXT</span> Upscale比較保存の実素材QA</h3>
-          <p>Tile ControlNet ON/OFF と denoise 0.25 / 0.35 / 0.45 を同一素材で並べ、drift / seam / detail の判断基準を保存する。</p>
+          <h3><span class="tag ok">DONE</span> 実素材QA 4本完了</h3>
+          <p>ControlNet UI、Workspace復元、Model Library復旧、Upscale比較保存を実アプリ/実データで確認した。</p>
         </div>
         <div class="card flat">
-          <h3><span class="tag info">理由</span> 制作品質に直結</h3>
-          <p>ControlNet APIは通った。次に残っている最大の品質リスクは、Upscale時に構図・衣装・境界が崩れるかどうか。</p>
+          <h3><span class="tag ok">基準</span> Upscale標準値確定</h3>
+          <p>人物素材では <code>Tile ON / denoise 0.25</code> を標準候補にし、厳密な顔保持では <code>Tile OFF / 0.25</code> も確認する。</p>
         </div>
         <div class="card flat">
-          <h3><span class="tag ok">完了条件</span> 比較1セット保存</h3>
-          <p><code>userdata/upscale-comparisons/</code> に比較結果が作成され、採用基準がレポートに残る。</p>
+          <h3><span class="tag warn">NEXT</span> 実生成と共有性</h3>
+          <p>pose / lineart / depth 用ControlNet model追加後の実生成、欠落参照の差し替えUI、保存済み比較ビューが次の焦点。</p>
         </div>
       </div>
     </section>
@@ -172,13 +174,13 @@
         <div class="rank"><strong>P0-1</strong><span>最優先</span></div>
         <div>
           <h3>Upscale比較保存の実素材QA</h3>
-          <p class="why">実装済みだが、実画像での比較保存と判断基準がまだない。制作結果の品質に一番効く。</p>
+          <p class="why">実画像で6候補を保存し、drift / seam / detail の採用基準を確定した。</p>
           <ul>
             <li>同一履歴PNGをUpscaleへ投入する。</li>
             <li>Tile ControlNet OFF/ON と denoise 0.25 / 0.35 / 0.45 の候補を生成する。</li>
             <li>上下分裂、衣装drift、顔/手のdetail、tile seamを見て採用基準を保存する。</li>
           </ul>
-          <p><span class="done">完了条件:</span> 比較保存ディレクトリ、判断基準、次回推奨denoiseが残っている。</p>
+          <p><span class="done">完了:</span> <code>docs/QA_UPSCALE_COMPARISON_2026-05-12.md</code> に証跡を保存。標準候補は <code>Tile ON / denoise 0.25</code>。</p>
         </div>
       </div>
 
@@ -186,13 +188,13 @@
         <div class="rank"><strong>P0-2</strong><span>安全性</span></div>
         <div>
           <h3>Workspace参照保存のエンドツーエンドQA</h3>
-          <p class="why"><code>embed</code> / <code>references</code> / <code>settings-only</code> の挙動は実装済み。次は、実素材と欠落参照で復元体験を確認する。</p>
+          <p class="why"><code>embed</code> / <code>references</code> / <code>settings-only</code> を実APIで保存・読込し、履歴IDと外部ファイル参照の復元を確認した。</p>
           <ul>
             <li>外部画像を参照保存して復元する。</li>
             <li>参照先を一時的に移動し、欠落警告が出ることを確認する。</li>
             <li>設定復元自体が画像欠落で止まらないことを確認する。</li>
           </ul>
-          <p><span class="done">完了条件:</span> 画像あり/画像欠落の2ケースで、復元結果と警告文が記録されている。</p>
+          <p><span class="done">完了:</span> <code>docs/QA_WORKSPACE_RESTORE_2026-05-12.md</code> に証跡を保存。次は欠落参照の差し替えUI。</p>
         </div>
       </div>
 
@@ -200,13 +202,13 @@
         <div class="rank"><strong>P0-3</strong><span>データ保守</span></div>
         <div>
           <h3>Model Library復旧の実データQA</h3>
-          <p class="why">復旧処理は入っているが、19GB規模の既存ライブラリでSHA queueやmetadata/preview再取得の負荷をまだ見ていない。</p>
+          <p class="why">約21.3GB / 12件の既存ライブラリで復旧処理を実行し、metadata/preview再取得とSHA queue完了を確認した。</p>
           <ul>
             <li>ToolsのModel Library復旧を1回実行する。</li>
             <li>stale running job、metadata/preview取得、SHA未計算queueの結果を記録する。</li>
             <li>UIが固まる場合は、進捗表示・停止・queue上限を追加する。</li>
           </ul>
-          <p><span class="done">完了条件:</span> 復旧結果件数、所要時間、UI負荷、追加修正の要否が記録されている。</p>
+          <p><span class="done">完了:</span> <code>docs/QA_MODEL_LIBRARY_RECOVERY_2026-05-12.md</code> に証跡を保存。整合性Issueは0。</p>
         </div>
       </div>
 
@@ -214,13 +216,13 @@
         <div class="rank"><strong>P1</strong><span>UI確認</span></div>
         <div>
           <h3>ControlNet Builder UIで長時間preprocessorを確認</h3>
-          <p class="why">API QAはPASS済み。ただし <code>openpose_full</code> と <code>depth_midas</code> は初回ロード込みで約66〜70秒かかったため、UI上の待機表示を確認する必要がある。</p>
+          <p class="why">API QAに加えて、Builder UIからDepth preprocessor、結果プレビュー、Unit 1反映まで確認済み。経過秒表示も追加した。</p>
           <ul>
             <li>Builder UIから画像を落とし、OpenPose/Depthを実行する。</li>
             <li>実行中ボタンdisable、toast、プレビュー表示が破綻しないか見る。</li>
             <li>必要ならキャンセル、長時間警告、所要時間表示を追加する。</li>
           </ul>
-          <p><span class="done">完了条件:</span> Builder UIからの実行結果と、長時間処理時のUX判断が残っている。</p>
+          <p><span class="done">完了:</span> <code>docs/QA_CONTROLNET_UI_2026-05-12.md</code> に証跡を保存。次は対応ControlNet model追加後の実生成。</p>
         </div>
       </div>
 
@@ -291,23 +293,23 @@
           </tr>
           <tr>
             <td>ControlNet</td>
-            <td><span class="tag ok">API QA PASS</span></td>
-            <td>4種類のpreprocessor実行に成功。UI長時間表示は次に確認。</td>
+            <td><span class="tag ok">API/UI QA PASS</span></td>
+            <td>4種類のpreprocessor APIと、Builder UIからのDepth実行・プレビュー・Unit 1反映を確認済み。</td>
           </tr>
           <tr>
             <td>Workspace</td>
-            <td><span class="tag ok">実装済み</span></td>
-            <td><code>references</code> と欠落参照警告まで追加済み。実素材E2E QAが次。</td>
+            <td><span class="tag ok">QA PASS</span></td>
+            <td><code>embed</code> / <code>references</code> / <code>settings-only</code> と履歴ID・外部ファイル参照復元を確認済み。</td>
           </tr>
           <tr>
             <td>Upscale</td>
-            <td><span class="tag warn">比較QA待ち</span></td>
-            <td>比較保存は実装済み。採用基準が未確定。</td>
+            <td><span class="tag ok">QA PASS</span></td>
+            <td>同一素材で6候補を比較保存し、<code>Tile ON / denoise 0.25</code> を標準候補にした。</td>
           </tr>
           <tr>
             <td>Model Library</td>
-            <td><span class="tag warn">実データQA待ち</span></td>
-            <td>復旧処理は実装済み。大きいライブラリでの負荷確認が未実施。</td>
+            <td><span class="tag ok">QA PASS</span></td>
+            <td>約21.3GB / 12件で復旧を実行。metadata/preview再取得、SHA queue完了、整合性Issue 0。</td>
           </tr>
           <tr>
             <td>Build</td>
@@ -321,7 +323,7 @@
     <section class="card">
       <h2>今はやらないこと</h2>
       <ul>
-        <li>新しい大機能追加。保存・復元・比較・復旧の実QAが先。</li>
+        <li>ControlNet model未配置のまま、pose / lineart / depth の実生成QAを完了扱いにすること。</li>
         <li>Forge/ControlNetの常時ロード停止。現状はTile Upscaleや通常ControlNet導線への影響が大きい。</li>
         <li>Format Converterの無理な実変換。対象checkpointファイルが入ってから実施する。</li>
         <li>public公開。private repoで実QAと共有範囲を固めてから判断する。</li>
@@ -335,6 +337,10 @@
           <tr><td>全体精査</td><td><a href="PROJECT_REVIEW_2026-05-12.html">PROJECT_REVIEW_2026-05-12.html</a></td></tr>
           <tr><td>ロードマップ</td><td><a href="ROADMAP.md">ROADMAP.md</a></td></tr>
           <tr><td>ControlNet QA</td><td><a href="QA_CONTROLNET_2026-05-12.md">QA_CONTROLNET_2026-05-12.md</a></td></tr>
+          <tr><td>ControlNet UI QA</td><td><a href="QA_CONTROLNET_UI_2026-05-12.md">QA_CONTROLNET_UI_2026-05-12.md</a></td></tr>
+          <tr><td>Workspace復元QA</td><td><a href="QA_WORKSPACE_RESTORE_2026-05-12.md">QA_WORKSPACE_RESTORE_2026-05-12.md</a></td></tr>
+          <tr><td>Model Library復旧QA</td><td><a href="QA_MODEL_LIBRARY_RECOVERY_2026-05-12.md">QA_MODEL_LIBRARY_RECOVERY_2026-05-12.md</a></td></tr>
+          <tr><td>Upscale比較QA</td><td><a href="QA_UPSCALE_COMPARISON_2026-05-12.md">QA_UPSCALE_COMPARISON_2026-05-12.md</a></td></tr>
           <tr><td>構造整理</td><td><a href="PROJECT_STRUCTURE.md">PROJECT_STRUCTURE.md</a></td></tr>
           <tr><td>PixAI調査</td><td><a href="PIXAI_RESEARCH_REPORT_2026-05-12.html">PIXAI_RESEARCH_REPORT_2026-05-12.html</a></td></tr>
         </tbody>
