@@ -122,7 +122,7 @@ function WorkspaceCard(): JSX.Element {
     const s = useStore.getState()
     const { inputImage: _upscaleInputImage, outputImage: _upscaleOutputImage, isRunning: _isRunning, ...upscale } = s.upscale
     const includeImages = imageSaveMode === 'embed'
-    const includeRefs = imageSaveMode === 'references' || imageSaveMode === 'settings-only'
+    const includeRefs = imageSaveMode === 'references'
     const controlnet = includeImages
       ? { ...s.controlnet }
       : {
@@ -218,9 +218,12 @@ function WorkspaceCard(): JSX.Element {
       s.patchUpscale({
         ...(snap.upscale as Partial<typeof s.upscale>),
         inputImage: upscaleInputRef ?? null,
+        inputFilename: imageReferenceFilename(refs?.upscaleInputImage) ?? (snap.upscale as Partial<typeof s.upscale>).inputFilename ?? null,
         inputImagePath: imageFilePath(refs?.upscaleInputImage),
         inputHistoryId: imageHistoryId(refs?.upscaleInputImage),
         outputImage: upscaleOutputRef ?? null,
+        outputImagePath: imageFilePath(refs?.upscaleOutputImage),
+        outputHistoryId: imageHistoryId(refs?.upscaleOutputImage),
         isRunning: false
       })
       s.patchControlnet(restoredControlnet as Partial<typeof s.controlnet>)
@@ -401,6 +404,10 @@ function imageFilePath(ref: WorkspaceImageReference | null | undefined): string 
 
 function imageHistoryId(ref: WorkspaceImageReference | null | undefined): string | null {
   return ref?.kind === 'history' ? ref.historyId : null
+}
+
+function imageReferenceFilename(ref: WorkspaceImageReference | null | undefined): string | null {
+  return ref?.filename ?? null
 }
 
 function StartupDiagnosticsCard(): JSX.Element {

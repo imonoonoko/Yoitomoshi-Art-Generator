@@ -11,7 +11,7 @@ import type { UiLanguage } from '@shared/types'
  *
  * Adding a string:
  *   1. Pick a stable key like `settings.forgePath`
- *   2. Add an entry to ALL four dictionaries (missing entries fall back to ja)
+ *   2. Add an entry to ALL four dictionaries (missing entries fall back to en, then ja)
  *   3. Replace the JSX literal with `t('settings.forgePath')`
  *
  * Parameters use `{name}` placeholder syntax: `t('toast.imported', { count: 3 })`.
@@ -3101,8 +3101,11 @@ function format(template: string, params?: Record<string, string | number>): str
 /** Resolve a translation key in the active language with parameter substitution. */
 function resolve(lang: UiLanguage, key: string, params?: Record<string, string | number>): string {
   const dict = TRANSLATIONS[lang] ?? TRANSLATIONS.ja
-  // Fallback chain: requested lang → ja → raw key (so missing keys are obvious in dev)
-  const template = dict[key] ?? TRANSLATIONS.ja[key] ?? key
+  // Fallback chain: requested lang -> en -> ja -> raw key.
+  // English is the safest partial-localization fallback because it avoids
+  // Japanese text leaking into the Russian/Portuguese UI while missing keys
+  // are being translated.
+  const template = dict[key] ?? TRANSLATIONS.en[key] ?? TRANSLATIONS.ja[key] ?? key
   return format(template, params)
 }
 
