@@ -157,6 +157,67 @@ export function buildAlwaysOnScripts(
     scripts['ControlNet'] = { args: units }
   }
 
+  // ---- Regional Prompter -----------------------------------------------
+  // hako-mikan/sd-webui-regional-prompter exposes an AlwaysVisible script
+  // titled "Regional Prompter". Its UI returns positional args in this order:
+  // active, debug placeholder, selected tab, matrix/mask/prompt submodes,
+  // ratios, base ratios, base/common flags, calc mode, options, LoRA text
+  // ratios, prompt threshold, mask image, LoRA stop steps, flip.
+  if (state.regionalPrompter.enabled) {
+    const r = state.regionalPrompter
+    scripts['Regional Prompter'] = {
+      args: [
+        true,
+        false,
+        'Matrix',
+        r.splitMode,
+        'Mask',
+        'Prompt',
+        r.ratios,
+        r.baseRatios,
+        r.useBase,
+        r.useCommon,
+        r.useCommonNegative,
+        r.calcMode,
+        [],
+        '0',
+        '0',
+        '0',
+        null,
+        '0',
+        '0',
+        r.flip
+      ]
+    }
+  }
+
+  // ---- FABRIC ----------------------------------------------------------
+  // dvruette/sd-webui-fabric stores feedback images under its own
+  // log/fabric/images folder and receives only those filenames in the API
+  // args. The renderer saves files via storageSaveFabricFeedbackImage before
+  // enabling this payload.
+  if (state.fabric.enabled && (state.fabric.positive.length > 0 || state.fabric.negative.length > 0)) {
+    const f = state.fabric
+    scripts['FABRIC'] = {
+      args: [
+        f.positive.map((item) => item.filename),
+        f.negative.map((item) => item.filename),
+        true,
+        f.start,
+        f.end,
+        f.minWeight,
+        f.maxWeight,
+        f.negativeWeight,
+        f.feedbackDuringHighResFix,
+        f.tomeEnabled,
+        f.tomeRatio,
+        f.tomeMaxTokens,
+        f.tomeSeed,
+        f.burnoutProtection
+      ]
+    }
+  }
+
   return Object.keys(scripts).length > 0 ? scripts : undefined
 }
 

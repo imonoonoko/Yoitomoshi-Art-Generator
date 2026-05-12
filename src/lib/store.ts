@@ -218,6 +218,81 @@ export const DEFAULT_CONTROLNET: ControlNetState = {
   units: [DEFAULT_CONTROLNET_UNIT]
 }
 
+export type RegionalPrompterSplitMode = 'Columns' | 'Rows'
+export type RegionalPrompterCalcMode = 'Attention' | 'Latent'
+
+export interface RegionalPrompterState {
+  enabled: boolean
+  splitMode: RegionalPrompterSplitMode
+  ratios: string
+  baseRatios: string
+  useBase: boolean
+  useCommon: boolean
+  useCommonNegative: boolean
+  calcMode: RegionalPrompterCalcMode
+  commonPrompt: string
+  basePrompt: string
+  regionPrompts: string[]
+  flip: boolean
+}
+
+export const DEFAULT_REGIONAL_PROMPTER: RegionalPrompterState = {
+  enabled: false,
+  splitMode: 'Columns',
+  ratios: '1,1',
+  baseRatios: '0.2',
+  useBase: false,
+  useCommon: true,
+  useCommonNegative: false,
+  calcMode: 'Attention',
+  commonPrompt: 'masterpiece, best quality',
+  basePrompt: '',
+  regionPrompts: ['left side subject', 'right side subject'],
+  flip: false
+}
+
+export interface FabricFeedbackItem {
+  filename: string
+  path: string | null
+  image: string
+  sourceLabel: string
+  addedAt: number
+}
+
+export interface FabricState {
+  enabled: boolean
+  positive: FabricFeedbackItem[]
+  negative: FabricFeedbackItem[]
+  start: number
+  end: number
+  minWeight: number
+  maxWeight: number
+  negativeWeight: number
+  feedbackDuringHighResFix: boolean
+  tomeEnabled: boolean
+  tomeRatio: number
+  tomeMaxTokens: number
+  tomeSeed: number
+  burnoutProtection: boolean
+}
+
+export const DEFAULT_FABRIC: FabricState = {
+  enabled: false,
+  positive: [],
+  negative: [],
+  start: 0,
+  end: 0.8,
+  minWeight: 0,
+  maxWeight: 0.8,
+  negativeWeight: 0.5,
+  feedbackDuringHighResFix: false,
+  tomeEnabled: false,
+  tomeRatio: 0.5,
+  tomeMaxTokens: 8192,
+  tomeSeed: -1,
+  burnoutProtection: false
+}
+
 /**
  * Upscale workspace state. Three paths:
  *   - 'simple': pure neural upscaler via /sdapi/v1/extra-single-image. Fast,
@@ -373,6 +448,12 @@ export interface AppState {
   patchControlnetUnit(index: number, patch: Partial<ControlNetUnitState>): void
   addControlnetUnit(): void
   removeControlnetUnit(index: number): void
+
+  regionalPrompter: RegionalPrompterState
+  patchRegionalPrompter(patch: Partial<RegionalPrompterState>): void
+
+  fabric: FabricState
+  patchFabric(patch: Partial<FabricState>): void
 
   upscale: UpscaleState
   upscalerList: string[]                                       // populated when Forge ready
@@ -592,6 +673,16 @@ export const useStore = create<AppState>((set) => ({
         ? s.controlnet.units
         : s.controlnet.units.filter((_, i) => i !== index)
     }
+  })),
+
+  regionalPrompter: DEFAULT_REGIONAL_PROMPTER,
+  patchRegionalPrompter: (patch) => set((s) => ({
+    regionalPrompter: { ...s.regionalPrompter, ...patch }
+  })),
+
+  fabric: DEFAULT_FABRIC,
+  patchFabric: (patch) => set((s) => ({
+    fabric: { ...s.fabric, ...patch }
   })),
 
   upscale: DEFAULT_UPSCALE,

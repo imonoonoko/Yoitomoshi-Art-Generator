@@ -129,6 +129,13 @@ function WorkspaceCard(): JSX.Element {
           ...s.controlnet,
           units: s.controlnet.units.map((unit) => ({ ...unit, image: null }))
         }
+    const fabric = includeImages
+      ? { ...s.fabric }
+      : {
+          ...s.fabric,
+          positive: s.fabric.positive.map((item) => ({ ...item, image: '' })),
+          negative: s.fabric.negative.map((item) => ({ ...item, image: '' }))
+        }
     const snapshot: WorkspaceSnapshot = {
       imageSaveMode,
       imageReferences: includeRefs ? buildWorkspaceImageReferences(s) : undefined,
@@ -157,6 +164,8 @@ function WorkspaceCard(): JSX.Element {
         isRunning: false
       },
       controlnet,
+      regionalPrompter: { ...s.regionalPrompter },
+      fabric,
       adetailer: { ...s.adetailer },
       dynThres: { ...s.dynThres },
       freeu: { ...s.freeu }
@@ -187,12 +196,22 @@ function WorkspaceCard(): JSX.Element {
       const s = useStore.getState()
       const refs = snap.imageReferences
       const missingReferences: string[] = []
-      const [inputRef, lastRef, upscaleInputRef, upscaleOutputRef, controlnetRefs] = await Promise.all([
+      const [
+        inputRef,
+        lastRef,
+        upscaleInputRef,
+        upscaleOutputRef,
+        controlnetRefs,
+        fabricPositiveImages,
+        fabricNegativeImages
+      ] = await Promise.all([
         snap.inputImageDataUrl ? Promise.resolve(snap.inputImageDataUrl) : resolveImageReference(refs?.inputImage, 'inputImage', missingReferences),
         snap.lastImageDataUrl ? Promise.resolve(snap.lastImageDataUrl) : resolveImageReference(refs?.lastImage, 'lastImage', missingReferences),
         snap.upscaleInputImageDataUrl ? Promise.resolve(snap.upscaleInputImageDataUrl) : resolveImageReference(refs?.upscaleInputImage, 'upscaleInputImage', missingReferences),
         snap.upscaleOutputImageDataUrl ? Promise.resolve(snap.upscaleOutputImageDataUrl) : resolveImageReference(refs?.upscaleOutputImage, 'upscaleOutputImage', missingReferences),
-        Promise.all((refs?.controlnetUnits ?? []).map((ref, index) => resolveImageReference(ref, `controlnet-${index + 1}`, missingReferences)))
+        Promise.all((refs?.controlnetUnits ?? []).map((ref, index) => resolveImageReference(ref, `controlnet-${index + 1}`, missingReferences))),
+        Promise.all((refs?.fabricPositive ?? []).map((ref, index) => resolveImageReference(ref, `fabric-positive-${index + 1}`, missingReferences))),
+        Promise.all((refs?.fabricNegative ?? []).map((ref, index) => resolveImageReference(ref, `fabric-negative-${index + 1}`, missingReferences)))
       ])
       const rawControlnet = snap.controlnet as Partial<typeof s.controlnet> & { units?: typeof s.controlnet.units }
       const restoredControlnet = {
@@ -206,6 +225,13 @@ function WorkspaceCard(): JSX.Element {
             }
           : {})
       }
+      const restoredFabric = restoreFabricImages(
+        snap.fabric as Partial<typeof s.fabric> | undefined,
+        fabricPositiveImages,
+        fabricNegativeImages,
+        refs?.fabricPositive,
+        refs?.fabricNegative
+      )
       s.setCurrentTab(snap.currentTab)
       s.setPrompt(snap.prompt)
       s.setNegativePrompt(snap.negativePrompt)
@@ -228,6 +254,8 @@ function WorkspaceCard(): JSX.Element {
         isRunning: false
       })
       s.patchControlnet(restoredControlnet as Partial<typeof s.controlnet>)
+      if (snap.regionalPrompter) s.patchRegionalPrompter(snap.regionalPrompter as Partial<typeof s.regionalPrompter>)
+      if (restoredFabric) s.patchFabric(restoredFabric)
       s.patchAdetailer(snap.adetailer as Partial<typeof s.adetailer>)
       s.patchDynThres(snap.dynThres as Partial<typeof s.dynThres>)
       s.patchFreeu(snap.freeu as Partial<typeof s.freeu>)
@@ -379,6 +407,12 @@ function buildWorkspaceImageReferences(s: StoreSnapshot): WorkspaceSnapshot['ima
   const controlnetUnits = s.controlnet.units.map((unit, index) =>
     unit.image ? fileRef(unit.imagePath, `controlnet-unit-${index + 1}.png`) : null
   )
+  const fabricPositive = s.fabric.positive.map((item) =>
+    item.path ? fileRef(item.path, item.filename) : null
+  )
+  const fabricNegative = s.fabric.negative.map((item) =>
+    item.path ? fileRef(item.path, item.filename) : null
+  )
 
   return {
     inputImage,
@@ -386,8 +420,36 @@ function buildWorkspaceImageReferences(s: StoreSnapshot): WorkspaceSnapshot['ima
     lastImage,
     upscaleInputImage,
     upscaleOutputImage: s.upscale.outputHistoryId ? historyRef(s.upscale.outputHistoryId, 'upscale-output.png') : null,
-    controlnetUnits
+    controlnetUnits,
+    fabricPositive,
+    fabricNegative
   }
+}
+
+function restoreFabricImages(
+  rawFabric: Partial<StoreSnapshot['fabric']> | undefined,
+  positiveImages: Array<string | null>,
+  negativeImages: Array<string | null>,
+  positiveRefs: Array<WorkspaceImageReference | null> | undefined,
+  negativeRefs: Array<WorkspaceImageReference | null> | undefined
+): Partial<StoreSnapshot['fabric']> | null {
+  if (!rawFabric) return null
+  const restored: Partial<StoreSnapshot['fabric']> = { ...rawFabric }
+  if (Array.isArray(rawFabric.positive)) {
+    restored.positive = rawFabric.positive.map((item, index) => ({
+      ...item,
+      path: item.path ?? imageFilePath(positiveRefs?.[index]) ?? null,
+      image: item.image || positiveImages[index] || ''
+    }))
+  }
+  if (Array.isArray(rawFabric.negative)) {
+    restored.negative = rawFabric.negative.map((item, index) => ({
+      ...item,
+      path: item.path ?? imageFilePath(negativeRefs?.[index]) ?? null,
+      image: item.image || negativeImages[index] || ''
+    }))
+  }
+  return restored
 }
 
 function historyRef(historyId: string | null, filename?: string | null): WorkspaceImageReference | null {

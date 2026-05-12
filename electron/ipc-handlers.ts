@@ -3,6 +3,7 @@ import { copyFile, mkdir, readdir, rename, stat, statfs, unlink } from 'node:fs/
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { IPC } from '../src/shared/ipc-channels.js'
 import type { ForgeManager } from './forge-manager.js'
 import type { ForgeApi } from './forge-api.js'
@@ -56,7 +57,8 @@ import type {
   Txt2ImgResponse,
   WorkspaceSnapshot,
   WorkspaceImageReference,
-  UpscaleComparisonSaveRequest
+  UpscaleComparisonSaveRequest,
+  FabricFeedbackImageSaveResult
 } from '../src/shared/types.js'
 
 type HealthSeverity = 'warn' | 'error'
@@ -1338,6 +1340,52 @@ async function resolveWorkspaceImageReference(storage: Storage, rawRef: unknown)
   return `data:${mime};base64,${readFileSync(path).toString('base64')}`
 }
 
+async function saveFabricFeedbackImage(
+  storage: Storage,
+  rawImage: unknown
+): Promise<FabricFeedbackImageSaveResult> {
+  const image = validateImagePayload(rawImage, 'FABRIC feedback image')
+  const match = image.match(/^data:image\/([^;]+);base64,(.+)$/s)
+  const mimeExt = match?.[1]?.toLowerCase()
+  const payload = match?.[2] ?? image
+  const ext = mimeExt === 'jpeg' || mimeExt === 'jpg'
+    ? '.jpg'
+    : mimeExt === 'webp'
+      ? '.webp'
+      : '.png'
+  const bytes = Buffer.from(payload.replace(/\s+/g, ''), 'base64')
+  if (bytes.length === 0 || bytes.length > MAX_WORKSPACE_IMAGE_BYTES) {
+    throw new Error('FABRIC feedback image is too large')
+  }
+
+  const settings = storage.getSettings()
+  const forgeRoot = resolve(settings.forgePath)
+  const candidates = [
+    resolve(forgeRoot, 'webui', 'extensions', 'sd-webui-fabric'),
+    resolve(forgeRoot, 'extensions', 'sd-webui-fabric')
+  ]
+  const extensionRoot = candidates.find((candidate) => existsSync(candidate))
+  if (!extensionRoot) {
+    throw new Error('sd-webui-fabric extension was not found under Forge extensions')
+  }
+  if (!isSubpath(forgeRoot, extensionRoot)) {
+    throw new Error('Invalid FABRIC extension path')
+  }
+
+  const outDir = resolve(extensionRoot, 'log', 'fabric', 'images')
+  if (!isSubpath(extensionRoot, outDir)) {
+    throw new Error('Invalid FABRIC feedback folder')
+  }
+  await mkdir(outDir, { recursive: true })
+  const filename = `${createHash('sha256').update(bytes).digest('hex').slice(0, 20)}${ext}`
+  const outPath = resolve(outDir, filename)
+  if (!isSubpath(outDir, outPath)) {
+    throw new Error('Invalid FABRIC feedback path')
+  }
+  writeFileSync(outPath, bytes)
+  return { filename, path: outPath }
+}
+
 async function convertModelFormat(storage: Storage, win: BrowserWindow): Promise<ModelFormatConversionResult | null> {
   const settings = storage.getSettings()
   const modelRoot = resolve(settings.forgePath, 'webui', 'models', 'Stable-diffusion')
@@ -2517,6 +2565,9 @@ export function registerIpcHandlers(deps: {
   )
   ipcMain.handle(IPC.storageSaveUpscaleComparison, (_e, input: UpscaleComparisonSaveRequest) =>
     storage.saveUpscaleComparison(validateUpscaleComparisonSaveRequest(input))
+  )
+  ipcMain.handle(IPC.storageSaveFabricFeedbackImage, (_e, imageDataUrl: string) =>
+    saveFabricFeedbackImage(storage, imageDataUrl)
   )
 
   // Library --------------------------------------------------------------

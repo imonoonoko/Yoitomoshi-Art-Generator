@@ -785,6 +785,8 @@ export interface WorkspaceImageReferences {
   upscaleInputImage?: WorkspaceImageReference | null
   upscaleOutputImage?: WorkspaceImageReference | null
   controlnetUnits?: Array<WorkspaceImageReference | null>
+  fabricPositive?: Array<WorkspaceImageReference | null>
+  fabricNegative?: Array<WorkspaceImageReference | null>
 }
 
 export interface WorkspaceSnapshot {
@@ -817,6 +819,8 @@ export interface WorkspaceSnapshot {
   upscaleOutputImageDataUrl: string | null
   upscale: Record<string, unknown>
   controlnet: Record<string, unknown>
+  regionalPrompter?: Record<string, unknown>
+  fabric?: Record<string, unknown>
   adetailer: Record<string, unknown>
   dynThres: Record<string, unknown>
   freeu: Record<string, unknown>
@@ -892,4 +896,9 @@ export interface UpscaleComparisonSaveResult {
   id: string
   dir: string
   manifestPath: string
+}
+
+export interface FabricFeedbackImageSaveResult {
+  filename: string
+  path: string
 }

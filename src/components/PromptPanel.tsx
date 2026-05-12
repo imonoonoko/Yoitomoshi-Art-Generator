@@ -16,6 +16,8 @@ import { InputImagePanel } from './InputImagePanel'
 import { LoraSuggestionStrip } from './LoraSuggestionStrip'
 import { DynamicThresholdingPanel } from './extensions/DynamicThresholdingPanel'
 import { FreeUPanel } from './extensions/FreeUPanel'
+import { RegionalPrompterPanel } from './extensions/RegionalPrompterPanel'
+import { FabricFeedbackPanel } from './extensions/FabricFeedbackPanel'
 import { ADetailerPanel } from './extensions/ADetailerPanel'
 import { ControlNetBuilderPanel } from './extensions/ControlNetBuilderPanel'
 import { ControlNetPanel } from './extensions/ControlNetPanel'
@@ -134,6 +136,8 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
       </div>
 
       <div className="border-t border-line pt-3 space-y-2">
+        <RegionalPrompterPanel />
+        <FabricFeedbackPanel />
         <ControlNetBuilderPanel />
         <ControlNetPanel />
         <ADetailerPanel />

@@ -50,6 +50,7 @@ import type {
   WorkspaceImageReference,
   WorkspaceSnapshot,
   WorkspaceSummary,
+  FabricFeedbackImageSaveResult,
   UpscaleComparisonSaveRequest,
   UpscaleComparisonSaveResult
 } from '../src/shared/types.js'
@@ -285,7 +286,9 @@ const api = {
     resolveImageReference: (ref: WorkspaceImageReference): Promise<string | null> =>
       ipcRenderer.invoke(IPC.storageResolveImageReference, ref),
     saveUpscaleComparison: (input: UpscaleComparisonSaveRequest): Promise<UpscaleComparisonSaveResult> =>
-      ipcRenderer.invoke(IPC.storageSaveUpscaleComparison, input)
+      ipcRenderer.invoke(IPC.storageSaveUpscaleComparison, input),
+    saveFabricFeedbackImage: (imageDataUrl: string): Promise<FabricFeedbackImageSaveResult> =>
+      ipcRenderer.invoke(IPC.storageSaveFabricFeedbackImage, imageDataUrl)
   },
 
   // Library

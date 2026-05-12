@@ -98,6 +98,7 @@ export const IPC = {
   storageDeleteWorkspace: 'storage:delete-workspace',
   storageResolveImageReference: 'storage:resolve-image-reference',
   storageSaveUpscaleComparison: 'storage:save-upscale-comparison',
+  storageSaveFabricFeedbackImage: 'storage:save-fabric-feedback-image',
 
   // Prompt library
   libraryLoad: 'library:load',
