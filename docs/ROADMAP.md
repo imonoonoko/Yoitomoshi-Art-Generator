@@ -1,6 +1,6 @@
 # Yoitomoshi Art Generator — ロードマップ
 
-最終更新: 2026-05-12
+最終更新: 2026-05-13
 
 現在の作業フォルダ: `C:\宵灯工房アート\Yoitomoshi-Art-Generator`
 
@@ -156,12 +156,22 @@
 - P1: Upscale比較を Tile ControlNet OFF/ON と denoise 0.25 / 0.35 / 0.45 の組み合わせに拡張。比較候補、入力画像、drift / seam / detail の判断基準を `userdata/upscale-comparisons/` に保存できる。
 - 公開準備: READMEに全体精査レポート、ロードマップ、構造ドキュメントへの入口を追加し、HTMLレポートも実装後の状態へ更新する。
 
+2026-05-13 追加進捗:
+
+- Prompt All in ONEはAPI専用Forge起動では無効化対象にしているため、依存せずに設計だけを取り込む方針にした。対象はタグチップ編集、英語タグ変換、Prompt Library連携、ControlNet用途別導線。
+- Prompt入力欄に英語タグ変換ボタンを追加。日本語の自然文やPrompt Libraryの日本語ラベルを、ローカル辞書と既存ライブラリ検索だけで英語タグ列へ変換する。
+- Prompt Helperに英語タグ候補行と「英語に置換」操作を追加。自然文メモから候補生成、タグ追加、英語タグ化を同じ補助パネル内で行える。
+- Prompt Editorの補完を英語タグだけでなく日本語ラベルにも対応させ、ローマ字/英語入力と日本語メモの両方からタグへ到達しやすくした。
+- PromptPanelにタグチップ編集を追加。既存textareaを正本にしたまま、タグ単位で重み+/-、削除、positive/negative間移動、重複整理ができる。Prompt Libraryの日本語ラベルもチップに併記する。
+- ControlNet Builderの役割プリセットを拡張。pose / lineart / depth / tile / referenceに加えて、canny / softedge / scribble / normal / segmentationを選べるようにした。
+
 残タスク更新:
 
 - ControlNet入力生成はUI/IPC実装とUI QAまで完了。pose / lineart / depth モデルが揃った環境で、preprocessor結果をControlNet modelに渡す実生成QAが必要。
 - Workspace参照保存は実素材QA済み。参照先が存在しない共有Workspaceの差し替えUIと、相対パス化の是非は後続で検討する。
 - Model Library復旧は実データQA済み。既存の約21.3GBライブラリで復旧ボタンを実行し、SHA queueがUI操作を阻害しないこととmetadata/preview再取得を確認した。
 - Upscale比較保存は実素材QA済み。比較結果を1セット保存し、drift / seam / detail の採用基準と推奨denoiseを確定した。
+- Promptタグ編集は文字列プロンプトを正本にした軽量実装まで完了。次の拡張は、タグ無効化を含む構造化Prompt RecipeとしてWorkspace/Historyに保存するかどうかを決めてから進める。
 - Format Converter は `.ckpt/.pt/.pth` の checkpoint 実ファイルが環境にないため、次に該当ファイルが `webui/models/Stable-diffusion/` に入った時点で実変換を1回確認する。
 
 以下は2026-05-11に完了済み。

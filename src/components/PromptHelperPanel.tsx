@@ -1,12 +1,14 @@
-import { AlertTriangle, Plus, Sparkles, Wand2, X } from 'lucide-react'
+import { AlertTriangle, Languages, Plus, Sparkles, Wand2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useStore } from '@/lib/store'
 import { promptAppend } from '@/lib/prompt-utils'
+import { translatePromptToEnglishTags } from '@/lib/prompt-translate'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import type { PromptCategory, PromptGroupTag } from '@shared/types'
 
 interface HelperResult {
+  translated: string[]
   positive: string[]
   negative: string[]
   warnings: string[]
@@ -75,6 +77,11 @@ export function PromptHelperPanel(): JSX.Element {
     setNegative(next)
   }
 
+  function replacePromptWithEnglish(tags: string[]): void {
+    if (!tags.length) return
+    setPrompt(tags.join(', '))
+  }
+
   return (
     <section className="border border-line rounded-md bg-bg-0/60">
       <button
@@ -113,9 +120,23 @@ export function PromptHelperPanel(): JSX.Element {
               <X className="h-3.5 w-3.5" />
               {t('promptHelper.applyNegative')}
             </button>
+            <button
+              type="button"
+              className="btn text-xs py-1.5 gap-1.5"
+              disabled={!result.translated.length}
+              onClick={() => replacePromptWithEnglish(result.translated)}
+            >
+              <Languages className="h-3.5 w-3.5" />
+              {t('promptHelper.replaceWithEnglish')}
+            </button>
           </div>
           {hasResult ? (
             <div className="space-y-2">
+              <TagRow
+                label={t('promptHelper.translated')}
+                tags={result.translated}
+                onClick={(tag) => applyPositive([tag])}
+              />
               <TagRow
                 label={t('promptHelper.positive')}
                 tags={result.positive}
@@ -190,10 +211,13 @@ function analyzeDescription(
   t: (key: string) => string
 ): HelperResult {
   const text = raw.trim().toLowerCase()
-  if (!text) return { positive: [], negative: [], warnings: [] }
+  if (!text) return { translated: [], positive: [], negative: [], warnings: [] }
+  const translated = translatePromptToEnglishTags(raw, library)
   const positive = new Set(BASE_QUALITY)
   const negative = new Set(BASE_NEGATIVE)
   const warnings = new Set<string>()
+
+  translated.forEach((tag) => positive.add(tag))
 
   for (const rule of POSITIVE_RULES) {
     if (rule.needles.some((needle) => text.includes(needle.toLowerCase()))) {
@@ -213,6 +237,7 @@ function analyzeDescription(
   findLibraryTags(text, library).forEach((tag) => positive.add(tag.en))
 
   return {
+    translated,
     positive: [...positive].slice(0, 18),
     negative: [...negative].slice(0, 14),
     warnings: [...warnings].slice(0, 4)

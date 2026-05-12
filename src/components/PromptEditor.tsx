@@ -55,7 +55,9 @@ export function PromptEditor({
     const lc = token.toLowerCase()
     const out: Suggestion[] = []
     for (const [en, ja] of autocomplete.entries()) {
-      if (en.toLowerCase().startsWith(lc)) {
+      const enLower = en.toLowerCase()
+      const jaLower = ja.toLowerCase()
+      if (enLower.startsWith(lc) || jaLower.startsWith(lc)) {
         out.push({ en, ja })
         if (out.length >= MAX_SUGGESTIONS) break
       }
@@ -63,7 +65,9 @@ export function PromptEditor({
     if (out.length === 0) {
       // Fallback: substring search
       for (const [en, ja] of autocomplete.entries()) {
-        if (en.toLowerCase().includes(lc)) {
+        const enLower = en.toLowerCase()
+        const jaLower = ja.toLowerCase()
+        if (enLower.includes(lc) || jaLower.includes(lc)) {
           out.push({ en, ja })
           if (out.length >= MAX_SUGGESTIONS) break
         }

@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { api } from '@/lib/ipc'
 import { CollapsiblePanel } from '../CollapsiblePanel'
 
-type BuilderRole = 'pose' | 'lineart' | 'depth' | 'tile' | 'reference'
+type BuilderRole = 'pose' | 'lineart' | 'canny' | 'softedge' | 'scribble' | 'depth' | 'normal' | 'seg' | 'tile' | 'reference'
 
 interface RolePreset {
   id: BuilderRole
@@ -34,12 +34,42 @@ const ROLE_PRESETS: RolePreset[] = [
   {
     id: 'lineart',
     icon: <ScanLine className="h-3.5 w-3.5" />,
-    moduleCandidates: ['lineart_anime', 'lineart_realistic', 'lineart_standard', 'canny'],
-    modelKeywords: ['lineart', 'canny', 'softedge'],
+    moduleCandidates: ['lineart_anime', 'lineart_realistic', 'lineart_standard'],
+    modelKeywords: ['lineart'],
     fallbackModel: 'None',
     weight: 0.8,
     controlMode: 1,
     hintKey: 'cnBuilder.role.lineart.hint'
+  },
+  {
+    id: 'canny',
+    icon: <ScanLine className="h-3.5 w-3.5" />,
+    moduleCandidates: ['canny'],
+    modelKeywords: ['canny'],
+    fallbackModel: 'None',
+    weight: 0.75,
+    controlMode: 1,
+    hintKey: 'cnBuilder.role.canny.hint'
+  },
+  {
+    id: 'softedge',
+    icon: <ScanLine className="h-3.5 w-3.5" />,
+    moduleCandidates: ['softedge_hed', 'softedge_hedsafe', 'softedge_pidinet', 'softedge_pidisafe'],
+    modelKeywords: ['softedge', 'hed'],
+    fallbackModel: 'None',
+    weight: 0.75,
+    controlMode: 1,
+    hintKey: 'cnBuilder.role.softedge.hint'
+  },
+  {
+    id: 'scribble',
+    icon: <Wand2 className="h-3.5 w-3.5" />,
+    moduleCandidates: ['scribble_hed', 'scribble_pidinet', 'scribble_xdog'],
+    modelKeywords: ['scribble'],
+    fallbackModel: 'None',
+    weight: 0.9,
+    controlMode: 2,
+    hintKey: 'cnBuilder.role.scribble.hint'
   },
   {
     id: 'depth',
@@ -50,6 +80,26 @@ const ROLE_PRESETS: RolePreset[] = [
     weight: 0.75,
     controlMode: 1,
     hintKey: 'cnBuilder.role.depth.hint'
+  },
+  {
+    id: 'normal',
+    icon: <Layers3 className="h-3.5 w-3.5" />,
+    moduleCandidates: ['normal_bae'],
+    modelKeywords: ['normal'],
+    fallbackModel: 'None',
+    weight: 0.7,
+    controlMode: 1,
+    hintKey: 'cnBuilder.role.normal.hint'
+  },
+  {
+    id: 'seg',
+    icon: <Layers3 className="h-3.5 w-3.5" />,
+    moduleCandidates: ['seg_ofade20k', 'seg_ufade20k', 'seg_anime_face'],
+    modelKeywords: ['seg', 'segmentation'],
+    fallbackModel: 'None',
+    weight: 0.8,
+    controlMode: 1,
+    hintKey: 'cnBuilder.role.seg.hint'
   },
   {
     id: 'tile',

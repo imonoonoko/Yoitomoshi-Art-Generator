@@ -56,7 +56,7 @@ export function adjustTokenWeight(
   caret: number,
   delta: number
 ): { prompt: string; caret: number } {
-  const tokens = splitTokensWithRanges(prompt)
+  const tokens = splitPromptTokensWithRanges(prompt)
   const cur = tokens.find((t) => caret >= t.start && caret <= t.end)
   if (!cur) return { prompt, caret }
 
@@ -84,10 +84,10 @@ function clampWeight(n: number): number {
   return Math.max(0.1, Math.min(2.0, Math.round(n * 10) / 10))
 }
 
-interface TokenRange { text: string; start: number; end: number }
+export interface PromptTokenRange { text: string; start: number; end: number }
 
-function splitTokensWithRanges(prompt: string): TokenRange[] {
-  const out: TokenRange[] = []
+export function splitPromptTokensWithRanges(prompt: string): PromptTokenRange[] {
+  const out: PromptTokenRange[] = []
   // Split on commas at the top level — but skip commas inside parens for weighted tokens.
   let depth = 0
   let tokenStart = 0
@@ -106,6 +106,42 @@ function splitTokensWithRanges(prompt: string): TokenRange[] {
     }
   }
   return out
+}
+
+export function cleanPromptTokenForMatch(text: string): string {
+  const trimmed = text.trim()
+  const weighted = trimmed.match(/^\(\s*(.+?)\s*:\s*[0-9.]+\s*\)$/)
+  const inner = weighted?.[1] ?? trimmed
+  return inner.replace(/^[(\[]+|[)\]]+$/g, '').trim()
+}
+
+export function removePromptToken(prompt: string, token: PromptTokenRange): string {
+  return tidyPromptCommas(prompt.slice(0, token.start) + prompt.slice(token.end))
+}
+
+export function dedupePromptTokens(prompt: string): { prompt: string; removed: number } {
+  const tokens = splitPromptTokensWithRanges(prompt)
+  const seen = new Set<string>()
+  const kept: string[] = []
+  let removed = 0
+  for (const token of tokens) {
+    const key = cleanPromptTokenForMatch(token.text).toLowerCase()
+    if (!key) continue
+    if (seen.has(key)) {
+      removed += 1
+      continue
+    }
+    seen.add(key)
+    kept.push(token.text)
+  }
+  return { prompt: kept.join(', '), removed }
+}
+
+function tidyPromptCommas(prompt: string): string {
+  return prompt
+    .replace(/\s*,\s*/g, ', ')
+    .replace(/(?:,\s*){2,}/g, ', ')
+    .replace(/^[\s,]+|[\s,]+$/g, '')
 }
 
 /**

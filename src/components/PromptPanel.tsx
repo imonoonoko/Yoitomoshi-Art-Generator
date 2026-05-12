@@ -1,11 +1,13 @@
-import { Wand2, X } from 'lucide-react'
+import { Languages, Wand2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore } from '@/lib/store'
 import { api } from '@/lib/ipc'
-import { approxTokenCount } from '@/lib/prompt-utils'
+import { approxTokenCount, promptAppend, removePromptToken, type PromptTokenRange } from '@/lib/prompt-utils'
+import { translatePromptToEnglishTags } from '@/lib/prompt-translate'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { PromptEditor } from './PromptEditor'
+import { PromptTagChips } from './PromptTagChips'
 import { PromptHelperPanel } from './PromptHelperPanel'
 import { ParametersPanel } from './ParametersPanel'
 import { RecommendationCard } from './RecommendationCard'
@@ -31,6 +33,8 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
   const isGenerating = useStore((s) => s.isGenerating)
   const selected = useStore((s) => s.selectedModelTitle)
   const currentTab = useStore((s) => s.currentTab)
+  const library = useStore((s) => s.library)
+  const customLibrary = useStore((s) => s.customLibrary)
   const t = useT()
 
   const canGenerate = status.kind === 'ready' && !!selected && !isGenerating
@@ -44,6 +48,26 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
     }
   }
 
+  function translateCurrentPrompt(): void {
+    const tags = translatePromptToEnglishTags(prompt, [...library, ...customLibrary])
+    if (tags.length === 0) {
+      toast(tStatic('prompt.translateEmpty'), { icon: 'ℹ' })
+      return
+    }
+    setPrompt(tags.join(', '))
+    toast.success(tStatic('prompt.translated'))
+  }
+
+  function movePromptTagToNegative(token: PromptTokenRange): void {
+    setPrompt(removePromptToken(prompt, token))
+    setNeg(promptAppend(negative, token.text))
+  }
+
+  function moveNegativeTagToPrompt(token: PromptTokenRange): void {
+    setNeg(removePromptToken(negative, token))
+    setPrompt(promptAppend(prompt, token.text))
+  }
+
   return (
     <aside className="flex flex-col gap-3 p-3 overflow-y-auto bg-bg-1 border-r border-line w-[380px] shrink-0">
       <RecommendationCard />
@@ -53,7 +77,18 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
 
       <div className="space-y-1.5">
         <div className="flex items-baseline justify-between">
-          <span className="label">{t('prompt.label')}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="label">{t('prompt.label')}</span>
+            <button
+              type="button"
+              className="btn btn-ghost px-1.5 py-0.5 text-[10px] gap-1"
+              onClick={translateCurrentPrompt}
+              title={t('prompt.translateToEnglish')}
+            >
+              <Languages className="h-3 w-3" />
+              {t('prompt.translateShort')}
+            </button>
+          </div>
           <TokenMeter text={prompt} />
         </div>
         <QuickPresetBar target="positive" value={prompt} onChange={setPrompt} />
@@ -64,6 +99,12 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
           placeholder={t('prompt.placeholder')}
           rows={6}
           onSubmit={canGenerate ? onGenerate : undefined}
+        />
+        <PromptTagChips
+          target="positive"
+          value={prompt}
+          onChange={setPrompt}
+          onMoveToken={movePromptTagToNegative}
         />
       </div>
 
@@ -81,6 +122,12 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
           placeholder={t('prompt.negativePlaceholder')}
           rows={3}
           onSubmit={canGenerate ? onGenerate : undefined}
+        />
+        <PromptTagChips
+          target="negative"
+          value={negative}
+          onChange={setNeg}
+          onMoveToken={moveNegativeTagToPrompt}
         />
       </div>
 
