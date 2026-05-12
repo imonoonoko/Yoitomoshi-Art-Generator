@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yoitomoshi Art Generator 全体機能・シナジー精査レポート 2026-05-13</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a0d10;
+      --panel: #131820;
+      --panel-2: #171e28;
+      --line: #2a3340;
+      --ink: #edf3fa;
+      --soft: #cbd7e4;
+      --muted: #94a4b8;
+      --accent: #79a8ff;
+      --accent-2: #5fd0b5;
+      --warn: #f2bf63;
+      --bad: #ef7b7b;
+      --ok: #61d394;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.65;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: rgba(255, 255, 255, .045);
+      padding: .12rem .35rem;
+      color: #dce7ff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: .92em;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(121, 168, 255, .16), rgba(10, 13, 16, 0) 72%),
+        #10151d;
+    }
+    .wrap { max-width: 1220px; margin: 0 auto; padding: 28px; }
+    .hero { padding-top: 42px; padding-bottom: 38px; }
+    .eyebrow {
+      color: var(--accent-2);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.25; letter-spacing: 0; }
+    h1 { margin-top: 10px; font-size: clamp(30px, 5vw, 52px); }
+    h2 { margin-bottom: 14px; font-size: 23px; }
+    h3 { font-size: 15px; }
+    p { margin: .55rem 0 0; color: var(--soft); }
+    .lead { max-width: 920px; color: #d9e3ef; font-size: 16px; }
+    main { padding: 28px 0 64px; }
+    section { margin-top: 20px; }
+    .meta, .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .meta { margin-top: 18px; }
+    .pill, .tag {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .04);
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .pill { padding: 5px 10px; }
+    .tag { padding: 2px 8px; }
+    .tag.ok { color: var(--ok); border-color: rgba(97, 211, 148, .5); }
+    .tag.warn { color: var(--warn); border-color: rgba(242, 191, 99, .5); }
+    .tag.bad { color: var(--bad); border-color: rgba(239, 123, 123, .5); }
+    .grid { display: grid; gap: 14px; }
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      padding: 18px;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, .24);
+    }
+    .card.flat { background: var(--panel-2); box-shadow: none; }
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: rgba(255, 255, 255, .035);
+      padding: 14px;
+      min-height: 104px;
+    }
+    .stat .label { color: var(--muted); font-size: 12px; }
+    .stat .value { margin-top: 3px; color: var(--ink); font-size: 26px; font-weight: 850; }
+    .stat .note { margin-top: 3px; color: var(--muted); font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 8px; font-size: 13px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px 12px; vertical-align: top; }
+    th { background: rgba(255, 255, 255, .04); color: var(--muted); text-align: left; font-size: 12px; }
+    tr:last-child td { border-bottom: 0; }
+    ul, ol { margin: .65rem 0 0; padding-left: 1.2rem; color: var(--soft); }
+    li + li { margin-top: .25rem; }
+    .toc a {
+      display: block;
+      border-bottom: 1px solid rgba(255, 255, 255, .05);
+      padding: 7px 0;
+      color: var(--soft);
+      font-size: 13px;
+    }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .flow .step {
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: rgba(255, 255, 255, .04);
+      padding: 12px;
+      min-height: 116px;
+    }
+    .step .num { color: var(--accent-2); font-size: 12px; font-weight: 800; }
+    .step .name { margin-top: 4px; font-weight: 800; color: var(--ink); }
+    .step .text { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .priority {
+      display: grid;
+      grid-template-columns: 88px minmax(0, 1fr) minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+      margin-top: 12px;
+    }
+    .rank {
+      border-radius: 8px;
+      padding: 6px 8px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 850;
+      background: rgba(121, 168, 255, .16);
+      color: var(--accent);
+      border: 1px solid rgba(121, 168, 255, .4);
+    }
+    .rank.p0 { background: rgba(97, 211, 148, .12); border-color: rgba(97, 211, 148, .44); color: var(--ok); }
+    .rank.p1 { background: rgba(242, 191, 99, .12); border-color: rgba(242, 191, 99, .44); color: var(--warn); }
+    .rank.p2 { background: rgba(255, 255, 255, .05); color: var(--soft); }
+    .small { color: var(--muted); font-size: 12px; }
+    .note {
+      border-left: 3px solid var(--accent);
+      background: rgba(121, 168, 255, .08);
+      padding: 12px 14px;
+      border-radius: 8px;
+    }
+    .warnbox {
+      border-left: 3px solid var(--warn);
+      background: rgba(242, 191, 99, .08);
+      padding: 12px 14px;
+      border-radius: 8px;
+    }
+    @media (max-width: 980px) {
+      .cols-2, .cols-3, .cols-4, .flow { grid-template-columns: 1fr; }
+      .priority { grid-template-columns: 1fr; }
+      .wrap { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap hero">
+      <div class="eyebrow">Full Feature and Synergy Audit</div>
+      <h1>Yoitomoshi Art Generator 全体機能・シナジー精査レポート</h1>
+      <p class="lead">
+        2026-05-13 時点の実装を、React UI、Zustand状態、Electron IPC、Forge API、Storage、既存ドキュメントから再調査した。
+        現在のアプリは「生成フロントエンド」ではなく、モデル探索、プロンプト設計、画像再利用、拡張機能操作、Upscale比較、ワークスペース保存までつながるローカル制作環境になっている。
+      </p>
+      <div class="meta">
+        <span class="pill">対象: <code>C:\宵灯工房アート\Yoitomoshi-Art-Generator</code></span>
+        <span class="pill">調査日: 2026-05-13</span>
+        <span class="pill">方法: 静的コード精査 + 既存QA/ロードマップ照合</span>
+        <span class="pill">実機生成: 今回は未実行</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="grid cols-4">
+      <div class="stat">
+        <div class="label">主要タブ</div>
+        <div class="value">4</div>
+        <div class="note">txt2img / img2img / Upscale / Tools</div>
+      </div>
+      <div class="stat">
+        <div class="label">保存領域</div>
+        <div class="value">11+</div>
+        <div class="note">history, workspaces, downloads, model-library など</div>
+      </div>
+      <div class="stat">
+        <div class="label">Forge拡張UI</div>
+        <div class="value">7</div>
+        <div class="note">DT, FreeU, ADetailer, ControlNet, Regional, FABRIC, Upscale系</div>
+      </div>
+      <div class="stat">
+        <div class="label">言語</div>
+        <div class="value">4</div>
+        <div class="note">ja / en / ru / pt</div>
+      </div>
+    </section>
+
+    <section class="grid cols-3">
+      <div class="card toc">
+        <h2>目次</h2>
+        <a href="#summary">1. 総合評価</a>
+        <a href="#architecture">2. 構造と設計</a>
+        <a href="#inventory">3. 既存機能の全棚卸し</a>
+        <a href="#synergy">4. 機能間シナジー</a>
+        <a href="#gaps">5. 弱点と取りこぼし</a>
+        <a href="#improvements">6. 改善案と優先順位</a>
+        <a href="#roadmap">7. ゴールまでの実行順</a>
+      </div>
+      <div class="card">
+        <h2>結論</h2>
+        <p>
+          現在の最重要テーマは、新機能をさらに単体追加することではなく、すでにある
+          <code>History</code>、<code>Workspace</code>、<code>Prompt Helper</code>、<code>ControlNet Builder</code>、
+          <code>FABRIC</code>、<code>Regional Prompter</code>、<code>Model Library</code> を「制作レシピ」として束ねること。
+        </p>
+        <p>
+          既存実装は広いが、入口が分かれているため、初心者には「次にどれを押せばよいか」がまだ分散して見える。
+          次はレシピ復元、プリフライト、視覚ビルダー、履歴活用を一本化すると伸びる。
+        </p>
+      </div>
+      <div class="card">
+        <h2>今回の判断</h2>
+        <div class="chips">
+          <span class="tag ok">既存基盤は強い</span>
+          <span class="tag ok">Storage/IPCは整備済み</span>
+          <span class="tag warn">導線統合が課題</span>
+          <span class="tag warn">Recipe保存に差分あり</span>
+          <span class="tag bad">実機QAは別途必要</span>
+        </div>
+        <p>
+          追加すべき中心機能は「Generate前の制作意図を保つ」方向。ControlNet、Regional、FABRIC、LoRA、Promptタグを別々に強化するより、同じ素材制作フロー内で往復できるようにする。
+        </p>
+      </div>
+    </section>
+
+    <section id="summary" class="card">
+      <h2>1. 総合評価</h2>
+      <p>
+        アプリは Forge を API専用で裏起動し、Electron/React UI から生成、素材管理、Civitai/Hugging Face検索、拡張機能、Upscale、ワークスペース保存を操作する設計。
+        Stable Diffusion WebUI の汎用UIを置き換えつつ、ゲーム素材制作で必要な「生成結果を次工程へ送る」導線が多く実装済み。
+      </p>
+      <div class="flow">
+        <div class="step">
+          <div class="num">01</div>
+          <div class="name">Prompt</div>
+          <div class="text">Prompt Library、Quick Preset、英訳、Prompt Helper、タグ編集で作る。</div>
+        </div>
+        <div class="step">
+          <div class="num">02</div>
+          <div class="name">Control</div>
+          <div class="text">ControlNet、ADetailer、Regional Prompter、FABRICで構図や品質を固定する。</div>
+        </div>
+        <div class="step">
+          <div class="num">03</div>
+          <div class="name">Generate</div>
+          <div class="text">txt2img/img2img、inpaint、variation、progress previewで候補を作る。</div>
+        </div>
+        <div class="step">
+          <div class="num">04</div>
+          <div class="name">Reuse</div>
+          <div class="text">History、metadata解析、send to img2img/Upscale、Workspaceで再利用する。</div>
+        </div>
+        <div class="step">
+          <div class="num">05</div>
+          <div class="name">Manage</div>
+          <div class="text">Model Library、Download jobs、Inspector、Merger、Converterで環境を保守する。</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="architecture" class="card">
+      <h2>2. 構造と設計</h2>
+      <table>
+        <thead>
+          <tr><th>層</th><th>主なファイル</th><th>役割</th><th>評価</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Renderer UI</td>
+            <td><code>src/App.tsx</code>, <code>src/components/*</code></td>
+            <td>4タブ構成、PromptPanel、PreviewPanel、SidePanel、Upscale、Tools、Modalを構成。</td>
+            <td><span class="tag ok">豊富</span> ただし表示入口が増えたため統合ナビが必要。</td>
+          </tr>
+          <tr>
+            <td>State</td>
+            <td><code>src/lib/store.ts</code></td>
+            <td>生成パラメータ、拡張設定、履歴、LoRA、Civitai、Workspace、Upscaleなどを一元管理。</td>
+            <td><span class="tag ok">中核</span> Recipe化しやすい状態設計。</td>
+          </tr>
+          <tr>
+            <td>Payload</td>
+            <td><code>src/lib/generation-utils.ts</code>, <code>src/lib/extension-payload.ts</code></td>
+            <td>LoRAトークン合成、Forge request、ControlNet/ADetailer/Regional/FABRICの <code>alwayson_scripts</code> 生成。</td>
+            <td><span class="tag warn">壊れやすい</span> 拡張更新の影響を受けるためテスト強化対象。</td>
+          </tr>
+          <tr>
+            <td>IPC</td>
+            <td><code>electron/ipc-handlers.ts</code>, <code>electron/preload.ts</code>, <code>src/shared/ipc-channels.ts</code></td>
+            <td>Forge API、Civitai/HF、Storage、Tools、外部URL、ファイル操作の安全境界。</td>
+            <td><span class="tag ok">堅い</span> 入力検証とallowlistが入っている。</td>
+          </tr>
+          <tr>
+            <td>Storage</td>
+            <td><code>electron/storage.ts</code>, <code>userdata/*</code></td>
+            <td>履歴、プリセット、QuickPreset、Workspace、DownloadJob、Model Library、起動計測をJSON/ファイルで保存。</td>
+            <td><span class="tag ok">実用的</span> 500件履歴まではJSON運用で十分。</td>
+          </tr>
+          <tr>
+            <td>Forge runtime</td>
+            <td><code>electron/forge-manager.ts</code>, <code>electron/forge-api.ts</code></td>
+            <td>Forge起動/停止、API ready待ち、モデル一覧、生成、ControlNet detect、interrogate、extras。</td>
+            <td><span class="tag ok">運用済み</span> API専用起動と拡張自動無効化で安定化済み。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="inventory" class="card">
+      <h2>3. 既存機能の全棚卸し</h2>
+      <div class="grid cols-2">
+        <div class="card flat">
+          <h3>3.1 起動・設定・Forge制御</h3>
+          <ul>
+            <li>Forgeパス、ポート、自動起動、追加引数、Civitai APIキー、UI言語を設定モーダルで保存。</li>
+            <li>Forge start/stop/status、ready待ち、progress preview、interruptをIPC経由で操作。</li>
+            <li>API専用起動、不要Gradio系拡張の自動無効化、stale process cleanup、single instance lock。</li>
+            <li>起動診断として app ready、IPC ready、renderer loaded、Forge ready を <code>startup-metrics.jsonl</code> に記録。</li>
+          </ul>
+        </div>
+        <div class="card flat">
+          <h3>3.2 生成ワークフロー</h3>
+          <ul>
+            <li><code>txt2img</code> と <code>img2img</code> の両対応。</li>
+            <li>Sampler、Scheduler、Steps、CFG、Size、Seed、Batch、Iterations、Clip Skip、VAE、Denoiseを管理。</li>
+            <li>LoRAはPrompt内トークンを整理し、Active LoRAから最終プロンプトへ合成。</li>
+            <li>生成結果はHistoryへ保存し、実seed、model、VAE、LoRA、sampler、size、denoiseを記録。</li>
+            <li>拡張ガードで、FABRICとControlNet referenceの競合、Regional prompt/ratio不一致を生成前に止める。</li>
+          </ul>
+        </div>
+        <div class="card flat">
+          <h3>3.3 Prompt入力・タグ操作</h3>
+          <ul>
+            <li>PromptEditor、オートコンプリート、トークンカウンター、シンタックスハイライト、重み調整ショートカット。</li>
+            <li>PromptTagChipsでタグを分解し、重み変更、削除、重複整理、並べ替え、Positive/Negative移動、選択タグ保存が可能。</li>
+            <li>QuickPresetBarでPositive/Negative別の短いスニペットをトグル、保存、非表示、削除。</li>
+            <li>自然文から英語タグへ変換する <code>translatePromptToEnglishTags</code> と Prompt Helperを搭載。</li>
+          </ul>
+        </div>
+        <div class="card flat">
+          <h3>3.4 Prompt Library</h3>
+          <ul>
+            <li><code>resources/prompt-library.ja.yaml</code> を組込ライブラリとして読み込み。</li>
+            <li>カテゴリ、サブカテゴリ、タグを表示。クリックで追加、Shiftで強調、AltでNegativeへ追加。</li>
+            <li>お気に入り、Recent、検索、サブカテゴリ複数選択、巨大カテゴリの段階表示に対応。</li>
+            <li>ユーザー追加カテゴリ/グループ/タグを <code>custom-prompt-library.json</code> に保存。組込カテゴリへの追加はshadow merge。</li>
+          </ul>
+        </div>
+        <div class="card flat">
+          <h3>3.5 img2img・入力画像・Inpaint</h3>
+          <ul>
+            <li>画像D&D、クリック選択、Ctrl+V貼付、Previewへのドロップで入力画像へ設定。</li>
+            <li>DeepDanbooru/CLIP interrogateでタグ抽出し、クリックでPromptへ追加。</li>
+            <li>Inpaint maskキャンバスで白領域を塗り、Forge img2imgのmaskとして送信。</li>
+            <li>PNG/JPEG/WebPメタデータ抽出、A1111形式テキスト貼付解析、Civitai照合に対応。</li>
+          </ul>
+        </div>
+        <div class="card flat">
+          <h3>3.6 Preview・Metadata・次工程アクション</h3>
+          <ul>
+            <li>生成中current_imageを表示し、sampling stepと進捗バーを表示。</li>
+            <li>結果をDownload、Folder表示、img2imgへ戻す、Upscaleへ送る、Variationを開く、Recipe保存。</li>
+            <li>MetadataInfoPanelで現在画像のmodel/VAE/LoRA/params概要を表示。</li>
+            <li>ドロップ画像はCivitai照合結果から不足モデル/LoRA/VAEのDL導線を出す。</li>
+          </ul>
+        </div>
+        <div class="card flat">
+          <h3>3.7 History</h3>
+          <ul>
+            <li>最大500件の生成履歴を <code>userdata/history</code> に保存。</li>
+            <li>検索、期間、model、sampler、LoRA、labelで絞り込み。</li>
+            <li>ラベルは <code>favorite</code>、<code>candidate</code>、<code>rejected</code>、<code>asset</code>。</li>
+            <li>復元でPrompt、Negative、params、model、VAE、Active LoRA、実seedを戻す。</li>
+            <li>2件比較でPrompt差分を表示し、履歴画像をUpscaleへ送れる。</li>
+          </ul>
+        </div>
+        <div class="card flat">
+          <h3>3.8 Variation</h3>
+          <ul>
+            <li>Seed、CFG、Denoiseを軸に2/4/8枚の候補生成。</li>
+            <li>候補はHistoryへ保存し、サムネイルからPreview表示、img2img/Upscaleへ送れる。</li>
+            <li>img2img時のみDenoise variationを許可し、入力画像必須のガードあり。</li>
+          </ul>
+        </div>
+        <div class="card flat">
+          <h3>3.9 LoRA</h3>
+          <ul>
+            <li>ForgeのLoRAフォルダを走査し、検索、互換、Favorites、Activeでフィルタ。</li>
+            <li>Civitai hash lookupでthumbnail、trigger words、baseModel、tagsを取得。</li>
+            <li>Active LoRAはweightとtrigger wordsを管理し、生成時にプロンプトへ合成。</li>
+            <li>自動提案はCivitai推奨、base model一致、trigger一致、favorite、直近使用、類似prompt、同カテゴリpenaltyを加味。</li>
+            <li>LoRA使用履歴を <code>lora-usage.json</code> に記録。</li>
+          </ul>
+        </div>
+        <div class="card flat">
+          <h3>3.10 Civitai / Hugging Face</h3>
+          <ul>
+            <li>Civitaiモデル検索、sort、type、NSFW、人気タグ、cursor/page pagination。</li>
+            <li>Hugging Face検索とファイル選択ダウンロード。</li>
+            <li>Checkpoint/LoRA/VAE/ControlNet等の配置先を自動決定。</li>
+            <li>download progress、cancel、resume、manifest、SHA照合、metadata/preview cache。</li>
+            <li>Checkpointの推奨設定、trained words、recommended VAE/LoRA、community image mining、model update check。</li>
+          </ul>
+        </div>
+        <div class="card flat">
+          <h3>3.11 拡張パネル</h3>
+          <ul>
+            <li>Dynamic Thresholding: mimic scale、threshold percentile、詳細mode群。</li>
+            <li>FreeU: b1/b2/s1/s2、start/end step。</li>
+            <li>ADetailer: face/hand/person/YOLO-world、unit最大4、prompt/negative/detection/inpaint params。</li>
+            <li>ControlNet: 最大3 Unit、image、module、model、weight、guidance、pixel perfect、resize/control mode。</li>
+            <li>ControlNet Builder: 画像ドロップ、role preset、preprocessor実行、preview、Unit反映、run and apply。</li>
+            <li>Regional Prompter: Columns/Rows、ratio/base ratio、common/base/region prompts、BREAK prompt生成、validation。</li>
+            <li>FABRIC: positive/negative feedback画像、last/input/upload追加、strength、negative weight、start/end、TOME、burnout protection。</li>
+          </ul>
+        </div>
+        <div class="card flat">
+          <h3>3.12 Upscale</h3>
+          <ul>
+            <li>Simple: Forge extras <code>extra-single-image</code> で非diffusion拡大。</li>
+            <li>Diffusion: MultiDiffusion / Mixture of Diffusers、tile size/overlap、denoise、prompt共有。</li>
+            <li>Ultimate: Ultimate SD upscale script、seams fix、mask blur、padding、redraw settings。</li>
+            <li>Tile ControlNet: upscale専用のControlNet payloadを生成し、通常PromptPanelのControlNetと分離。</li>
+            <li>メタデータ/寸法から推奨設定を提案し、Denoise 0.25/0.35/0.45 と Tile ON/OFF比較を保存可能。</li>
+          </ul>
+        </div>
+        <div class="card flat">
+          <h3>3.13 Tools</h3>
+          <ul>
+            <li>Workspace: <code>embed</code>、<code>references</code>、<code>settings-only</code> で <code>.yoitoart</code> 保存/復元。</li>
+            <li>Startup Diagnostics: 起動計測サンプル表示。</li>
+            <li>Catalog Health: Forge/model/LoRA/VAE/ControlNet/Upscaler状況とTile model/module確認。</li>
+            <li>Model Library: scan/rescan、検索、種別集計、SHA保持、preview/metadata、download jobs。</li>
+            <li>Model Health: models配下の空ファイル、重複、種別違い、欠落フォルダなどを診断。</li>
+            <li>Model Inspector: safetensors/ckptのヘッダ、tensor key、metadataを表示。</li>
+            <li>Model Merger: Forge Python経由、事前見積り、空き容量、上書き防止、progress log、cancel、自動inspect。</li>
+            <li>Format Converter: ckpt/pt/pthをsafetensorsへ一時ファイル経由で安全変換し、出力inspect。</li>
+          </ul>
+        </div>
+        <div class="card flat">
+          <h3>3.14 多言語・ショートカット・外部リンク</h3>
+          <ul>
+            <li><code>src/lib/i18n.ts</code> にja/en/ru/pt辞書。fallback chainは requested -> en -> ja -> raw key。</li>
+            <li>ShortcutsModalで生成、PromptEditor、Library操作、画像貼付/ドロップを案内。</li>
+            <li>タイトルバーからCivitai、Civitai Green、Hugging Face、aipictors、Lexicaへ外部ブラウザで遷移。</li>
+            <li>外部URLはallowlistで制限。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="synergy" class="card">
+      <h2>4. 機能間シナジー</h2>
+      <table>
+        <thead>
+          <tr><th>組み合わせ</th><th>現在できること</th><th>強化すると何が起きるか</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Prompt Helper + Prompt Library + 英訳</td>
+            <td>自然文から英語タグ候補を作り、組込/ユーザータグも拾える。</td>
+            <td>自然文を「Promptレシピ」に変換し、Regional領域、LoRA候補、ControlNet役割まで同時提案できる。</td>
+          </tr>
+          <tr>
+            <td>History label + FABRIC</td>
+            <td>履歴に採用候補/没/素材化済みを付けられる。FABRICはpositive/negative画像を受け取れる。</td>
+            <td>ラベル付き履歴からpositive/negative feedbackを自動構築すれば、好みの方向性を即座に再生成へ反映できる。</td>
+          </tr>
+          <tr>
+            <td>History + Workspace</td>
+            <td>Historyは生成条件、Workspaceは拡張設定や画像参照を保存できる。</td>
+            <td>履歴復元をWorkspace復元相当に拡張すると、Regional/FABRIC/ControlNet込みの完全Recipe再現になる。</td>
+          </tr>
+          <tr>
+            <td>Metadata解析 + Civitai DL + Model Library</td>
+            <td>画像からmodel/LoRA/VAEを推定し、不足資産をCivitaiからDLできる。</td>
+            <td>画像ドロップだけで不足モデルの検出、ダウンロード、Library index登録、Workspace保存まで一気通貫になる。</td>
+          </tr>
+          <tr>
+            <td>Civitai Community Stats + QuickPreset</td>
+            <td>頻出prompt phrase、sampler、steps、CFG、VAE、LoRAをRecommendationCardで見られる。</td>
+            <td>モデル別QuickPresetやNegative presetを自動生成すれば、モデルごとの初期設定が大幅に速くなる。</td>
+          </tr>
+          <tr>
+            <td>ControlNet Builder + Upscale Tile ControlNet</td>
+            <td>Builderはpose/depth/lineart等の入力生成、UpscaleはTile ControlNetでdrift抑制。</td>
+            <td>「通常生成用ControlNet」と「Upscale保持用Tile」を同じ素材から連続設定できるようになる。</td>
+          </tr>
+          <tr>
+            <td>Regional Prompter + PromptTagChips</td>
+            <td>Regionalは領域Promptを持ち、PromptTagChipsはタグ単位編集できる。</td>
+            <td>選択タグを領域へ振り分け、BREAK/ADDROW/ADDCOLを視覚的に組む地域Promptビルダーへ進化できる。</td>
+          </tr>
+          <tr>
+            <td>ADetailer + Inpaint + History</td>
+            <td>ADetailerは自動顔/手補正、Inpaintは手動mask、Historyは候補比較を保持。</td>
+            <td>顔だけ/手だけ/衣装だけの修正結果を履歴で比較し、採用候補をFABRIC/Workspaceへ戻せる。</td>
+          </tr>
+          <tr>
+            <td>Download Manager + Update Check + Health Scan</td>
+            <td>未完了DL復旧、SHA、metadata、preview、更新検出、健全性チェックがある。</td>
+            <td>モデルカードに「未検証/更新あり/壊れた/復旧可能」を統合表示すれば、Toolsを探さず保守できる。</td>
+          </tr>
+          <tr>
+            <td>Startup Metrics + Lazy Loading</td>
+            <td>起動計測と各Tab lazy chunk化は実装済み。</td>
+            <td>Forge起動ログ、拡張ロード時間、Civitai遅延処理を同じ診断表へ入れると、重い原因を継続的に潰せる。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="gaps" class="card">
+      <h2>5. 弱点と取りこぼし</h2>
+      <div class="grid cols-2">
+        <div class="warnbox">
+          <h3>Recipe保存導線が2種類あり、保存範囲が違う</h3>
+          <p>
+            ToolsのWorkspace保存は <code>regionalPrompter</code> と <code>fabric</code>、画像参照モードまで含む。
+            一方、Previewの「Recipe保存」は簡易snapshotで、Regional/FABRICや参照保存モードが揃っていない。
+            ユーザー視点では同じ「Recipe」なので、ここは統一すべき。
+          </p>
+        </div>
+        <div class="warnbox">
+          <h3>History復元は強いが、拡張状態までは戻らない</h3>
+          <p>
+            Historyはprompt/model/VAE/LoRA/paramsを戻せるが、ControlNet、Regional、FABRIC、ADetailerなどの拡張状態はWorkspace側の責務。
+            「良かった生成を完全再現する」体験にはHistoryとWorkspaceの統合が必要。
+          </p>
+        </div>
+        <div class="warnbox">
+          <h3>Regional Prompterはまだ1D寄り</h3>
+          <p>
+            Columns/Rows、ratio、BREAK prompt生成はあるが、2D gridを直接編集するADDROW/ADDCOLビルダーではない。
+            画面内の領域を見ながらPromptを割り当てるUIが入ると、初心者にも使いやすくなる。
+          </p>
+        </div>
+        <div class="warnbox">
+          <h3>FABRICは履歴・ラベルとの連携が未統合</h3>
+          <p>
+            現在はlast/input/uploadからfeedback画像を入れる形。Historyの「採用候補」「没」ラベルを直接FABRICへ流せると、ユーザーの評価が生成制御へ戻る。
+          </p>
+        </div>
+        <div class="warnbox">
+          <h3>ControlNet Builderは単発Unit中心</h3>
+          <p>
+            Role presetとpreprocessor実行は強いが、pose+depth+reference、lineart+tileのような複合レシピはまだ手作業。
+            よく使う組み合わせを「構図固定」「画風参照」「高解像保持」として保存すると効果が高い。
+          </p>
+        </div>
+        <div class="warnbox">
+          <h3>Model Libraryの情報がToolsに寄っている</h3>
+          <p>
+            index、download job、integrity、update、previewは存在するが、TitleBar/LoRA/Civitai検索/Recommendation側で一枚のモデルカードとして見えるわけではない。
+            生成中の判断場所へ状態を出す必要がある。
+          </p>
+        </div>
+      </div>
+      <p class="small">
+        注: 今回は静的精査のため、実Forge生成、Civitai live API、ブラウザ目視QAは実施していない。実動作の最終判断は既存QAに続く再確認が必要。
+      </p>
+    </section>
+
+    <section id="improvements" class="card">
+      <h2>6. 改善案と優先順位</h2>
+
+      <div class="priority">
+        <div class="rank p0">P0-1</div>
+        <div>
+          <h3>Recipe保存の統一</h3>
+          <p>Previewの「Recipe保存」をTools Workspace保存と同じsnapshot builderへ寄せ、Regional/FABRIC/画像参照モードも保存する。</p>
+        </div>
+        <div class="small">効果: 生成直後に保存したRecipeが、Toolsで保存したWorkspaceと同じ信頼性になる。</div>
+      </div>
+
+      <div class="priority">
+        <div class="rank p0">P0-2</div>
+        <div>
+          <h3>Historyから拡張込みRecipeを作る</h3>
+          <p>History itemにWorkspace snapshot IDを紐づける、または生成時の拡張snapshotをHistory paramsへ軽量保存する。</p>
+        </div>
+        <div class="small">効果: 「良かった1枚」からControlNet/Regional/FABRIC込みで再開できる。</div>
+      </div>
+
+      <div class="priority">
+        <div class="rank p0">P0-3</div>
+        <div>
+          <h3>Generation Preflight Panel</h3>
+          <p>生成ボタン直前に、model/VAE/LoRA/ControlNet model/Regional ratio/FABRIC競合/Upscale tile modelを一覧で判定する。</p>
+        </div>
+        <div class="small">効果: 失敗理由を生成後のエラーではなく、押す前に見える化できる。</div>
+      </div>
+
+      <div class="priority">
+        <div class="rank p0">P0-4</div>
+        <div>
+          <h3>History label to FABRIC</h3>
+          <p>Historyの <code>favorite/candidate</code> をFABRIC positive、<code>rejected</code> をnegativeへ一括追加する。</p>
+        </div>
+        <div class="small">効果: ユーザー評価を直接生成制御へ戻せる。今ある機能同士の接続だけで価値が高い。</div>
+      </div>
+
+      <div class="priority">
+        <div class="rank p0">P0-5</div>
+        <div>
+          <h3>Model card統合</h3>
+          <p>TitleBarのモデル選択、Recommendation、Model Library、Update Check、Health Scanを統合したモデル状態カードを作る。</p>
+        </div>
+        <div class="small">効果: 「このモデルは更新あり/破損なし/推奨VAEあり/よく使うLoRAあり」が一目で分かる。</div>
+      </div>
+
+      <div class="priority">
+        <div class="rank p1">P1-1</div>
+        <div>
+          <h3>Regional 2D Grid Builder</h3>
+          <p>行/列追加、比率調整、領域選択、Prompt割当、BREAK/ADDROW/ADDCOL出力を視覚UI化する。</p>
+        </div>
+        <div class="small">効果: Regional Prompterが専門ユーザー向けから日常操作へ近づく。</div>
+      </div>
+
+      <div class="priority">
+        <div class="rank p1">P1-2</div>
+        <div>
+          <h3>ControlNet recipe presets</h3>
+          <p>pose+depth、lineart+reference、tile upscaleなど複数Unitの組み合わせを保存/適用できるようにする。</p>
+        </div>
+        <div class="small">効果: ControlNet Builderの単発入力生成が、制作用途別の構図レシピになる。</div>
+      </div>
+
+      <div class="priority">
+        <div class="rank p1">P1-3</div>
+        <div>
+          <h3>Civitai stats to QuickPreset</h3>
+          <p>community miningの頻出positive/negative phraseをモデル別QuickPresetとして保存する。</p>
+        </div>
+        <div class="small">効果: モデルごとの当たりPromptを手元のプリセットへ蓄積できる。</div>
+      </div>
+
+      <div class="priority">
+        <div class="rank p1">P1-4</div>
+        <div>
+          <h3>Inpaint workspace upgrade</h3>
+          <p>消しゴム、mask反転、blur preview、領域履歴、History候補比較を追加する。</p>
+        </div>
+        <div class="small">効果: ADetailerで直らない部分を手動修正しやすくなる。</div>
+      </div>
+
+      <div class="priority">
+        <div class="rank p1">P1-5</div>
+        <div>
+          <h3>Upscale比較レポートの自動HTML化</h3>
+          <p>保存済み比較候補と判断基準から、denoise/tile ON/OFFの差分HTMLを自動生成する。</p>
+        </div>
+        <div class="small">効果: 素材ごとのdrift/seam判断を後から見返せる。</div>
+      </div>
+
+      <div class="priority">
+        <div class="rank p2">P2-1</div>
+        <div>
+          <h3>History/Library indexing強化</h3>
+          <p>500件を超えたらSQLiteまたは軽量indexへ移行し、タグ検索、類似Prompt、モデル別時系列を高速化する。</p>
+        </div>
+        <div class="small">効果: 長期運用で履歴が資産化する。</div>
+      </div>
+
+      <div class="priority">
+        <div class="rank p2">P2-2</div>
+        <div>
+          <h3>拡張互換性モニタ</h3>
+          <p>Forge拡張のscript title、args順、API endpoint availabilityを起動時に軽く検査する。</p>
+        </div>
+        <div class="small">効果: 拡張更新でpayloadが壊れた時、生成失敗前に検知できる。</div>
+      </div>
+
+      <div class="priority">
+        <div class="rank p2">P2-3</div>
+        <div>
+          <h3>Prompt翻訳辞書のユーザー編集</h3>
+          <p>自然文から英語タグへの変換辞書に、ユーザーの言い回しと固定タグを追加できるようにする。</p>
+        </div>
+        <div class="small">効果: 外部AIなしのPrompt Helperを個人制作向けに育てられる。</div>
+      </div>
+    </section>
+
+    <section id="roadmap" class="card">
+      <h2>7. ゴールまでの実行順</h2>
+      <ol>
+        <li><strong>Recipe保存統一</strong>: Workspace snapshot builderを共通化し、Preview保存でもRegional/FABRIC/参照保存を扱う。</li>
+        <li><strong>History to FABRIC</strong>: 履歴ラベルからpositive/negative feedbackを一括追加するUIを作る。</li>
+        <li><strong>Generation Preflight</strong>: 生成前の不足/競合/不整合を1パネルで表示する。</li>
+        <li><strong>Regional 2D Grid Builder</strong>: 既存Regional Panelを2D領域編集へ拡張する。</li>
+        <li><strong>ControlNet recipe presets</strong>: Builderのrole presetを複合Unitレシピへ広げる。</li>
+        <li><strong>Model card統合</strong>: TitleBarとToolsのModel Library情報をつなぐ。</li>
+        <li><strong>Upscale比較HTML</strong>: 保存済み比較からdrift/seam判断レポートを生成する。</li>
+      </ol>
+      <div class="note">
+        <h3>次に着手するなら</h3>
+        <p>
+          最初の実装対象は <strong>Recipe保存統一</strong> が最もよい。
+          理由は、既存のTools Workspace保存がすでに正しい保存範囲を持っており、Preview側の簡易保存との差を埋めるだけで、
+          History、FABRIC、Regional、ControlNetの後続改善すべての土台になるため。
+        </p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>調査対象ファイル</h2>
+      <p class="small">
+        主に以下を確認した: <code>src/App.tsx</code>, <code>src/lib/store.ts</code>, <code>src/lib/generation-utils.ts</code>,
+        <code>src/lib/extension-payload.ts</code>, <code>src/lib/extension-guards.ts</code>, <code>src/components/PromptPanel.tsx</code>,
+        <code>src/components/PreviewPanel.tsx</code>, <code>src/components/HistoryGallery.tsx</code>, <code>src/components/ToolsWorkspace.tsx</code>,
+        <code>src/components/UpscaleWorkspace.tsx</code>, <code>src/components/extensions/*</code>, <code>electron/ipc-handlers.ts</code>,
+        <code>electron/storage.ts</code>, <code>electron/forge-api.ts</code>, <code>electron/forge-manager.ts</code>,
+        <code>electron/civitai-api.ts</code>, <code>electron/huggingface-api.ts</code>, <code>README.md</code>, <code>docs/ROADMAP.md</code>。
+      </p>
+    </section>
+  </main>
+</body>
+</html>
