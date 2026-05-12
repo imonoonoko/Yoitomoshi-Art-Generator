@@ -1,16 +1,18 @@
-import { Heart, ImagePlus, ThumbsDown, ThumbsUp, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Heart, ImagePlus, ThumbsDown, ThumbsUp, Trash2, Upload } from 'lucide-react'
 import { useRef } from 'react'
 import toast from 'react-hot-toast'
 import { useStore, type FabricFeedbackItem } from '@/lib/store'
 import { api } from '@/lib/ipc'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { hasActiveControlNetReference } from '@/lib/extension-guards'
 import { CollapsiblePanel } from '../CollapsiblePanel'
 
 type FeedbackKind = 'positive' | 'negative'
 
 export function FabricFeedbackPanel(): JSX.Element {
   const fabric = useStore((s) => s.fabric)
+  const controlnetReferenceActive = useStore((s) => hasActiveControlNetReference(s.controlnet))
   const patch = useStore((s) => s.patchFabric)
   const lastImage = useStore((s) => s.lastImage)
   const inputImage = useStore((s) => s.inputImage)
@@ -63,6 +65,7 @@ export function FabricFeedbackPanel(): JSX.Element {
   }
 
   const activeFeedbackCount = fabric.positive.length + fabric.negative.length
+  const conflictWarning = fabric.enabled && activeFeedbackCount > 0 && controlnetReferenceActive
 
   return (
     <CollapsiblePanel
@@ -86,6 +89,13 @@ export function FabricFeedbackPanel(): JSX.Element {
             onUpload={() => openUpload('negative')}
           />
         </div>
+
+        {conflictWarning && (
+          <div className="flex items-start gap-1.5 rounded-md border border-warn/45 bg-warn/5 p-2 text-[10px] leading-relaxed text-warn">
+            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+            <span>{t('guard.fabricControlnetReference')}</span>
+          </div>
+        )}
 
         <input
           ref={fileInputRef}

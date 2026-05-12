@@ -14,6 +14,7 @@ import {
   imageDataUrlFromPngBase64,
   makeThumbnail
 } from '@/lib/generation-utils'
+import { getExtensionGuardIssues } from '@/lib/extension-guards'
 
 type VariationAxis = 'seed' | 'cfg' | 'denoise'
 type VariationCount = 2 | 4 | 8
@@ -73,6 +74,11 @@ export function VariationPanel(): JSX.Element {
     const fixedSeed = base.params.seed >= 0
       ? base.params.seed
       : Math.floor(Math.random() * 2_147_483_647)
+    const guardIssue = getExtensionGuardIssues(base)[0]
+    if (guardIssue) {
+      toast.error(tStatic(guardIssue.messageKey, guardIssue.params))
+      return
+    }
     const variants = buildVariants(axis, count, base.params, fixedSeed)
     const inputImage = base.inputImage
 

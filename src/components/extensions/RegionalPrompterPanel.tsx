@@ -1,15 +1,18 @@
-import { Grid2X2, Plus, Trash2, Wand2 } from 'lucide-react'
+import { AlertTriangle, Grid2X2, Plus, Trash2, Wand2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore, type RegionalPrompterSplitMode } from '@/lib/store'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { getRegionalValidation } from '@/lib/extension-guards'
 import { CollapsiblePanel } from '../CollapsiblePanel'
 
 export function RegionalPrompterPanel(): JSX.Element {
   const regional = useStore((s) => s.regionalPrompter)
+  const prompt = useStore((s) => s.prompt)
   const patch = useStore((s) => s.patchRegionalPrompter)
   const setPrompt = useStore((s) => s.setPrompt)
   const t = useT()
+  const validation = getRegionalValidation(regional, prompt)
 
   function updateRegion(index: number, value: string): void {
     patch({
@@ -36,6 +39,12 @@ export function RegionalPrompterPanel(): JSX.Element {
     const prompt = buildRegionalPrompt(regional)
     if (!prompt) {
       toast.error(tStatic('regional.needPrompt'))
+      return
+    }
+    const nextValidation = getRegionalValidation(regional, prompt)
+    const issue = nextValidation.issues[0]
+    if (issue) {
+      toast.error(tStatic(issue.messageKey, issue.params))
       return
     }
     setPrompt(prompt)
@@ -143,6 +152,17 @@ export function RegionalPrompterPanel(): JSX.Element {
             {t('regional.applyPrompt')}
           </button>
         </div>
+
+        {regional.enabled && validation.issues.length > 0 && (
+          <div className="space-y-1 rounded-md border border-warn/45 bg-warn/5 p-2">
+            {validation.issues.map((issue) => (
+              <div key={issue.code} className="flex items-start gap-1.5 text-[10px] leading-relaxed text-warn">
+                <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                <span>{t(issue.messageKey, issue.params)}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="rounded-md border border-line bg-bg-2/50 p-2">
           <div className="mb-1 flex items-center gap-1 text-[10px] text-ink-3">

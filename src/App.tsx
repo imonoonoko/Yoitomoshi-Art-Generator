@@ -13,6 +13,7 @@ import {
   imageDataUrlFromPngBase64,
   makeThumbnail
 } from './lib/generation-utils'
+import { getExtensionGuardIssues } from './lib/extension-guards'
 import { TitleBar } from './components/TitleBar'
 import { MainTabs } from './components/MainTabs'
 import { PromptPanel } from './components/PromptPanel'
@@ -304,6 +305,11 @@ export default function App(): JSX.Element {
 
   async function handleGenerate(): Promise<void> {
     const s = useStore.getState()
+    const guardIssue = getExtensionGuardIssues(s)[0]
+    if (guardIssue) {
+      toast.error(tStatic(guardIssue.messageKey, guardIssue.params))
+      return
+    }
     const plan = buildGenerationPlan(s)
     if (!plan) return
 

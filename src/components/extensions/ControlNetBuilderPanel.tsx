@@ -5,6 +5,7 @@ import { useStore, type ControlNetUnitState } from '@/lib/store'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/ipc'
+import { hasActiveFabricFeedback } from '@/lib/extension-guards'
 import { CollapsiblePanel } from '../CollapsiblePanel'
 
 type BuilderRole = 'pose' | 'lineart' | 'canny' | 'softedge' | 'scribble' | 'depth' | 'normal' | 'seg' | 'tile' | 'reference'
@@ -132,6 +133,7 @@ interface DetectionResult {
 
 export function ControlNetBuilderPanel(): JSX.Element {
   const controlnet = useStore((s) => s.controlnet)
+  const fabricFeedbackActive = useStore(hasActiveFabricFeedback)
   const status = useStore((s) => s.forgeStatus)
   const modules = useStore((s) => s.controlnetModuleList)
   const models = useStore((s) => s.controlnetModelList)
@@ -180,6 +182,10 @@ export function ControlNetBuilderPanel(): JSX.Element {
   }, [controlnet.units.length, targetUnitIndex])
 
   function applyPreset(preset: RolePreset): void {
+    if (preset.id === 'reference' && fabricFeedbackActive) {
+      toast.error(tStatic('guard.fabricControlnetReference'))
+      return
+    }
     setSelectedRole(preset.id)
     const resolved = resolvePreset(preset, modules, models)
     const unitPatch: Partial<ControlNetUnitState> = {
@@ -424,6 +430,7 @@ export function ControlNetBuilderPanel(): JSX.Element {
       <div className="grid grid-cols-2 gap-2">
         {ROLE_PRESETS.map((preset) => {
           const resolved = resolvePreset(preset, modules, models)
+          const blockedByFabric = preset.id === 'reference' && fabricFeedbackActive
           const active = controlnet.enabled &&
             targetUnit?.enabled &&
             targetUnit.module === resolved.module &&
@@ -435,9 +442,11 @@ export function ControlNetBuilderPanel(): JSX.Element {
               className={cn(
                 'min-h-[74px] rounded-md border border-line bg-bg-2 p-2 text-left transition-colors hover:border-accent/60',
                 resolved.modelMissing && 'border-warn/50 bg-warn/5',
+                blockedByFabric && 'cursor-not-allowed opacity-60 hover:border-line',
                 (active || selectedRole === preset.id) && 'border-accent bg-accent/10'
               )}
               aria-label={`${t(`cnBuilder.role.${preset.id}`)} ${resolved.modelMissing ? t('cnBuilder.modelNeeded') : t('cnBuilder.ready')}`}
+              disabled={blockedByFabric}
               onClick={() => applyPreset(preset)}
             >
               <div className="flex items-center gap-1.5 min-w-0">
@@ -453,7 +462,7 @@ export function ControlNetBuilderPanel(): JSX.Element {
               <div className="mt-1 flex items-center gap-1 text-[10px]">
                 <span className="truncate text-ink-3">{resolved.module}</span>
                 <span className={cn('ml-auto shrink-0', resolved.modelMissing ? 'text-warn' : 'text-ink-2')}>
-                  {resolved.modelMissing ? t('cnBuilder.modelNeeded') : t('cnBuilder.ready')}
+                  {blockedByFabric ? t('cnBuilder.fabricBlocked') : resolved.modelMissing ? t('cnBuilder.modelNeeded') : t('cnBuilder.ready')}
                 </span>
               </div>
             </button>
