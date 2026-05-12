@@ -52,6 +52,7 @@ export const IPC = {
   toolsRunModelMerger: 'tools:run-model-merger',
   toolsCancelModelMerger: 'tools:cancel-model-merger',
   toolsModelMergerProgress: 'tools:model-merger-progress',
+  toolsInspectCharacterCompositeIntegrations: 'tools:inspect-character-composite-integrations',
 
   // Civitai
   civitaiLookupByModel: 'civitai:lookup-model',

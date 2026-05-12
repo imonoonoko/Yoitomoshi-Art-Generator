@@ -173,6 +173,7 @@
 - 参考調査は Inpaint + ControlNet、ControlNet reference_only、IP-Adapter、LayerDiffuse、IC-Light、Inpaint Anything、Replacer、GLIGEN/Add-it/Paint-by-Example に整理し、まずはForge APIで即実装できる「置く→マスク→ControlNet/Inpaint準備」をP0として採用した。詳細は [`CHARACTER_COMPOSITE_WORKFLOW_REPORT_2026-05-13.html`](CHARACTER_COMPOSITE_WORKFLOW_REPORT_2026-05-13.html)。
 - AIキャラ追加の強化版として、背景トーン自動合わせ、ControlNet Unit 2へのキャラ参照自動投入、Before/After比較パッケージ保存を追加した。比較パッケージは `userdata/character-composites/<uuid>/` に元画像、キャラ、仮配置、mask、生成後画像、manifest、HTMLレポートを保存する。
 - AIキャラ追加は準備後も元画像をローカル保持し、再調整で仮配置画像にさらにキャラを重ねてしまう二重合成を避ける。詳細は [`CHARACTER_COMPOSITE_ADVANCED_REPORT_2026-05-13.html`](CHARACTER_COMPOSITE_ADVANCED_REPORT_2026-05-13.html)。
+- AIキャラ追加パネルに連携診断を追加。Forge拡張フォルダ、`disabled_extensions`、ControlNetモデルフォルダをIPCでスキャンし、LayerDiffuse / IP-Adapter / ControlNetモデル / IC-Light の導入状態と不足点を表示する。現環境ではControlNet Tileのみ検出し、LayerDiffuse / IP-Adapter model / IC-Light は未導入。詳細は [`CHARACTER_COMPOSITE_INTEGRATION_STATUS_REPORT_2026-05-13.html`](CHARACTER_COMPOSITE_INTEGRATION_STATUS_REPORT_2026-05-13.html)。
 
 残タスク更新:
 
@@ -182,7 +183,7 @@
 - Upscale比較保存は実素材QA済み。比較結果を1セット保存し、drift / seam / detail の採用基準と推奨denoiseを確定した。
 - Promptタグ編集は文字列プロンプトを正本にした軽量実装まで完了。次の拡張は、タグ無効化を含む構造化Prompt RecipeとしてWorkspace/Historyに保存するかどうかを決めてから進める。
 - 生成前チェックは初期版。次はチェック結果をGenerateボタンのdisabled理由と連動させ、警告はクリックで該当パネルへ移動できるようにする。
-- AIキャラ追加はP0導線と比較保存まで完了。次は実写真+透明PNGでのElectron目視QA、IP-Adapter model配置済み環境でのUnit 2効果確認、LayerDiffuse透明生成・IC-Light照明合わせの段階統合を進める。
+- AIキャラ追加はP0導線、比較保存、連携診断まで完了。次はIP-Adapter model配置済み環境でのUnit 2効果確認、実写真+透明PNGでのトーンON/OFF比較、LayerDiffuse透明生成・IC-Light照明合わせの段階統合を進める。
 - Format Converter は `.ckpt/.pt/.pth` の checkpoint 実ファイルが環境にないため、次に該当ファイルが `webui/models/Stable-diffusion/` に入った時点で実変換を1回確認する。
 
 以下は2026-05-11に完了済み。

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIキャラ追加 連携診断レポート 2026-05-13</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101316;
+      --panel: #181f25;
+      --panel-2: #202933;
+      --line: #33404d;
+      --ink: #f2f6fb;
+      --soft: #c8d4df;
+      --muted: #96a7ba;
+      --accent: #76d3be;
+      --warn: #f0bf66;
+      --ok: #78dd98;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.65; }
+    code { border: 1px solid var(--line); border-radius: 5px; background: rgba(255,255,255,.045); padding: .12rem .34rem; color: #e6f0ff; font-family: "Cascadia Code", Consolas, monospace; }
+    header { border-bottom: 1px solid var(--line); background: linear-gradient(180deg, rgba(118,211,190,.12), rgba(16,19,22,0) 74%), #121a20; }
+    main, .wrap { max-width: 1160px; margin: 0 auto; padding: 28px; }
+    .hero { padding-top: 38px; padding-bottom: 34px; }
+    .eyebrow { color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    h1, h2, h3 { margin: 0; line-height: 1.25; letter-spacing: 0; }
+    h1 { margin-top: 10px; font-size: clamp(30px, 5vw, 48px); }
+    h2 { margin-bottom: 14px; font-size: 23px; }
+    h3 { font-size: 16px; }
+    p { margin: .55rem 0 0; color: var(--soft); }
+    section { margin-top: 22px; }
+    .grid { display: grid; gap: 14px; }
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 16px; }
+    .card.alt { background: var(--panel-2); }
+    .tag { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--soft); font-size: 12px; font-weight: 650; }
+    .tag.ok { color: var(--ok); border-color: rgba(120,221,152,.48); }
+    .tag.warn { color: var(--warn); border-color: rgba(240,191,102,.48); }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+    th, td { border-bottom: 1px solid var(--line); padding: 11px 12px; text-align: left; vertical-align: top; color: var(--soft); font-size: 14px; }
+    th { color: var(--ink); background: rgba(255,255,255,.045); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    tr:last-child td { border-bottom: 0; }
+    ul { margin: 8px 0 0; padding-left: 20px; color: var(--soft); }
+    li { margin: 5px 0; }
+    @media (max-width: 860px) {
+      main, .wrap { padding: 20px; }
+      .cols-2, .cols-4 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap hero">
+      <div class="eyebrow">Character Composite Integration Status</div>
+      <h1>LayerDiffuse / IP-Adapter / IC-Light の準備状況をアプリ内で見える化</h1>
+      <p>
+        AIキャラ追加は、透明キャラ生成、キャラ参照保持、照明合わせを足すほど強くなる。
+        ただし現環境で何が導入済みか分からないと、次に何を置くべきか判断しにくい。
+        今回はAIキャラ追加パネルへ連携診断を追加し、Forge拡張とControlNetモデルの不足を即確認できるようにした。
+      </p>
+      <div class="chips">
+        <span class="tag ok">typecheck PASS</span>
+        <span class="tag">2026-05-13</span>
+        <span class="tag">LayerDiffuse</span>
+        <span class="tag">IP-Adapter</span>
+        <span class="tag">IC-Light</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>現環境の確認結果</h2>
+      <div class="grid cols-4">
+        <article class="card">
+          <h3>LayerDiffuse</h3>
+          <p><span class="tag warn">未導入</span></p>
+          <p><code>runtime/forge/webui/extensions</code> に <code>sd-forge-layerdiffuse</code> は未検出。</p>
+        </article>
+        <article class="card">
+          <h3>IP-Adapter</h3>
+          <p><span class="tag warn">モデル未配置</span></p>
+          <p><code>webui/models/ControlNet</code> にIP-Adapter系モデルは未検出。</p>
+        </article>
+        <article class="card">
+          <h3>ControlNet</h3>
+          <p><span class="tag ok">Tileあり</span></p>
+          <p>現時点のControlNetモデルは <code>xinsir-controlnet-tile-sdxl-1.0.safetensors</code> のみ。</p>
+        </article>
+        <article class="card">
+          <h3>IC-Light</h3>
+          <p><span class="tag warn">未導入</span></p>
+          <p>当面はアプリ側の軽量トーン合わせを照明合わせの代替として使う。</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Before / After</h2>
+      <table>
+        <thead>
+          <tr><th>Before</th><th>After</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>AIキャラ追加パネルからは、LayerDiffuseやIP-Adapterが入っているか分からなかった。</td>
+            <td>パネル内に「連携状態」を追加し、LayerDiffuse、IP-Adapter、ControlNetモデル、IC-Lightの状態を表示。</td>
+          </tr>
+          <tr>
+            <td>足りないモデルや拡張はREADMEやフォルダを手で見て判断する必要があった。</td>
+            <td>Electron IPCでForgeの拡張フォルダ、disabled_extensions、ControlNetモデルフォルダを直接スキャン。</td>
+          </tr>
+          <tr>
+            <td>IP-Adapterが未配置でも、Unit 2設定の理由が分かりにくかった。</td>
+            <td>IP-Adapter model数とreference_only fallbackの理由を同じUIで確認できる。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>実装内容</h2>
+      <div class="grid cols-2">
+        <article class="card">
+          <h3>IPC</h3>
+          <ul>
+            <li><code>tools:inspect-character-composite-integrations</code> を追加。</li>
+            <li>Forge拡張、<code>disabled_extensions</code>、ControlNetモデルを読み取り。</li>
+            <li><code>CharacterCompositeIntegrationStatus</code> を共有型に追加。</li>
+          </ul>
+        </article>
+        <article class="card alt">
+          <h3>UI</h3>
+          <ul>
+            <li>AIキャラ追加パネルに連携状態カードを追加。</li>
+            <li>再確認ボタンで状態をリフレッシュ可能。</li>
+            <li>ja/en/ru/ptの文言を追加。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>次の実作業</h2>
+      <div class="card">
+        <ol>
+          <li>IP-Adapter SDXL modelを <code>runtime/forge/webui/models/ControlNet/</code> に配置し、Unit 2の選択と実生成効果を確認する。</li>
+          <li>LayerDiffuseをForge拡張として導入し、透明キャラ生成からAIキャラ追加へ渡す導線を設計する。</li>
+          <li>IC-Lightは重い統合なので、先に現在のトーン自動合わせで暗所写真のON/OFF比較を保存する。</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
-import { FlipHorizontal, FolderOpen, Image as ImageIcon, Layers3, Link2, Move, Play, RotateCcw, Save, Sparkles, Upload, Wand2, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AlertTriangle, CheckCircle2, FlipHorizontal, FolderOpen, Image as ImageIcon, Layers3, Link2, Move, Play, RefreshCw, RotateCcw, Save, Sparkles, Upload, Wand2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
+import type { CharacterCompositeIntegrationStatus } from '@shared/types'
 import { useStore, type ControlNetUnitState } from '@/lib/store'
 import { api } from '@/lib/ipc'
 import { promptAppend } from '@/lib/prompt-utils'
@@ -142,6 +143,8 @@ export function CharacterComposePanel({ onGenerate }: { onGenerate(): Promise<vo
   const [characterReference, setCharacterReference] = useState(true)
   const [lastPrepared, setLastPrepared] = useState<ComposeResult | null>(null)
   const [lastSavedDir, setLastSavedDir] = useState<string | null>(null)
+  const [integrationStatus, setIntegrationStatus] = useState<CharacterCompositeIntegrationStatus | null>(null)
+  const [integrationLoading, setIntegrationLoading] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const preset = PRESETS.find((item) => item.id === presetId) ?? PRESETS[0]
@@ -149,6 +152,22 @@ export function CharacterComposePanel({ onGenerate }: { onGenerate(): Promise<vo
   const baseFilename = baseLayerFilename ?? inputImageFilename
   const referenceSupport = chooseReferenceControl(modules, models)
   const ready = !!baseImage && !!characterImage
+
+  useEffect(() => {
+    let cancelled = false
+    setIntegrationLoading(true)
+    api.tools.inspectCharacterCompositeIntegrations()
+      .then((status) => {
+        if (!cancelled) setIntegrationStatus(status)
+      })
+      .catch(() => {
+        if (!cancelled) setIntegrationStatus(null)
+      })
+      .finally(() => {
+        if (!cancelled) setIntegrationLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [])
 
   function readBaseFile(file: File): void {
     if (!file.type.startsWith('image/')) {
@@ -306,6 +325,17 @@ export function CharacterComposePanel({ onGenerate }: { onGenerate(): Promise<vo
       toast.error(tStatic('characterCompose.packageSaveFailed', { message: (e as Error).message }))
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function refreshIntegrations(): Promise<void> {
+    setIntegrationLoading(true)
+    try {
+      setIntegrationStatus(await api.tools.inspectCharacterCompositeIntegrations())
+    } catch (e) {
+      toast.error(tStatic('characterCompose.integrationsFailed', { message: (e as Error).message }))
+    } finally {
+      setIntegrationLoading(false)
     }
   }
 
@@ -497,6 +527,70 @@ export function CharacterComposePanel({ onGenerate }: { onGenerate(): Promise<vo
           </label>
         </div>
 
+        <div className="rounded border border-line bg-bg-2/40 p-2 text-[10px]">
+          <div className="mb-1.5 flex items-center gap-2">
+            <span className="font-semibold text-ink-1">{t('characterCompose.integrations')}</span>
+            {integrationStatus && (
+              <span className="ml-auto text-ink-3">
+                {t('characterCompose.integrationsChecked', { count: integrationStatus.controlNet.modelCount })}
+              </span>
+            )}
+            <button
+              type="button"
+              className="btn btn-icon btn-ghost"
+              title={t('characterCompose.integrationsRefresh')}
+              onClick={() => { void refreshIntegrations() }}
+            >
+              <RefreshCw className={cn('h-3 w-3', integrationLoading && 'animate-spin')} />
+            </button>
+          </div>
+          <div className="grid gap-1">
+            <IntegrationRow
+              label={t('characterCompose.layerDiffuse')}
+              ok={integrationStatus?.layerDiffuse.installed === true && integrationStatus.layerDiffuse.disabled !== true}
+              text={integrationStatus?.layerDiffuse.installed
+                ? integrationStatus.layerDiffuse.disabled
+                  ? t('characterCompose.integrationDisabled')
+                  : t('characterCompose.integrationInstalled')
+                : t('characterCompose.integrationMissing')}
+            />
+            <IntegrationRow
+              label={t('characterCompose.ipAdapter')}
+              ok={(integrationStatus?.ipAdapter.modelCount ?? 0) > 0}
+              text={t('characterCompose.ipAdapterModels', { count: integrationStatus?.ipAdapter.modelCount ?? 0 })}
+            />
+            <IntegrationRow
+              label={t('characterCompose.controlNetModels')}
+              ok={(integrationStatus?.controlNet.modelCount ?? 0) > 0}
+              text={integrationStatus
+                ? t('characterCompose.controlNetModelSummary', {
+                  tile: integrationStatus.controlNet.tileModelCount,
+                  lineart: integrationStatus.controlNet.lineartModelCount,
+                  canny: integrationStatus.controlNet.cannyModelCount,
+                  depth: integrationStatus.controlNet.depthModelCount
+                })
+                : t('characterCompose.integrationsLoading')}
+            />
+            <IntegrationRow
+              label={t('characterCompose.icLight')}
+              ok={integrationStatus?.icLight.installed === true}
+              text={integrationStatus?.icLight.installed
+                ? t('characterCompose.integrationInstalled')
+                : t('characterCompose.integrationMissing')}
+            />
+          </div>
+          {integrationStatus?.recommendations.length ? (
+            <ul className="mt-1.5 space-y-1 text-ink-3">
+              {integrationStatus.recommendations.slice(0, 3).map((item) => (
+                <li key={item} className="flex gap-1">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-warn" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+
         <div className="space-y-2 rounded border border-line bg-bg-2/40 p-2">
           <SliderRow
             icon={<Move className="h-3.5 w-3.5" />}
@@ -616,6 +710,26 @@ export function CharacterComposePanel({ onGenerate }: { onGenerate(): Promise<vo
         <p className="text-[10px] leading-relaxed text-ink-3">{t('characterCompose.outputHint')}</p>
       </div>
     </CollapsiblePanel>
+  )
+}
+
+function IntegrationRow({
+  label,
+  ok,
+  text
+}: {
+  label: string
+  ok: boolean
+  text: string
+}): JSX.Element {
+  return (
+    <div className="flex items-center gap-1.5 rounded border border-line/80 bg-bg-1/60 px-2 py-1">
+      {ok
+        ? <CheckCircle2 className="h-3 w-3 shrink-0 text-ok" />
+        : <AlertTriangle className="h-3 w-3 shrink-0 text-warn" />}
+      <span className="font-semibold text-ink-2">{label}</span>
+      <span className="ml-auto truncate text-right text-ink-3">{text}</span>
+    </div>
   )
 }
 

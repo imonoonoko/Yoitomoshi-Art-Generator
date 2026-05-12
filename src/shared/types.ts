@@ -937,6 +937,36 @@ export interface CharacterCompositeSaveResult {
   reportPath: string
 }
 
+export interface CharacterCompositeIntegrationStatus {
+  checkedAt: number
+  forgePath: string
+  extensionsDir: string
+  controlNetDir: string
+  disabledExtensions: string[]
+  layerDiffuse: {
+    installed: boolean
+    disabled: boolean
+    path: string | null
+  }
+  ipAdapter: {
+    modelCount: number
+    models: string[]
+  }
+  controlNet: {
+    modelCount: number
+    tileModelCount: number
+    lineartModelCount: number
+    cannyModelCount: number
+    depthModelCount: number
+    models: string[]
+  }
+  icLight: {
+    installed: boolean
+    path: string | null
+  }
+  recommendations: string[]
+}
+
 export interface FabricFeedbackImageSaveResult {
   filename: string
   path: string

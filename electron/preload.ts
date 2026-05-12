@@ -22,6 +22,7 @@ import type {
   Img2ImgRequest,
   Img2ImgResponse,
   InterrogateResult,
+  CharacterCompositeIntegrationStatus,
   LibraryIntegrityReport,
   LoraCivitaiMetadata,
   LoraUsageRecord,
@@ -175,6 +176,8 @@ const api = {
       ipcRenderer.invoke(IPC.toolsRunModelMerger, req),
     cancelModelMerger: (): Promise<void> =>
       ipcRenderer.invoke(IPC.toolsCancelModelMerger),
+    inspectCharacterCompositeIntegrations: (): Promise<CharacterCompositeIntegrationStatus> =>
+      ipcRenderer.invoke(IPC.toolsInspectCharacterCompositeIntegrations),
     onModelMergerProgress: (cb: (p: ModelMergerProgress) => void): (() => void) => {
       const handler = (_e: Electron.IpcRendererEvent, p: ModelMergerProgress): void => cb(p)
       ipcRenderer.on(IPC.toolsModelMergerProgress, handler)

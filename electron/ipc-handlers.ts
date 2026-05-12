@@ -30,6 +30,7 @@ import type {
   CivitaiAssetType,
   CivitaiDownloadRequest,
   CivitaiSearchOptions,
+  CharacterCompositeIntegrationStatus,
   ControlNetDetectRequest,
   DownloadJob,
   HuggingFaceSearchOptions,
@@ -83,6 +84,7 @@ interface ModelHealthFolder {
 const MODEL_FILE_EXTS = new Set(['.safetensors', '.ckpt', '.pt', '.pth', '.vae'])
 const INSPECTABLE_MODEL_FILE_EXTS = new Set(['.safetensors', '.ckpt', '.pt', '.pth', '.vae'])
 const CONVERTIBLE_MODEL_FILE_EXTS = new Set(['.ckpt', '.pt', '.pth'])
+const CHARACTER_REFERENCE_MODEL_EXTS = new Set(['.safetensors', '.ckpt', '.pt', '.pth', '.bin'])
 const IMAGE_FILE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp'])
 const SETTINGS_LANGUAGES = new Set(['ja', 'en', 'ru', 'pt'])
 const CIVITAI_ASSET_TYPES = new Set<CivitaiAssetType>([
@@ -417,6 +419,45 @@ async function assertExistingFile(
     throw new Error(`Unsupported file extension: ${extname(resolved)}`)
   }
   return resolved
+}
+
+async function walkFilesByExt(root: string, allowedExts: Set<string>, limit = 400): Promise<string[]> {
+  if (!existsSync(root)) return []
+  const out: string[] = []
+  async function visit(dir: string): Promise<void> {
+    if (out.length >= limit) return
+    let entries: Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>
+    try {
+      entries = await readdir(dir, { withFileTypes: true }) as Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (out.length >= limit) return
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name === '__pycache__' || entry.name.startsWith('.')) continue
+        await visit(full)
+      } else if (entry.isFile() && allowedExts.has(extname(entry.name).toLowerCase())) {
+        out.push(full)
+      }
+    }
+  }
+  await visit(root)
+  return out
+}
+
+function readDisabledExtensions(forgePath: string): string[] {
+  const cfgPath = join(forgePath, 'webui', 'config.json')
+  if (!existsSync(cfgPath)) return []
+  try {
+    const cfg = JSON.parse(readFileSync(cfgPath, 'utf8').replace(/^\uFEFF/, '')) as Record<string, unknown>
+    return Array.isArray(cfg.disabled_extensions)
+      ? cfg.disabled_extensions.filter((item): item is string => typeof item === 'string')
+      : []
+  } catch {
+    return []
+  }
 }
 
 async function assertForgeRoot(rawPath: unknown): Promise<string> {
@@ -1436,6 +1477,95 @@ async function saveFabricFeedbackImage(
   return { filename, path: outPath }
 }
 
+async function inspectCharacterCompositeIntegrations(storage: Storage): Promise<CharacterCompositeIntegrationStatus> {
+  const settings = storage.getSettings()
+  const forgePath = resolve(settings.forgePath)
+  const extensionsDir = resolve(forgePath, 'webui', 'extensions')
+  const controlNetDir = resolve(forgePath, 'webui', 'models', 'ControlNet')
+  const disabledExtensions = readDisabledExtensions(forgePath)
+  const disabledSet = new Set(disabledExtensions.map((name) => name.toLowerCase()))
+
+  const layerDiffuseCandidates = [
+    resolve(extensionsDir, 'sd-forge-layerdiffuse'),
+    resolve(extensionsDir, 'sd-webui-layerdiffusion')
+  ]
+  const layerDiffusePath = layerDiffuseCandidates.find((candidate) => existsSync(candidate)) ?? null
+  const layerDiffuseName = layerDiffusePath ? basename(layerDiffusePath) : 'sd-forge-layerdiffuse'
+
+  const icLightCandidates = [
+    resolve(forgePath, '..', 'integrations', 'IC-Light'),
+    resolve(extensionsDir, 'sd-forge-ic-light'),
+    resolve(extensionsDir, 'sd-webui-ic-light')
+  ]
+  const icLightPath = icLightCandidates.find((candidate) => existsSync(candidate)) ?? null
+
+  const controlNetModelFiles = await walkFilesByExt(controlNetDir, CHARACTER_REFERENCE_MODEL_EXTS)
+  const controlNetModels = controlNetModelFiles
+    .map((file) => basename(file))
+    .sort((a, b) => a.localeCompare(b))
+  const ipAdapterModels = controlNetModels.filter((name) => {
+    const normalized = name.toLowerCase()
+    return normalized.includes('ip-adapter') || normalized.includes('ip_adapter') || normalized.includes('ipadapter')
+  })
+  const tileModels = filterModelNames(controlNetModels, ['tile'])
+  const lineartModels = filterModelNames(controlNetModels, ['lineart', 'line art'])
+  const cannyModels = filterModelNames(controlNetModels, ['canny'])
+  const depthModels = filterModelNames(controlNetModels, ['depth', 'midas', 'zoe'])
+
+  const recommendations: string[] = []
+  if (!layerDiffusePath) {
+    recommendations.push('LayerDiffuse extension is not installed; transparent character generation still needs an external step.')
+  } else if (disabledSet.has(layerDiffuseName.toLowerCase())) {
+    recommendations.push('LayerDiffuse is installed but disabled in Forge config.')
+  }
+  if (ipAdapterModels.length === 0) {
+    recommendations.push('No IP-Adapter ControlNet model was found; Unit 2 will use reference_only modules when Forge exposes them.')
+  }
+  if (lineartModels.length === 0 && cannyModels.length === 0) {
+    recommendations.push('No lineart/canny ControlNet model was found; character placement can still use module previews, but generation guidance is weaker.')
+  }
+  if (!icLightPath) {
+    recommendations.push('IC-Light is not installed; the app will use lightweight local tone matching for now.')
+  }
+
+  return {
+    checkedAt: Date.now(),
+    forgePath,
+    extensionsDir,
+    controlNetDir,
+    disabledExtensions,
+    layerDiffuse: {
+      installed: layerDiffusePath !== null,
+      disabled: disabledSet.has(layerDiffuseName.toLowerCase()),
+      path: layerDiffusePath
+    },
+    ipAdapter: {
+      modelCount: ipAdapterModels.length,
+      models: ipAdapterModels.slice(0, 20)
+    },
+    controlNet: {
+      modelCount: controlNetModels.length,
+      tileModelCount: tileModels.length,
+      lineartModelCount: lineartModels.length,
+      cannyModelCount: cannyModels.length,
+      depthModelCount: depthModels.length,
+      models: controlNetModels.slice(0, 30)
+    },
+    icLight: {
+      installed: icLightPath !== null,
+      path: icLightPath
+    },
+    recommendations
+  }
+}
+
+function filterModelNames(names: string[], keywords: string[]): string[] {
+  return names.filter((name) => {
+    const normalized = name.toLowerCase()
+    return keywords.some((keyword) => normalized.includes(keyword))
+  })
+}
+
 async function convertModelFormat(storage: Storage, win: BrowserWindow): Promise<ModelFormatConversionResult | null> {
   const settings = storage.getSettings()
   const modelRoot = resolve(settings.forgePath, 'webui', 'models', 'Stable-diffusion')
@@ -1929,6 +2059,9 @@ export function registerIpcHandlers(deps: {
   ipcMain.handle(IPC.toolsEstimateModelMerger, (_e, req) => estimateModelMerger(storage, req))
   ipcMain.handle(IPC.toolsRunModelMerger, (_e, req) => runModelMerger(storage, win, req))
   ipcMain.handle(IPC.toolsCancelModelMerger, () => cancelModelMerger(win))
+  ipcMain.handle(IPC.toolsInspectCharacterCompositeIntegrations, () =>
+    inspectCharacterCompositeIntegrations(storage)
+  )
 
   // Generation with progress streaming. Both txt2img and img2img share the
   // poller — only the API call differs.
