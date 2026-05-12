@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Trash2, RotateCcw, Search, Filter, ImageUpscale, GitCompare, Star, CheckCircle2, XCircle, PackageCheck } from 'lucide-react'
+import { Trash2, RotateCcw, Search, Filter, ImageUpscale, GitCompare, Star, CheckCircle2, XCircle, PackageCheck, ThumbsUp, ThumbsDown, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useStore } from '@/lib/store'
+import { useStore, type FabricFeedbackItem } from '@/lib/store'
 import { api } from '@/lib/ipc'
 import { cn } from '@/lib/utils'
 import { useT, t as tStatic } from '@/lib/i18n'
@@ -16,6 +16,8 @@ const RANGE_OPTIONS = [
 ] as const
 type RangeId = (typeof RANGE_OPTIONS)[number]['id']
 const HISTORY_PAGE_SIZE = 40
+const FABRIC_IMPORT_LIMIT = 24
+const FABRIC_POSITIVE_LABELS = new Set<HistoryLabel>(['favorite', 'candidate', 'asset'])
 const LABEL_OPTIONS: Array<{ id: HistoryLabel; labelKey: string; icon: typeof Star; className: string }> = [
   { id: 'favorite', labelKey: 'history.label.favorite', icon: Star, className: 'text-amber-300' },
   { id: 'candidate', labelKey: 'history.label.candidate', icon: CheckCircle2, className: 'text-ok' },
@@ -35,6 +37,7 @@ export function HistoryGallery(): JSX.Element {
   const setActiveLoras = useStore((s) => s.setActiveLoras)
   const patchUpscale = useStore((s) => s.patchUpscale)
   const setCurrentTab = useStore((s) => s.setCurrentTab)
+  const patchFabric = useStore((s) => s.patchFabric)
   const t = useT()
 
   const [query, setQuery] = useState('')
@@ -45,6 +48,7 @@ export function HistoryGallery(): JSX.Element {
   const [labelFilter, setLabelFilter] = useState('all')
   const [compareIds, setCompareIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
+  const [fabricBusy, setFabricBusy] = useState<'positive' | 'negative' | null>(null)
   const [visibleCount, setVisibleCount] = useState(HISTORY_PAGE_SIZE)
 
   useEffect(() => {
@@ -113,6 +117,8 @@ export function HistoryGallery(): JSX.Element {
     .filter((h): h is HistoryItem => !!h)
     .slice(0, 2)
   const visibleItems = filtered.slice(0, visibleCount)
+  const fabricPositiveCount = history.filter((h) => h.label && FABRIC_POSITIVE_LABELS.has(h.label)).length
+  const fabricNegativeCount = history.filter((h) => h.label === 'rejected').length
 
   async function restore(id: string): Promise<void> {
     const h = history.find((x) => x.id === id)
@@ -186,6 +192,67 @@ export function HistoryGallery(): JSX.Element {
     setHistory(history.map((item) => item.id === id ? updated : item))
   }
 
+  async function addLabeledToFabric(kind: 'positive' | 'negative'): Promise<void> {
+    const targets = history
+      .filter((h) => kind === 'positive'
+        ? !!h.label && FABRIC_POSITIVE_LABELS.has(h.label)
+        : h.label === 'rejected')
+      .slice(0, FABRIC_IMPORT_LIMIT)
+    if (targets.length === 0) {
+      toast(tStatic(kind === 'positive' ? 'history.fabricNoPositive' : 'history.fabricNoNegative'), { icon: '!' })
+      return
+    }
+
+    setFabricBusy(kind)
+    try {
+      const existingSources = new Set([
+        ...useStore.getState().fabric.positive,
+        ...useStore.getState().fabric.negative
+      ].map((item) => item.sourceLabel))
+      const imported: FabricFeedbackItem[] = []
+      let skipped = 0
+
+      for (const item of targets) {
+        const sourceLabel = `history:${item.id}`
+        if (existingSources.has(sourceLabel)) {
+          skipped += 1
+          continue
+        }
+        const image = await api.storage.readHistoryImage(item.id).catch(() => null)
+        if (!image) {
+          skipped += 1
+          continue
+        }
+        const saved = await api.storage.saveFabricFeedbackImage(image)
+        imported.push({
+          filename: saved.filename,
+          path: saved.path,
+          image,
+          sourceLabel,
+          addedAt: Date.now()
+        })
+        existingSources.add(sourceLabel)
+      }
+
+      if (imported.length === 0) {
+        toast(tStatic('history.fabricNothingAdded', { skipped }), { icon: '!' })
+        return
+      }
+
+      const current = useStore.getState().fabric
+      if (kind === 'positive') {
+        patchFabric({ enabled: true, positive: [...current.positive, ...imported] })
+      } else {
+        patchFabric({ enabled: true, negative: [...current.negative, ...imported] })
+      }
+      toast.success(tStatic('history.fabricAdded', { count: imported.length, skipped }))
+    } catch (e) {
+      toast.error(tStatic('history.fabricFailed', { message: (e as Error).message }))
+    } finally {
+      setFabricBusy(null)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-2 border-b border-line shrink-0 space-y-1.5">
@@ -230,6 +297,28 @@ export function HistoryGallery(): JSX.Element {
             getLabel={(value) => value === 'none' ? t('history.label.none') : t(`history.label.${value}`)}
           />
         </div>
+        {(fabricPositiveCount > 0 || fabricNegativeCount > 0) && (
+          <div className="grid grid-cols-2 gap-1">
+            <button
+              className="btn text-[10px] py-1 gap-1 justify-center"
+              disabled={fabricBusy !== null || fabricPositiveCount === 0}
+              onClick={() => { void addLabeledToFabric('positive') }}
+              title={t('history.fabricPositiveTitle')}
+            >
+              {fabricBusy === 'positive' ? <Loader2 className="h-3 w-3 animate-spin" /> : <ThumbsUp className="h-3 w-3 text-accent" />}
+              {t('history.fabricPositive', { count: Math.min(fabricPositiveCount, FABRIC_IMPORT_LIMIT) })}
+            </button>
+            <button
+              className="btn text-[10px] py-1 gap-1 justify-center"
+              disabled={fabricBusy !== null || fabricNegativeCount === 0}
+              onClick={() => { void addLabeledToFabric('negative') }}
+              title={t('history.fabricNegativeTitle')}
+            >
+              {fabricBusy === 'negative' ? <Loader2 className="h-3 w-3 animate-spin" /> : <ThumbsDown className="h-3 w-3 text-warn" />}
+              {t('history.fabricNegative', { count: Math.min(fabricNegativeCount, FABRIC_IMPORT_LIMIT) })}
+            </button>
+          </div>
+        )}
         {compareItems.length === 2 && (
           <PromptDiffPanel left={compareItems[0]} right={compareItems[1]} onClear={() => setCompareIds([])} />
         )}

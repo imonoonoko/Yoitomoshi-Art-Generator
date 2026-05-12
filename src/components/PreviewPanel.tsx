@@ -5,9 +5,9 @@ import { useStore } from '@/lib/store'
 import { api } from '@/lib/ipc'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { buildWorkspaceSnapshot } from '@/lib/workspace-snapshot'
 import { MetadataInfoPanel } from './MetadataInfoPanel'
 import { VariationPanel } from './VariationPanel'
-import type { WorkspaceSnapshot } from '@shared/types'
 
 export function PreviewPanel(): JSX.Element {
   const isGenerating = useStore((s) => s.isGenerating)
@@ -82,27 +82,7 @@ export function PreviewPanel(): JSX.Element {
   async function saveResultRecipe(): Promise<void> {
     if (!lastImage) return
     const s = useStore.getState()
-    const { inputImage: _upscaleInputImage, outputImage: _upscaleOutputImage, isRunning: _isRunning, ...upscale } = s.upscale
-    const snapshot: WorkspaceSnapshot = {
-      currentTab: s.currentTab,
-      prompt: s.prompt,
-      negativePrompt: s.negativePrompt,
-      params: s.params,
-      selectedModelTitle: s.selectedModelTitle,
-      selectedVae: s.selectedVae,
-      activeLoras: s.activeLoras,
-      inputImageDataUrl: s.inputImage,
-      inputImageFilename: s.inputImageFilename,
-      inpaintMaskImage: s.inpaintMaskImage,
-      lastImageDataUrl: s.lastImage,
-      upscaleInputImageDataUrl: s.upscale.inputImage,
-      upscaleOutputImageDataUrl: s.upscale.outputImage,
-      upscale: { ...upscale, inputImage: null, outputImage: null, isRunning: false },
-      controlnet: { ...s.controlnet },
-      adetailer: { ...s.adetailer },
-      dynThres: { ...s.dynThres },
-      freeu: { ...s.freeu }
-    }
+    const snapshot = buildWorkspaceSnapshot(s, 'embed')
     const promptHead = s.prompt
       .replace(/\s+/g, ' ')
       .replace(/[\\/:*?"<>|]/g, '')

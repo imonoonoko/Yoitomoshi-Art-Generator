@@ -164,6 +164,10 @@
 - Prompt Editorの補完を英語タグだけでなく日本語ラベルにも対応させ、ローマ字/英語入力と日本語メモの両方からタグへ到達しやすくした。
 - PromptPanelにタグチップ編集を追加。既存textareaを正本にしたまま、タグ単位で重み+/-、削除、positive/negative間移動、重複整理ができる。Prompt Libraryの日本語ラベルもチップに併記する。
 - ControlNet Builderの役割プリセットを拡張。pose / lineart / depth / tile / referenceに加えて、canny / softedge / scribble / normal / segmentationを選べるようにした。
+- 全体機能・シナジー精査レポートのP0改善を実装。PreviewのRecipe保存とToolsのWorkspace保存を共通スナップショット生成へ統一し、Regional Prompter / FABRIC / ADetailer / Dynamic Thresholding / FreeU / ControlNet / Upscale を同じ保存範囲で扱う。
+- Historyのラベル整理とFABRICを接続。お気に入り / 採用候補 / 素材化済みはFABRIC positive、没はFABRIC negativeへまとめて送れるようにし、`history:{id}` で重複投入を防ぐ。
+- PromptPanelに生成前チェックを追加。Forge ready、モデル未選択、非生成タブ、img2img入力画像、拡張ガード、VAE/LoRAのカタログ不一致、ControlNet画像/モデル、FABRIC feedback、ADetailer検出モデルを生成直前に見える化する。
+- 検証: `npm.cmd run typecheck` と `npm.cmd run build` はPASS。Electron実機での目視QAは次回、履歴ラベル付き実データとControlNet/FABRICを使って確認する。
 
 残タスク更新:
 
@@ -172,6 +176,7 @@
 - Model Library復旧は実データQA済み。既存の約21.3GBライブラリで復旧ボタンを実行し、SHA queueがUI操作を阻害しないこととmetadata/preview再取得を確認した。
 - Upscale比較保存は実素材QA済み。比較結果を1セット保存し、drift / seam / detail の採用基準と推奨denoiseを確定した。
 - Promptタグ編集は文字列プロンプトを正本にした軽量実装まで完了。次の拡張は、タグ無効化を含む構造化Prompt RecipeとしてWorkspace/Historyに保存するかどうかを決めてから進める。
+- 生成前チェックは初期版。次はチェック結果をGenerateボタンのdisabled理由と連動させ、警告はクリックで該当パネルへ移動できるようにする。
 - Format Converter は `.ckpt/.pt/.pth` の checkpoint 実ファイルが環境にないため、次に該当ファイルが `webui/models/Stable-diffusion/` に入った時点で実変換を1回確認する。
 
 以下は2026-05-11に完了済み。

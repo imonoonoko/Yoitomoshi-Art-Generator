@@ -21,6 +21,7 @@ import { FabricFeedbackPanel } from './extensions/FabricFeedbackPanel'
 import { ADetailerPanel } from './extensions/ADetailerPanel'
 import { ControlNetBuilderPanel } from './extensions/ControlNetBuilderPanel'
 import { ControlNetPanel } from './extensions/ControlNetPanel'
+import { GenerationPreflightPanel } from './GenerationPreflightPanel'
 
 interface Props {
   onGenerate(): Promise<void>
@@ -144,6 +145,8 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
         <DynamicThresholdingPanel />
         <FreeUPanel />
       </div>
+
+      <GenerationPreflightPanel />
 
       <div className="h-24 shrink-0" aria-hidden="true" />
 
