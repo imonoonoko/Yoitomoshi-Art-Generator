@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GitHub 調査: Regional Prompter / FABRIC 改善候補 - 2026-05-13</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d0f14;
+      --panel: #151923;
+      --panel2: #1b202c;
+      --line: #303849;
+      --ink: #f4f6fa;
+      --muted: #aab3c2;
+      --accent: #7c8cff;
+      --ok: #68c587;
+      --warn: #e0b85b;
+      --bad: #e36f6f;
+      --code: #0f1219;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.7 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    }
+    a { color: #9ba8ff; }
+    code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: var(--code);
+      color: #dfe4ff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: #111621;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    .eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.25; }
+    h1 { margin-top: 8px; font-size: clamp(28px, 4vw, 42px); }
+    h2 { margin: 32px 0 12px; font-size: 21px; }
+    h3 { font-size: 16px; margin-bottom: 8px; }
+    p { margin: 8px 0 0; }
+    .lead { max-width: 930px; color: var(--muted); font-size: 16px; }
+    .grid { display: grid; gap: 14px; }
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 16px;
+    }
+    .tag {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      margin: 0 5px 5px 0;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .p0 { color: var(--bad); border-color: rgba(227,111,111,.45); }
+    .p1 { color: var(--warn); border-color: rgba(224,184,91,.45); }
+    .p2 { color: var(--ok); border-color: rgba(104,197,135,.45); }
+    .note { color: var(--muted); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 8px;
+      background: var(--panel);
+    }
+    th, td { border: 1px solid var(--line); padding: 10px 12px; vertical-align: top; }
+    th { background: var(--panel2); text-align: left; color: var(--muted); }
+    ul { margin: 8px 0 0 18px; padding: 0; }
+    @media (max-width: 820px) {
+      .wrap { padding: 22px; }
+      .cols-2, .cols-3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="eyebrow">GitHub extension research</div>
+      <h1>Regional Prompter / FABRIC から追加で取り込める改善点</h1>
+      <p class="lead">
+        2026-05-13 時点で GitHub の README、主要スクリプト、open issues / PR を確認した。
+        直近実装済みの最小 UI からさらに伸ばすなら、まずは競合ガードとテンプレート化、次に 2D / Mask / Prompt mode の支援へ進むのが効率的。
+      </p>
+      <p class="note">
+        調査対象:
+        <a href="https://github.com/hako-mikan/sd-webui-regional-prompter">hako-mikan/sd-webui-regional-prompter</a>,
+        <a href="https://github.com/dvruette/sd-webui-fabric">dvruette/sd-webui-fabric</a>
+      </p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <h2>結論</h2>
+    <section class="grid cols-3">
+      <article class="card">
+        <span class="tag p0">P0</span>
+        <h3>FABRIC と ControlNet reference の同時ONガード</h3>
+        <p class="note">
+          FABRIC README は ControlNet の reference mode と非互換で、同時に有効化すると WebUI 再起動が必要になる可能性を明記している。
+          アプリ側では ControlNet Builder に「雰囲気参照」があるため、FABRIC 有効時は reference 系 Unit を警告または無効化する。
+        </p>
+      </article>
+      <article class="card">
+        <span class="tag p1">P1</span>
+        <h3>Regional 2D テンプレート生成</h3>
+        <p class="note">
+          README では <code>ADDCOL</code>/<code>ADDROW</code> と比率からテンプレートを作る導線が重要。
+          現 UI は単純な <code>BREAK</code> 生成に留まるので、2D グリッド編集とテンプレート反映を追加する。
+        </p>
+      </article>
+      <article class="card">
+        <span class="tag p1">P1</span>
+        <h3>FABRIC preset と履歴ラベル連携</h3>
+        <p class="note">
+          FABRIC ソースには <code>log/fabric/presets</code> の preset 保存/読込がある。
+          履歴の「採用候補 / 没」から positive / negative preset を作ると、既存 Library/History と噛み合う。
+        </p>
+      </article>
+    </section>
+
+    <h2>改善候補一覧</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>優先</th>
+          <th>改善案</th>
+          <th>GitHub で見つけた根拠</th>
+          <th>実装イメージ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tag p0">P0</span></td>
+          <td>FABRIC と ControlNet reference の競合検知</td>
+          <td>
+            FABRIC README は WebUI Forge 対応を示しつつ、ControlNet <code>reference</code> mode とは非互換と説明している。
+          </td>
+          <td>
+            <code>buildAlwaysOnScripts()</code> または UI 側で、FABRIC enabled かつ ControlNet unit の role/model/module が reference 系なら toast 警告。
+            生成前チェックにして事故を止める。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="tag p0">P0</span></td>
+          <td>Regional の BREAK/領域数バリデーション</td>
+          <td>
+            README の Known Issue に、<code>BREAK</code> 数と領域数が合わないと <code>IndexError</code> が起きる旨がある。
+          </td>
+          <td>
+            Regional UI で ratio から期待領域数を計算し、prompt パーツ数と不一致なら生成前に警告。
+            <code>useBase/useCommon</code> 有効時の必要パーツ数も表示する。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>2D Region Builder</td>
+          <td>
+            README は 2D region assignment と <code>ADDCOL</code>/<code>ADDROW</code>、<code>1,1;2,3,2</code> 形式の比率を説明している。
+          </td>
+          <td>
+            R1/R2 の一次元リストを、行/列グリッド編集に拡張。
+            セルの並びから <code>ADDCOL</code>/<code>ADDROW</code> テンプレートと divide ratio を自動生成する。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>Regional 可視化プレビュー</td>
+          <td>
+            README は ratio を入力して領域を可視化し、prompt template を作る操作を紹介している。
+          </td>
+          <td>
+            Canvas/SVG ではなく React の軽量 CSS grid で十分。
+            ratio に応じたセルサイズ、Rows/Columns/flip の反映、セル別 prompt の省略表示を作る。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>Mask mode の入口</td>
+          <td>
+            README と open PR #413 は Mask mode の uploaded mask、色一致、<code>ADDCOL/ADDROW</code> クラッシュ回避に触れている。
+          </td>
+          <td>
+            最初は手描きエディタではなく、既存の inpaint mask / 外部 mask 画像を Regional の <code>polymask</code> へ渡す限定実装にする。
+            PR #413 の未マージ状態を踏まえ、mask mode は検証付き beta として表示する。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>FABRIC preset 保存/読込</td>
+          <td>
+            FABRIC ソースは <code>log/fabric/presets</code> に liked/disliked paths の JSON preset を保存する関数を持つ。
+          </td>
+          <td>
+            positive/negative リストを preset 名で保存し、Workspace とは別に再利用できる UI を追加。
+            履歴ラベル「採用候補」「没」から preset 生成するショートカットも候補。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="tag p2">P2</span></td>
+          <td>FABRIC feedback 枚数と強度のプリセット</td>
+          <td>
+            README は feedback 枚数が多いとモデルが混乱する場合があり、強度を下げるのが有効と説明している。
+          </td>
+          <td>
+            1-2枚、3-5枚、6枚以上で推奨 max weight を提示。
+            画像枚数が多い場合は <code>maxWeight</code> と <code>end</code> の推奨を UI に出す。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="tag p2">P2</span></td>
+          <td>Regional Latent mode の慎重な露出</td>
+          <td>
+            README は Latent mode をサポートするが遅く、Forge/reForge では制約があると説明。
+            open issue #418 では latent option 使用時のエラー報告もある。
+          </td>
+          <td>
+            UI に Latent を出す場合は「実験的」「Forge で要検証」と表示し、既定は Attention のままにする。
+            まずは payload だけでなく実生成比較を作ってから正式機能化する。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="tag p2">P2</span></td>
+          <td>Forge / Forge Neo 互換診断</td>
+          <td>
+            Regional issue #414/#410、FABRIC issue #40 は Forge 系互換の問題や要望を示している。
+          </td>
+          <td>
+            起動診断に拡張ファイル存在、主要 import、Forge variant を表示。
+            壊れている拡張を有効化しないための health check を Tools に追加する。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>次の実装順</h2>
+    <ol>
+      <li><strong>競合ガード:</strong> FABRIC ON + ControlNet reference 系 Unit を検知して生成前に止める。</li>
+      <li><strong>Regional バリデーション:</strong> ratio、use common、use base、region prompt 数の整合性を UI で表示する。</li>
+      <li><strong>2D テンプレート:</strong> <code>ADDCOL</code>/<code>ADDROW</code> を生成する小さなグリッド UI を追加する。</li>
+      <li><strong>FABRIC preset:</strong> positive/negative の保存/読込と、履歴ラベルからの投入を作る。</li>
+      <li><strong>実生成比較:</strong> Regional 1D/2D、FABRIC ON/OFF、ControlNet reference 競合回避の比較を同一 seed で残す。</li>
+    </ol>
+
+    <h2>参照リンク</h2>
+    <ul>
+      <li><a href="https://github.com/hako-mikan/sd-webui-regional-prompter">Regional Prompter README / repository</a></li>
+      <li><a href="https://github.com/hako-mikan/sd-webui-regional-prompter/issues/418">Regional issue #418: latent not working</a></li>
+      <li><a href="https://github.com/hako-mikan/sd-webui-regional-prompter/issues/414">Regional issue #414: Forge Neo sd_hijack removal</a></li>
+      <li><a href="https://github.com/hako-mikan/sd-webui-regional-prompter/pull/413">Regional PR #413: Mask workflow UX fixes</a></li>
+      <li><a href="https://github.com/dvruette/sd-webui-fabric">FABRIC README / repository</a></li>
+      <li><a href="https://github.com/dvruette/sd-webui-fabric/issues/40">FABRIC issue #40: Forge compatibility request</a></li>
+    </ul>
+  </main>
+</body>
+</html>
