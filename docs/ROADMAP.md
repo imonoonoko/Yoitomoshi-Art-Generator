@@ -174,6 +174,7 @@
 - AIキャラ追加の強化版として、背景トーン自動合わせ、ControlNet Unit 2へのキャラ参照自動投入、Before/After比較パッケージ保存を追加した。比較パッケージは `userdata/character-composites/<uuid>/` に元画像、キャラ、仮配置、mask、生成後画像、manifest、HTMLレポートを保存する。
 - AIキャラ追加は準備後も元画像をローカル保持し、再調整で仮配置画像にさらにキャラを重ねてしまう二重合成を避ける。詳細は [`CHARACTER_COMPOSITE_ADVANCED_REPORT_2026-05-13.html`](CHARACTER_COMPOSITE_ADVANCED_REPORT_2026-05-13.html)。
 - AIキャラ追加パネルに連携診断を追加。Forge拡張フォルダ、`disabled_extensions`、ControlNetモデルフォルダをIPCでスキャンし、LayerDiffuse / IP-Adapter / ControlNetモデル / IC-Light の導入状態と不足点を表示する。現環境ではControlNet Tileのみ検出し、LayerDiffuse / IP-Adapter model / IC-Light は未導入。詳細は [`CHARACTER_COMPOSITE_INTEGRATION_STATUS_REPORT_2026-05-13.html`](CHARACTER_COMPOSITE_INTEGRATION_STATUS_REPORT_2026-05-13.html)。
+- 未検証項目の棚卸しを実施。`typecheck` / `build` / Forge API smoke / AIキャラ追加UI+IPC / Model Library整合性 / DownloadJob現況 / Workspace参照保存 / Upscale比較保存 / 配布版EXE smokeを確認した。配布ビルドは `runtime/forge` の巨大モデル混入と Windows通常権限の `winCodeSign` 展開失敗を検出し、electron-builder設定で除外・未署名個人配布ビルドへ修正したうえで `npm.cmd run dist` PASS。詳細は [`PROJECT_UNVERIFIED_VALIDATION_REPORT_2026-05-13.html`](PROJECT_UNVERIFIED_VALIDATION_REPORT_2026-05-13.html)。
 
 残タスク更新:
 
@@ -185,6 +186,7 @@
 - 生成前チェックは初期版。次はチェック結果をGenerateボタンのdisabled理由と連動させ、警告はクリックで該当パネルへ移動できるようにする。
 - AIキャラ追加はP0導線、比較保存、連携診断まで完了。次はIP-Adapter model配置済み環境でのUnit 2効果確認、実写真+透明PNGでのトーンON/OFF比較、LayerDiffuse透明生成・IC-Light照明合わせの段階統合を進める。
 - Format Converter は `.ckpt/.pt/.pth` の checkpoint 実ファイルが環境にないため、次に該当ファイルが `webui/models/Stable-diffusion/` に入った時点で実変換を1回確認する。
+- 配布ビルドは個人配布向けの未署名NSIS installer生成まで確認済み。公開配布時はコード署名証明書、管理者権限または開発者モード、SmartScreen確認を別途検証する。
 
 以下は2026-05-11に完了済み。
 

@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>未検証項目 棚卸し・検証レポート 2026-05-13</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111214;
+      --panel: #181a1f;
+      --panel-2: #20232a;
+      --line: #343842;
+      --text: #eff1f5;
+      --muted: #a9afbd;
+      --ok: #79d18b;
+      --warn: #ffd36a;
+      --bad: #ff8f8f;
+      --info: #8cb9ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      line-height: 1.65;
+    }
+    header, main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    header { padding-top: 44px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 20px; }
+    h3 { margin: 20px 0 8px; font-size: 16px; }
+    p { margin: 8px 0; }
+    code { background: #0d0e11; border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+    table { width: 100%; border-collapse: collapse; margin: 14px 0 24px; }
+    th, td { border: 1px solid var(--line); padding: 10px 12px; vertical-align: top; }
+    th { background: #222630; text-align: left; }
+    td { background: var(--panel); }
+    ul { margin: 8px 0 18px 22px; padding: 0; }
+    li { margin: 6px 0; }
+    .lead { color: var(--muted); max-width: 900px; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+    .k { color: var(--muted); font-size: 12px; }
+    .v { font-size: 22px; font-weight: 700; margin-top: 4px; }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    .info { color: var(--info); }
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      background: var(--panel-2);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .note { color: var(--muted); }
+    @media (max-width: 900px) {
+      header, main { padding: 20px; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      table { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="pill">2026-05-13</p>
+    <h1>未検証項目 棚卸し・検証レポート</h1>
+    <p class="lead">
+      README、ROADMAP、既存QA、HTMLレポート、コード内の未検証表現を横断検索し、
+      現環境で検証可能なものを実行した。配布ビルドは実際に失敗を検出し、
+      設定修正後に NSIS installer 生成まで通した。
+    </p>
+  </header>
+
+  <main>
+    <section class="grid">
+      <div class="card"><div class="k">静的チェック</div><div class="v ok">PASS</div></div>
+      <div class="card"><div class="k">Forge API smoke</div><div class="v ok">PASS</div></div>
+      <div class="card"><div class="k">配布ビルド</div><div class="v ok">FIXED</div></div>
+      <div class="card"><div class="k">外部素材待ち</div><div class="v warn">残あり</div></div>
+    </section>
+
+    <h2>今回実行した検証</h2>
+    <table>
+      <thead>
+        <tr><th>対象</th><th>結果</th><th>証跡 / 内容</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>型チェック</td>
+          <td><span class="ok">PASS</span></td>
+          <td><code>npm.cmd run typecheck</code>。Node/Web 両 tsconfig が成功。</td>
+        </tr>
+        <tr>
+          <td>通常ビルド</td>
+          <td><span class="ok">PASS</span></td>
+          <td><code>npm.cmd run build</code>。main / preload / renderer の production build が成功。</td>
+        </tr>
+        <tr>
+          <td>配布ビルド</td>
+          <td><span class="ok">FIXED / PASS</span></td>
+          <td>
+            初回は <code>runtime/forge</code> の 6.9GB checkpoint を ASAR に詰めようとして失敗。
+            <code>package.json</code> に electron-builder の <code>files</code> / <code>extraResources</code> を追加し、
+            <code>runtime/</code>、<code>userdata/</code>、<code>output/</code>、<code>docs/</code> を除外。
+            さらに通常権限で止まる <code>winCodeSign</code> 展開を避けるため、
+            個人配布向けに <code>win.signAndEditExecutable=false</code> を設定。最終的に <code>npm.cmd run dist</code> が成功。
+          </td>
+        </tr>
+        <tr>
+          <td>生成物サイズ</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            <code>dist/Yoitomoshi Art Generator Setup 0.1.0.exe</code> は 83,983,805 bytes。
+            <code>win-unpacked</code> は 308,992,537 bytes / 75 files。
+            配布ビルド直後の dist には <code>runtime</code>、<code>userdata</code>、<code>output</code>、<code>docs</code> の同梱なし。
+          </td>
+        </tr>
+        <tr>
+          <td>配布版 EXE smoke</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            <code>dist/win-unpacked/Yoitomoshi Art Generator.exe</code> を remote debugging 付きで起動。
+            title、<code>txt2img</code>、<code>Prompt Helper</code>、Forge status 表示を DOM で確認。
+            <code>resources/prompt-library.ja.yaml</code> も <code>win-unpacked/resources</code> に配置済み。
+          </td>
+        </tr>
+        <tr>
+          <td>Forge API / ControlNet catalog</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            Electron 経由で Forge を起動し、<code>/sdapi/v1/sd-models</code>、<code>/controlnet/model_list</code>、
+            <code>/controlnet/module_list</code>、<code>/sdapi/v1/upscalers</code> を確認。
+            checkpoint 4件、ControlNet model は <code>None</code> + <code>xinsir-controlnet-tile-sdxl-1.0 [4d6257d3]</code>、
+            module 64件、upscaler 12件。
+          </td>
+        </tr>
+        <tr>
+          <td>AIキャラ追加 UI / IPC</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            Electron DOM smoke で <code>img2img</code> から <code>AIキャラ追加</code> を開き、
+            <code>連携状態</code> 表示と <code>inspectCharacterCompositeIntegrations()</code> を確認。
+            現環境の診断は LayerDiffuseなし、IP-Adapter model 0、ControlNet Tile 1、IC-Lightなし。
+            起動状態スクリーンショットは <code>output/ui-validation/project-unverified-audit-character-panel-2026-05-13.png</code>。
+          </td>
+        </tr>
+        <tr>
+          <td>Model Library 整合性</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            <code>userdata/model-library/index.json</code> は 13件。
+            SHA欠落 0、実ファイル欠落 0、preview欠落 0。
+            種別は VAE 1、Checkpoint 4、Controlnet 1、LORA 5、Upscaler 2。
+          </td>
+        </tr>
+        <tr>
+          <td>DownloadJob 現況</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            <code>userdata/downloads/jobs.json</code> は 1件、completed 1、running/failed/queued 0。
+            現時点で stale running job は存在しない。
+          </td>
+        </tr>
+        <tr>
+          <td>Workspace参照保存</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            現存 Workspace 2件はいずれも <code>imageReferences</code> を保持し、埋め込み画像なしの参照保存形。
+            既存QA <code>QA_WORKSPACE_RESTORE_2026-05-12.md</code> では履歴ID参照と外部ファイル参照の復元もPASS済み。
+          </td>
+        </tr>
+        <tr>
+          <td>Upscale比較保存</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            <code>userdata/upscale-comparisons</code> に比較セット 1件、ファイル 8件。
+            <code>comparison.json</code> に denoise 0.25 / 0.35 / 0.45 と Tile ON/OFF、drift / seam / detail 判断基準を保存済み。
+          </td>
+        </tr>
+        <tr>
+          <td>ControlNet preprocessor 証跡</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            <code>output/controlnet-qa/summary.json</code> で
+            <code>tile_resample</code>、<code>openpose_full</code>、
+            <code>lineart_standard</code>、<code>depth_midas</code> の preprocessor 出力が全て ok。
+          </td>
+        </tr>
+        <tr>
+          <td>READMEリンク</td>
+          <td><span class="ok">PASS</span></td>
+          <td>README内の <code>docs/...</code> リンクは全件実ファイルあり。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>検証で修正した点</h2>
+    <ul>
+      <li><code>package.json</code> に electron-builder 設定を追加し、配布物へ巨大モデルや個人データを混入させないようにした。</li>
+      <li><code>resources/prompt-library.ja.yaml</code> を packaged build の <code>process.resourcesPath</code> 直下へ配置する設定にした。</li>
+      <li>通常権限の Windows でも未署名 installer を作れるよう、<code>win.signAndEditExecutable=false</code> を設定した。</li>
+    </ul>
+
+    <h2>まだ残る未検証 / 外部条件待ち</h2>
+    <table>
+      <thead>
+        <tr><th>項目</th><th>残る理由</th><th>次の確認条件</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>pose / lineart / depth ControlNet 実生成</td>
+          <td>現環境の ControlNet model は Tile のみ。preprocessorは通るが、各用途の固定用 model がない。</td>
+          <td>SDXL向け pose / lineart / depth ControlNet model を配置後、同一素材で txt2img/img2img 実生成を比較。</td>
+        </tr>
+        <tr>
+          <td>AIキャラ追加の実素材保存QA</td>
+          <td><code>userdata/character-composites</code> は 0件。UI/IPCは通ったが、実写真 + 透明PNG + 生成後比較パッケージは未保存。</td>
+          <td>実写真と透明PNGを投入し、トーンON/OFF、Unit 2参照、mask、manifest、report の保存を確認。</td>
+        </tr>
+        <tr>
+          <td>IP-Adapter / LayerDiffuse / IC-Light 統合</td>
+          <td>現環境では IP-Adapter model 0、LayerDiffuseなし、IC-Lightなし。</td>
+          <td>各拡張または model を導入して、Unit 2効果、透明キャラ生成、照明合わせを段階検証。</td>
+        </tr>
+        <tr>
+          <td>DownloadJob 中断復旧</td>
+          <td>現時点で running/failed/queued job がないため、実中断ケースが再現できない。</td>
+          <td>大容量ダウンロードを途中停止し、再起動後の <code>running -> failed</code> と completed補正を確認。</td>
+        </tr>
+        <tr>
+          <td>Format Converter 実変換</td>
+          <td><code>webui/models/Stable-diffusion</code> に checkpoint系 <code>.ckpt/.pt/.pth</code> がない。</td>
+          <td>対象ファイルが入った時点で、変換、Inspector、cleanupを1回実行。</td>
+        </tr>
+        <tr>
+          <td>署名付き公開installer</td>
+          <td>今回の installer は個人配布向けの未署名ビルド。</td>
+          <td>公開配布時はコード署名証明書、管理者権限または開発者モード、SmartScreen確認を別途検証。</td>
+        </tr>
+        <tr>
+          <td>Mac / Linux</td>
+          <td>現在の実機検証環境が Windows 10/11 のみ。</td>
+          <td>対象OSで Forge path、portable userdata、起動スクリプト、GPU依存を個別確認。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>結論</h2>
+    <p>
+      現環境で実行できる検証は、配布ビルドを含めて通した。
+      特に配布ビルドは「未検証」ではなく、実際に失敗を検出して修正済みになった。
+      残る未検証は、追加ControlNetモデル、実写真+透明PNG、拡張導入、実中断DownloadJob、別OS、署名付き配布のように、
+      現時点で不足している外部条件が明確なものに絞られている。
+    </p>
+  </main>
+</body>
+</html>
