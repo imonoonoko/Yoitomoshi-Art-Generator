@@ -20,6 +20,8 @@ import type {
   QuickPreset,
   StartupMetrics,
   StartupMetricsSample,
+  CharacterCompositeSaveRequest,
+  CharacterCompositeSaveResult,
   UpscaleComparisonSaveRequest,
   UpscaleComparisonSaveResult,
   WorkspaceFile,
@@ -64,6 +66,7 @@ export class Storage {
     mkdirSync(join(this.root, 'downloads'), { recursive: true })
     mkdirSync(join(this.root, 'workspaces'), { recursive: true })
     mkdirSync(join(this.root, 'upscale-comparisons'), { recursive: true })
+    mkdirSync(join(this.root, 'character-composites'), { recursive: true })
   }
 
   getDataRoot(): string {
@@ -196,6 +199,48 @@ export class Storage {
     const manifestPath = join(dir, 'comparison.json')
     writeFileSync(manifestPath, JSON.stringify(manifest, null, 2))
     return { id, dir, manifestPath }
+  }
+
+  saveCharacterComposite(input: CharacterCompositeSaveRequest): CharacterCompositeSaveResult {
+    const id = randomUUID()
+    const dir = join(this.root, 'character-composites', id)
+    mkdirSync(dir, { recursive: true })
+
+    const files = {
+      base: 'base.png',
+      character: 'character.png',
+      composite: 'placed-composite.png',
+      mask: 'inpaint-mask.png',
+      generated: input.generatedImageDataUrl ? 'generated-after.png' : null
+    }
+    writeFileSync(join(dir, files.base), dataUrlToBuffer(input.baseImageDataUrl))
+    writeFileSync(join(dir, files.character), dataUrlToBuffer(input.characterImageDataUrl))
+    writeFileSync(join(dir, files.composite), dataUrlToBuffer(input.compositeImageDataUrl))
+    writeFileSync(join(dir, files.mask), dataUrlToBuffer(input.maskImageDataUrl))
+    if (input.generatedImageDataUrl && files.generated) {
+      writeFileSync(join(dir, files.generated), dataUrlToBuffer(input.generatedImageDataUrl))
+    }
+
+    const manifest = {
+      id,
+      createdAt: Date.now(),
+      baseFilename: input.baseFilename ?? null,
+      characterFilename: input.characterFilename ?? null,
+      presetId: input.presetId,
+      prompt: input.prompt,
+      negativePrompt: input.negativePrompt,
+      denoise: input.denoise,
+      controlNet: input.controlNet,
+      transform: input.transform,
+      notes: input.notes ?? '',
+      files
+    }
+
+    const manifestPath = join(dir, 'character-composite.json')
+    const reportPath = join(dir, 'character-composite-report.html')
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2))
+    writeFileSync(reportPath, renderCharacterCompositeReport(manifest))
+    return { id, dir, manifestPath, reportPath }
   }
 
   // -- model library -----------------------------------------------------
@@ -925,6 +970,107 @@ function normalizeSourceMetadata(raw: unknown): ModelSourceMetadata | undefined 
 function dataUrlToBuffer(dataUrl: string): Buffer {
   const raw = dataUrl.replace(/^data:image\/[a-z0-9.+-]+;base64,/i, '')
   return Buffer.from(raw, 'base64')
+}
+
+function renderCharacterCompositeReport(manifest: {
+  id: string
+  createdAt: number
+  baseFilename: string | null
+  characterFilename: string | null
+  presetId: string
+  prompt: string
+  negativePrompt: string
+  denoise: number
+  controlNet: {
+    structureModule: string
+    structureModel: string
+    referenceModule?: string | null
+    referenceModel?: string | null
+  }
+  transform: CharacterCompositeSaveRequest['transform']
+  notes: string
+  files: {
+    base: string
+    character: string
+    composite: string
+    mask: string
+    generated: string | null
+  }
+}): string {
+  const createdAt = new Date(manifest.createdAt).toLocaleString('ja-JP')
+  const generatedCard = manifest.files.generated
+    ? imageCard('After', manifest.files.generated, 'Generated result')
+    : '<section class="card muted"><h2>After</h2><p>No generated result was attached when this package was saved.</p></section>'
+  return `<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Character Composite Report - ${escapeHtml(manifest.id)}</title>
+  <style>
+    :root { color-scheme: dark; --bg: #121417; --panel: #1b2026; --line: #303843; --ink: #eef2f7; --muted: #aab4c0; --accent: #7fd7c4; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Segoe UI", sans-serif; line-height: 1.55; }
+    main { max-width: 1160px; margin: 0 auto; padding: 28px; }
+    header { display: grid; gap: 8px; margin-bottom: 20px; }
+    h1 { margin: 0; font-size: 28px; letter-spacing: 0; }
+    h2 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0; color: var(--muted); }
+    code { color: var(--accent); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    .card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 14px; }
+    .card img { width: 100%; display: block; border-radius: 6px; background: #0a0c0f; object-fit: contain; max-height: 520px; }
+    .muted { color: var(--muted); }
+    .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin: 18px 0; }
+    .kv { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: #161a20; }
+    .kv b { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+    pre { white-space: pre-wrap; word-break: break-word; margin: 0; color: var(--ink); }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>AI Character Composite Report</h1>
+      <p>Saved at ${escapeHtml(createdAt)} / package <code>${escapeHtml(manifest.id)}</code></p>
+    </header>
+    <section class="grid">
+      ${imageCard('Base', manifest.files.base, manifest.baseFilename ?? 'Base image')}
+      ${imageCard('Character', manifest.files.character, manifest.characterFilename ?? 'Character image')}
+      ${imageCard('Placed Composite', manifest.files.composite, 'img2img input')}
+      ${imageCard('Inpaint Mask', manifest.files.mask, 'white area will be redrawn')}
+      ${generatedCard}
+    </section>
+    <section class="meta">
+      <div class="kv"><b>Preset</b>${escapeHtml(manifest.presetId)}</div>
+      <div class="kv"><b>Denoise</b>${manifest.denoise}</div>
+      <div class="kv"><b>Structure ControlNet</b>${escapeHtml(manifest.controlNet.structureModule)} / ${escapeHtml(manifest.controlNet.structureModel)}</div>
+      <div class="kv"><b>Reference ControlNet</b>${escapeHtml(manifest.controlNet.referenceModule ?? 'None')} / ${escapeHtml(manifest.controlNet.referenceModel ?? 'None')}</div>
+      <div class="kv"><b>Transform</b>x ${manifest.transform.x}%, y ${manifest.transform.y}%, width ${manifest.transform.widthPct}%, rot ${manifest.transform.rotation}deg, flip ${manifest.transform.flipX ? 'on' : 'off'}</div>
+      <div class="kv"><b>Mask</b>expand ${manifest.transform.maskExpand}px, feather ${manifest.transform.maskFeather}px, auto tone ${manifest.transform.autoTone ? 'on' : 'off'}</div>
+    </section>
+    <section class="card">
+      <h2>Prompt</h2>
+      <pre>${escapeHtml(manifest.prompt)}</pre>
+    </section>
+    <section class="card" style="margin-top: 14px;">
+      <h2>Negative Prompt</h2>
+      <pre>${escapeHtml(manifest.negativePrompt)}</pre>
+    </section>
+  </main>
+</body>
+</html>`
+}
+
+function imageCard(title: string, src: string, caption: string): string {
+  return `<section class="card"><h2>${escapeHtml(title)}</h2><img src="${escapeHtml(src)}" alt="${escapeHtml(title)}" /><p>${escapeHtml(caption)}</p></section>`
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function normalizeModelLibraryEntry(raw: unknown): ModelLibraryEntry | null {

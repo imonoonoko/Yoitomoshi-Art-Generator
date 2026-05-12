@@ -50,6 +50,8 @@ import type {
   WorkspaceImageReference,
   WorkspaceSnapshot,
   WorkspaceSummary,
+  CharacterCompositeSaveRequest,
+  CharacterCompositeSaveResult,
   FabricFeedbackImageSaveResult,
   UpscaleComparisonSaveRequest,
   UpscaleComparisonSaveResult
@@ -287,6 +289,8 @@ const api = {
       ipcRenderer.invoke(IPC.storageResolveImageReference, ref),
     saveUpscaleComparison: (input: UpscaleComparisonSaveRequest): Promise<UpscaleComparisonSaveResult> =>
       ipcRenderer.invoke(IPC.storageSaveUpscaleComparison, input),
+    saveCharacterComposite: (input: CharacterCompositeSaveRequest): Promise<CharacterCompositeSaveResult> =>
+      ipcRenderer.invoke(IPC.storageSaveCharacterComposite, input),
     saveFabricFeedbackImage: (imageDataUrl: string): Promise<FabricFeedbackImageSaveResult> =>
       ipcRenderer.invoke(IPC.storageSaveFabricFeedbackImage, imageDataUrl)
   },

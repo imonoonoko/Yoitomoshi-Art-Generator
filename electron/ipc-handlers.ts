@@ -58,6 +58,7 @@ import type {
   WorkspaceSnapshot,
   WorkspaceImageReference,
   UpscaleComparisonSaveRequest,
+  CharacterCompositeSaveRequest,
   FabricFeedbackImageSaveResult
 } from '../src/shared/types.js'
 
@@ -635,6 +636,55 @@ function validateUpscaleComparisonSaveRequest(input: unknown): UpscaleComparison
     }
   })
   return { inputImageDataUrl, inputFilename, method, scale, criteria, candidates }
+}
+
+function validateCharacterCompositeSaveRequest(input: unknown): CharacterCompositeSaveRequest {
+  assertPlainObject(input, 'character composite package')
+  assertPlainObject(input.controlNet, 'character composite ControlNet')
+  assertPlainObject(input.transform, 'character composite transform')
+  const generatedImageDataUrl = input.generatedImageDataUrl == null
+    ? null
+    : validateImagePayload(input.generatedImageDataUrl, 'generated character composite image')
+  return {
+    baseImageDataUrl: validateImagePayload(input.baseImageDataUrl, 'base character composite image'),
+    characterImageDataUrl: validateImagePayload(input.characterImageDataUrl, 'character composite image'),
+    compositeImageDataUrl: validateImagePayload(input.compositeImageDataUrl, 'placed character composite image'),
+    maskImageDataUrl: validateImagePayload(input.maskImageDataUrl, 'character composite mask'),
+    generatedImageDataUrl,
+    baseFilename: optionalString(input.baseFilename, 'base filename', 240, { allowWhitespace: true }) ?? null,
+    characterFilename: optionalString(input.characterFilename, 'character filename', 240, { allowWhitespace: true }) ?? null,
+    presetId: optionalString(input.presetId, 'character composite preset', 80) ?? 'custom',
+    prompt: optionalString(input.prompt, 'character composite prompt', MAX_PROMPT_CHARS, {
+      allowWhitespace: true,
+      trim: false
+    }) ?? '',
+    negativePrompt: optionalString(input.negativePrompt, 'character composite negative prompt', MAX_PROMPT_CHARS, {
+      allowWhitespace: true,
+      trim: false
+    }) ?? '',
+    denoise: boundedNumber(input.denoise, 'character composite denoise', 0, 1) ?? 0,
+    controlNet: {
+      structureModule: optionalString(input.controlNet.structureModule, 'structure ControlNet module', 160, { allowWhitespace: true }) ?? 'None',
+      structureModel: optionalString(input.controlNet.structureModel, 'structure ControlNet model', 300, { allowWhitespace: true }) ?? 'None',
+      referenceModule: optionalString(input.controlNet.referenceModule, 'reference ControlNet module', 160, { allowWhitespace: true }) ?? null,
+      referenceModel: optionalString(input.controlNet.referenceModel, 'reference ControlNet model', 300, { allowWhitespace: true }) ?? null
+    },
+    transform: {
+      x: boundedNumber(input.transform.x, 'character x', -100, 200) ?? 50,
+      y: boundedNumber(input.transform.y, 'character y', -100, 200) ?? 50,
+      widthPct: boundedNumber(input.transform.widthPct, 'character width', 1, 200) ?? 40,
+      rotation: boundedNumber(input.transform.rotation, 'character rotation', -180, 180) ?? 0,
+      flipX: input.transform.flipX === true,
+      maskExpand: boundedNumber(input.transform.maskExpand, 'mask expand', 0, 256) ?? 0,
+      maskFeather: boundedNumber(input.transform.maskFeather, 'mask feather', 0, 128) ?? 0,
+      autoTone: input.transform.autoTone === true,
+      characterReference: input.transform.characterReference === true
+    },
+    notes: optionalString(input.notes, 'character composite notes', 4000, {
+      allowWhitespace: true,
+      trim: false
+    }) ?? ''
+  }
 }
 
 function validateModelMergerRequest(input: unknown): ModelMergerRequest {
@@ -2565,6 +2615,9 @@ export function registerIpcHandlers(deps: {
   )
   ipcMain.handle(IPC.storageSaveUpscaleComparison, (_e, input: UpscaleComparisonSaveRequest) =>
     storage.saveUpscaleComparison(validateUpscaleComparisonSaveRequest(input))
+  )
+  ipcMain.handle(IPC.storageSaveCharacterComposite, (_e, input: CharacterCompositeSaveRequest) =>
+    storage.saveCharacterComposite(validateCharacterCompositeSaveRequest(input))
   )
   ipcMain.handle(IPC.storageSaveFabricFeedbackImage, (_e, imageDataUrl: string) =>
     saveFabricFeedbackImage(storage, imageDataUrl)

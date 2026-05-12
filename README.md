@@ -13,6 +13,7 @@
 - [全体機能・シナジー精査レポート 2026-05-13](docs/FULL_FEATURE_SYNERGY_REPORT_2026-05-13.html)
 - [ブラッシュアップ実装レポート 2026-05-13](docs/FULL_FEATURE_BRUSHUP_REPORT_2026-05-13.html)
 - [AIキャラ追加ワークフロー実装レポート 2026-05-13](docs/CHARACTER_COMPOSITE_WORKFLOW_REPORT_2026-05-13.html)
+- [AIキャラ追加 強化レポート 2026-05-13](docs/CHARACTER_COMPOSITE_ADVANCED_REPORT_2026-05-13.html)
 - [ロードマップ](docs/ROADMAP.md)
 - [ファイル / フォルダ構造](docs/PROJECT_STRUCTURE.md)
 - QA証跡:
@@ -105,6 +106,7 @@ userdata/
 ├── downloads/                 再開可能ダウンロードジョブ
 ├── workspaces/                .yoitoart ワークスペース保存
 ├── upscale-comparisons/       Tile ControlNet / denoise 比較保存
+├── character-composites/      AIキャラ追加のBefore/After比較パッケージ
 └── startup-metrics.jsonl      起動診断ログ
 ```
 

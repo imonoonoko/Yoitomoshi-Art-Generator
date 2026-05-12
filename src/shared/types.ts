@@ -898,6 +898,45 @@ export interface UpscaleComparisonSaveResult {
   manifestPath: string
 }
 
+export interface CharacterCompositeSaveRequest {
+  baseImageDataUrl: string
+  characterImageDataUrl: string
+  compositeImageDataUrl: string
+  maskImageDataUrl: string
+  generatedImageDataUrl?: string | null
+  baseFilename?: string | null
+  characterFilename?: string | null
+  presetId: string
+  prompt: string
+  negativePrompt: string
+  denoise: number
+  controlNet: {
+    structureModule: string
+    structureModel: string
+    referenceModule?: string | null
+    referenceModel?: string | null
+  }
+  transform: {
+    x: number
+    y: number
+    widthPct: number
+    rotation: number
+    flipX: boolean
+    maskExpand: number
+    maskFeather: number
+    autoTone: boolean
+    characterReference: boolean
+  }
+  notes?: string
+}
+
+export interface CharacterCompositeSaveResult {
+  id: string
+  dir: string
+  manifestPath: string
+  reportPath: string
+}
+
 export interface FabricFeedbackImageSaveResult {
   filename: string
   path: string
