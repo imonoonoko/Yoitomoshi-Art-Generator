@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prompt Intelligence 実装ビフォーアフター - 2026-05-13</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d0f14;
+      --panel: #151923;
+      --panel2: #1b202c;
+      --line: #303849;
+      --ink: #f4f6fa;
+      --muted: #aab3c2;
+      --accent: #7c8cff;
+      --ok: #68c587;
+      --warn: #e0b85b;
+      --bad: #e36f6f;
+      --code: #0f1219;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.7 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    }
+    a { color: #9ba8ff; }
+    code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: var(--code);
+      color: #dfe4ff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: #111621;
+    }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 28px; }
+    .eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.25; }
+    h1 { margin-top: 8px; font-size: clamp(28px, 4vw, 42px); }
+    h2 { margin: 32px 0 12px; font-size: 21px; }
+    h3 { font-size: 16px; margin-bottom: 8px; }
+    p { margin: 8px 0 0; }
+    .lead { max-width: 920px; color: var(--muted); font-size: 16px; }
+    .grid { display: grid; gap: 14px; }
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 16px;
+    }
+    .before { border-color: rgba(224,184,91,.45); }
+    .after { border-color: rgba(104,197,135,.45); }
+    .tag {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      margin: 0 5px 5px 0;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .ok { color: var(--ok); border-color: rgba(104,197,135,.45); }
+    .warn { color: var(--warn); border-color: rgba(224,184,91,.45); }
+    .bad { color: var(--bad); border-color: rgba(227,111,111,.45); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #1a1f2a;
+      color: #dce2ed;
+      font-size: 12px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    tr:last-child td { border-bottom: 0; }
+    ul { margin: 8px 0 0; padding-left: 18px; }
+    li { margin: 4px 0; }
+    .note {
+      margin-top: 14px;
+      border: 1px solid rgba(124,140,255,.45);
+      border-radius: 8px;
+      background: rgba(124,140,255,.08);
+      padding: 12px 14px;
+      color: #d9ddff;
+    }
+    footer {
+      margin-top: 42px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: #7b8698;
+      font-size: 12px;
+    }
+    @media (max-width: 900px) {
+      .cols-2, .cols-3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="eyebrow">Before / After Report</div>
+      <h1>Prompt Intelligence 実装ビフォーアフター</h1>
+      <p class="lead">
+        拡張機能調査レポートのP0「Prompt Intelligence Hub」に対する実装スライス。
+        Better Prompt / Prompt All in ONEで重要な「タグの並び替え」と「複数タグの一括操作」を、既存のprompt文字列保存方式を維持したまま追加した。
+      </p>
+      <p>
+        参照レポート:
+        <a href="EXTENSION_GITHUB_SYNERGY_REPORT_2026-05-13.html">EXTENSION_GITHUB_SYNERGY_REPORT_2026-05-13.html</a>
+      </p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <h2>1. 実装前後</h2>
+      <div class="grid cols-2">
+        <article class="card before">
+          <h3>Before</h3>
+          <p>PromptPanelのタグチップは表示、重み調整、削除、positive/negative間移動、重複整理まで対応していた。</p>
+          <div>
+            <span class="tag warn">タグ順序はtextarea手編集</span>
+            <span class="tag warn">複数タグ操作は1件ずつ</span>
+            <span class="tag warn">よく使う部分タグ列の保存が遠い</span>
+            <span class="tag warn">構図/品質/LoRA triggerの優先順位整理が手間</span>
+            <span class="tag ok">既存prompt文字列は正本として維持</span>
+          </div>
+        </article>
+        <article class="card after">
+          <h3>After</h3>
+          <p>タグチップをドラッグで並び替え、チェックした複数タグをまとめて重み変更・削除・positive/negative移動・QuickPreset保存できる。</p>
+          <div>
+            <span class="tag ok">ドラッグ並び替え</span>
+            <span class="tag ok">複数選択</span>
+            <span class="tag ok">一括重み変更</span>
+            <span class="tag ok">一括移動/削除</span>
+            <span class="tag ok">選択タグ列をQuickPreset保存</span>
+            <span class="tag ok">日本語/英語ラベル併記維持</span>
+            <span class="tag ok">positive/negative両対応</span>
+            <span class="tag ok">保存形式変更なし</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. 変更内容</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ファイル</th>
+            <th>変更</th>
+            <th>狙い</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>src/lib/prompt-utils.ts</code></td>
+            <td><code>reorderPromptToken()</code>、<code>removePromptTokensByIndexes()</code>、<code>adjustPromptTokensByIndexes()</code> を追加。</td>
+            <td>カンマ区切りpromptをタグ配列として扱い、並び替え、一括削除、一括重み調整を安全に再結合する。</td>
+          </tr>
+          <tr>
+            <td><code>src/components/PromptTagChips.tsx</code></td>
+            <td>drag/drop、選択チェック、一括操作バー、選択タグ列のQuickPreset保存を追加。</td>
+            <td>Prompt All in ONE / Better Prompt系のタグ単位編集体験と、Easy Prompt Selector系の再利用導線を接続する。</td>
+          </tr>
+          <tr>
+            <td><code>src/components/PromptPanel.tsx</code></td>
+            <td>単体移動callbackを複数タグ移動callbackへ拡張。</td>
+            <td>選択タグをpositive/negative間で一括移動しても、既存の<code>promptAppend()</code>重複回避を使う。</td>
+          </tr>
+          <tr>
+            <td><code>src/lib/i18n.ts</code></td>
+            <td>drag/drop、複数選択、一括操作、選択保存の文言をja/en/ru/ptへ追加。</td>
+            <td>多言語UIの欠落を避ける。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>3. 操作フロー</h2>
+      <div class="grid cols-3">
+        <article class="card">
+          <h3>1. タグを作る</h3>
+          <p>Prompt Library、QuickPreset、英語タグ変換、手入力でpromptを作る。</p>
+        </article>
+        <article class="card">
+          <h3>2. チップを整える</h3>
+          <p>タグチップをドラッグして順序を調整し、チェックしたタグをまとめて重み変更、削除、positive/negative移動する。</p>
+        </article>
+        <article class="card">
+          <h3>3. 再利用して生成へ渡す</h3>
+          <p>よく使うタグ列はQuickPresetへ保存でき、編集結果はtextareaのprompt文字列に戻るため履歴、Workspace、生成payloadは従来どおり動く。</p>
+        </article>
+      </div>
+      <div class="note">
+        実装方針: 新しい構造化prompt stateはまだ導入していない。既存の保存・履歴・Workspace互換を守るため、prompt文字列を正本にしたまま操作UIだけを強化した。
+      </div>
+    </section>
+
+    <section>
+      <h2>4. 検証</h2>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>結果</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>npm.cmd run typecheck</code></td>
+            <td><span class="tag ok">PASS</span> React drag/drop型、複数選択イベント型、QuickPreset保存API、i18n参照、prompt-utils exportに問題なし。</td>
+          </tr>
+          <tr>
+            <td>Electron DOM確認</td>
+            <td><span class="tag ok">PASS</span> remote debugging経由でテストpromptを投入し、5件のタグチップ生成、2件選択、一括操作バー表示を確認。</td>
+          </tr>
+          <tr>
+            <td>保存互換</td>
+            <td><span class="tag ok">維持</span> prompt/negativePromptはstringのまま。Workspace/History/Generation payloadの形式変更なし。</td>
+          </tr>
+          <tr>
+            <td>残る確認</td>
+            <td><span class="tag warn">手動UI確認推奨</span> スクリーンショット取得はCDP応答が返らず未保存。Electron実画面でドラッグ、複数選択、QuickPreset保存の手触りを確認する。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>5. 次の改善候補</h2>
+      <ul>
+        <li><strong>タグ無効化:</strong> 文字列promptだけでは安全な無効化表現が難しいため、構造化Prompt Recipeを導入する段階で実装する。</li>
+        <li><strong>My Prompt拡張:</strong> 今回はQuickPreset保存に寄せた。次はPrompt Libraryのユーザーカテゴリや補完候補にも露出する。</li>
+        <li><strong>Blacklist:</strong> ネガティブへ送るべきタグ、重複しやすいタグ、LoRA triggerと競合するタグを検出する。</li>
+        <li><strong>構造化Prompt Recipe:</strong> タグ順序、無効化、グループ名、プリセット由来を保持し、文字列promptへエクスポートする層を追加する。</li>
+      </ul>
+    </section>
+
+    <footer>
+      <p>作成日: 2026-05-13 / 対象: Prompt Intelligence Hub P0 実装スライス</p>
+    </footer>
+  </main>
+</body>
+</html>

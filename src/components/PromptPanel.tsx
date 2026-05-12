@@ -2,7 +2,7 @@ import { Languages, Wand2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore } from '@/lib/store'
 import { api } from '@/lib/ipc'
-import { approxTokenCount, promptAppend, removePromptToken, type PromptTokenRange } from '@/lib/prompt-utils'
+import { approxTokenCount, promptAppend } from '@/lib/prompt-utils'
 import { translatePromptToEnglishTags } from '@/lib/prompt-translate'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -58,14 +58,12 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
     toast.success(tStatic('prompt.translated'))
   }
 
-  function movePromptTagToNegative(token: PromptTokenRange): void {
-    setPrompt(removePromptToken(prompt, token))
-    setNeg(promptAppend(negative, token.text))
+  function appendPromptTagsToNegative(tokens: string[]): void {
+    setNeg(tokens.reduce((next, token) => promptAppend(next, token), negative))
   }
 
-  function moveNegativeTagToPrompt(token: PromptTokenRange): void {
-    setNeg(removePromptToken(negative, token))
-    setPrompt(promptAppend(prompt, token.text))
+  function appendNegativeTagsToPrompt(tokens: string[]): void {
+    setPrompt(tokens.reduce((next, token) => promptAppend(next, token), prompt))
   }
 
   return (
@@ -104,7 +102,7 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
           target="positive"
           value={prompt}
           onChange={setPrompt}
-          onMoveToken={movePromptTagToNegative}
+          onMoveTokens={appendPromptTagsToNegative}
         />
       </div>
 
@@ -127,7 +125,7 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
           target="negative"
           value={negative}
           onChange={setNeg}
-          onMoveToken={moveNegativeTagToPrompt}
+          onMoveTokens={appendNegativeTagsToPrompt}
         />
       </div>
 

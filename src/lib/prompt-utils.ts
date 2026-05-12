@@ -60,24 +60,26 @@ export function adjustTokenWeight(
   const cur = tokens.find((t) => caret >= t.start && caret <= t.end)
   if (!cur) return { prompt, caret }
 
-  const text = cur.text
-  // Match (something:1.2) — capture content and weight.
-  const wrapped = text.match(/^\(\s*(.+?)\s*:\s*([0-9.]+)\s*\)$/)
-
-  let replacement: string
-  if (wrapped) {
-    const [, inner, w] = wrapped
-    const next = clampWeight(parseFloat(w) + delta)
-    replacement = next === 1 ? inner : `(${inner}:${next.toFixed(1)})`
-  } else {
-    const next = clampWeight(1 + delta)
-    replacement = next === 1 ? text : `(${text}:${next.toFixed(1)})`
-  }
+  const replacement = adjustPromptTokenText(cur.text, delta)
 
   const newPrompt = prompt.slice(0, cur.start) + replacement + prompt.slice(cur.end)
   // Place caret at the end of the replaced token so further key presses keep adjusting it.
   const newCaret = cur.start + replacement.length
   return { prompt: newPrompt, caret: newCaret }
+}
+
+function adjustPromptTokenText(text: string, delta: number): string {
+  // Match (something:1.2) — capture content and weight.
+  const wrapped = text.match(/^\(\s*(.+?)\s*:\s*([0-9.]+)\s*\)$/)
+
+  if (wrapped) {
+    const [, inner, w] = wrapped
+    const next = clampWeight(parseFloat(w) + delta)
+    return next === 1 ? inner : `(${inner}:${next.toFixed(1)})`
+  }
+
+  const next = clampWeight(1 + delta)
+  return next === 1 ? text : `(${text}:${next.toFixed(1)})`
 }
 
 function clampWeight(n: number): number {
@@ -119,6 +121,37 @@ export function removePromptToken(prompt: string, token: PromptTokenRange): stri
   return tidyPromptCommas(prompt.slice(0, token.start) + prompt.slice(token.end))
 }
 
+function selectedIndexSet(indexes: Iterable<number>): Set<number> {
+  return indexes instanceof Set ? indexes : new Set(indexes)
+}
+
+function joinPromptTokenTexts(tokens: string[]): string {
+  return tokens.map((token) => token.trim()).filter(Boolean).join(', ')
+}
+
+export function removePromptTokensByIndexes(prompt: string, indexes: Iterable<number>): string {
+  const selected = selectedIndexSet(indexes)
+  if (selected.size === 0) return prompt
+  return joinPromptTokenTexts(
+    splitPromptTokensWithRanges(prompt)
+      .filter((_token, index) => !selected.has(index))
+      .map((token) => token.text)
+  )
+}
+
+export function adjustPromptTokensByIndexes(
+  prompt: string,
+  indexes: Iterable<number>,
+  delta: number
+): string {
+  const selected = selectedIndexSet(indexes)
+  if (selected.size === 0) return prompt
+  return joinPromptTokenTexts(
+    splitPromptTokensWithRanges(prompt)
+      .map((token, index) => selected.has(index) ? adjustPromptTokenText(token.text, delta) : token.text)
+  )
+}
+
 export function dedupePromptTokens(prompt: string): { prompt: string; removed: number } {
   const tokens = splitPromptTokensWithRanges(prompt)
   const seen = new Set<string>()
@@ -135,6 +168,22 @@ export function dedupePromptTokens(prompt: string): { prompt: string; removed: n
     kept.push(token.text)
   }
   return { prompt: kept.join(', '), removed }
+}
+
+export function reorderPromptToken(prompt: string, fromIndex: number, toIndex: number): string {
+  const tokens = splitPromptTokensWithRanges(prompt).map((token) => token.text)
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= tokens.length ||
+    toIndex >= tokens.length
+  ) {
+    return prompt
+  }
+  const [moved] = tokens.splice(fromIndex, 1)
+  tokens.splice(toIndex, 0, moved)
+  return tokens.join(', ')
 }
 
 function tidyPromptCommas(prompt: string): string {

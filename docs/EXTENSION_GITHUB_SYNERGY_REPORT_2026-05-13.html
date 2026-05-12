@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>導入拡張 GitHub 調査と機能シナジー案 - 2026-05-13</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d0f14;
+      --panel: #151922;
+      --panel2: #1b202b;
+      --line: #303746;
+      --ink: #f3f5f8;
+      --muted: #a9b1bf;
+      --subtle: #768295;
+      --accent: #7c8cff;
+      --accent2: #59c4b6;
+      --ok: #67c587;
+      --warn: #e1b85a;
+      --bad: #e36f6f;
+      --code: #0f1219;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.7 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    }
+    a { color: #9aa7ff; }
+    code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: var(--code);
+      color: #dfe4ff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #141824 0%, #0d0f14 100%);
+    }
+    .wrap { max-width: 1220px; margin: 0 auto; padding: 28px; }
+    .eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.25; }
+    h1 { margin-top: 8px; font-size: clamp(28px, 4vw, 44px); }
+    h2 { margin: 32px 0 12px; font-size: 21px; }
+    h3 { font-size: 16px; }
+    p { margin: 8px 0 0; }
+    .lead { max-width: 960px; color: var(--muted); font-size: 16px; }
+    .meta, .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill, .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      white-space: nowrap;
+      font-weight: 700;
+    }
+    .pill { padding: 4px 10px; color: var(--muted); font-size: 12px; }
+    .tag { padding: 2px 8px; font-size: 11px; }
+    .ok { color: var(--ok); border-color: rgba(103,197,135,.45); }
+    .warn { color: var(--warn); border-color: rgba(225,184,90,.45); }
+    .bad { color: var(--bad); border-color: rgba(227,111,111,.45); }
+    .info { color: var(--accent2); border-color: rgba(89,196,182,.45); }
+    .grid { display: grid; gap: 14px; }
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 16px;
+    }
+    .card.flat { background: var(--panel2); }
+    .card h3 { margin-bottom: 8px; }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 22px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+    .metric strong { display: block; font-size: 24px; line-height: 1.2; }
+    .metric span { color: var(--muted); font-size: 12px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 8px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      color: #dce1ea;
+      background: #1a1f2a;
+      font-size: 12px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    tr:last-child td { border-bottom: 0; }
+    td.small { color: var(--muted); font-size: 12px; }
+    ul { margin: 8px 0 0; padding-left: 18px; }
+    li { margin: 4px 0; }
+    .priority {
+      display: grid;
+      grid-template-columns: 92px 1fr 1.2fr;
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+      margin-top: 10px;
+    }
+    .priority > div { padding: 12px; border-bottom: 1px solid var(--line); }
+    .priority > div:nth-last-child(-n+3) { border-bottom: 0; }
+    .priority .rank { font-weight: 900; color: var(--accent); background: #111520; }
+    .note {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border: 1px solid rgba(225,184,90,.45);
+      border-radius: 8px;
+      background: rgba(225,184,90,.08);
+      color: #f0d99c;
+    }
+    footer {
+      margin-top: 42px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: var(--subtle);
+      font-size: 12px;
+    }
+    @media (max-width: 900px) {
+      .summary, .cols-2, .cols-3 { grid-template-columns: 1fr; }
+      .priority { grid-template-columns: 1fr; }
+      .priority > div { border-bottom: 1px solid var(--line) !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="eyebrow">Yoitomoshi Art Generator / Extension Research</div>
+      <h1>導入拡張 GitHub 調査と機能シナジー案</h1>
+      <p class="lead">
+        現在 `runtime/forge/webui/extensions` に導入済みの11拡張と、Forge同梱拡張群を調査し、
+        YoitomoshiのElectron UIへ取り込むべき機能強化を整理した。結論として、Gradio UI拡張をそのまま再有効化するより、
+        既存のPrompt Library、Prompt Helper、Model Library、Workspace、ControlNet Builder、Upscale比較に機能思想を移植する方が安定する。
+      </p>
+      <div class="meta">
+        <span class="pill">調査日: 2026-05-13</span>
+        <span class="pill">対象: 追加拡張 11件</span>
+        <span class="pill">同梱拡張: Forge extensions-builtin 38件</span>
+        <span class="pill">運用前提: Forge API専用 / Gradio UI非依存</span>
+      </div>
+      <div class="summary">
+        <div class="metric"><strong>4</strong><span>追加拡張は現状有効</span></div>
+        <div class="metric"><strong>7</strong><span>追加拡張は現状無効</span></div>
+        <div class="metric"><strong>5</strong><span>高優先シナジー案</span></div>
+        <div class="metric"><strong>0</strong><span>外部コードコピー前提の提案</span></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <h2>1. 全体結論</h2>
+      <div class="grid cols-3">
+        <article class="card">
+          <h3>Prompt系は統合UIへ寄せる</h3>
+          <p>
+            TagComplete、Prompt All in ONE、Better Prompt、Easy Prompt Selectorは、全部が「promptを文字列ではなくタグ単位で扱う」方向を向いている。
+            Yoitomoshi側では既にタグチップ編集と英語タグ化を始めたので、次はドラッグ並び替え、無効化、履歴、ブラックリスト、My Prompt相当の登録を一体化する。
+          </p>
+        </article>
+        <article class="card">
+          <h3>Model系はRecipe化する</h3>
+          <p>
+            Model Preset Manager、Config Presets、Civitai Helperは、モデルごとの最適なprompt、negative、VAE、解像度、sampler、trigger wordsを保存する思想が強い。
+            YoitomoshiのModel LibraryとWorkspaceをつなぎ、モデル単位の「推奨Recipeカード」にするのが最短で効く。
+          </p>
+        </article>
+        <article class="card">
+          <h3>画像入力はタグ・補修・構図へ流す</h3>
+          <p>
+            WD14 Tagger、ADetailer、ControlNet、Ultimate Upscaleは、画像を解析してタグ化し、必要な場所だけ補修し、構図を保って高解像度化する流れを作れる。
+            Drop画像からPrompt Helper、ControlNet Builder、ADetailer、Upscale比較へ連結する導線を強化する。
+          </p>
+        </article>
+      </div>
+      <div class="note">
+        ライセンス上の注意: ADetailerとForgeはAGPL、Ultimate UpscaleはGPL、Model Preset Manager / Civitai Helper / WD14 TaggerはGitHubメタデータ上で明示ライセンスなし。
+        将来公開を考える場合、コード移植ではなく、公開READMEから分かる機能要件をYoitomoshi側で独自実装する方針を維持する。
+      </div>
+    </section>
+
+    <section>
+      <h2>2. 導入拡張別の調査結果</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>拡張</th>
+            <th>状態</th>
+            <th>GitHub上の主機能</th>
+            <th>Yoitomoshiへの取り込み案</th>
+            <th>優先</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><a href="https://github.com/DominikDoom/a1111-sd-webui-tagcomplete">a1111-sd-webui-tagcomplete</a><br><span class="tag">MIT</span></td>
+            <td><span class="tag warn">無効</span></td>
+            <td>Danbooru/e621タグ補完、翻訳、wildcard補完、Extra Networks補完、LoRA trigger word候補、preview表示。</td>
+            <td>既存PromptEditorを拡張し、タグ辞書CSV、LoRA trigger、ワイルドカード候補を同じ補完候補へ統合。Prompt Libraryの日本語ラベルと並べて表示。</td>
+            <td><span class="tag ok">P0</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/Bing-su/adetailer">adetailer</a><br><span class="tag bad">AGPL</span></td>
+            <td><span class="tag ok">有効</span></td>
+            <td>生成画像から対象検出、mask作成、inpaintを行う。追加YOLOモデルを `models/adetailer` に置ける。</td>
+            <td>ADetailerPanelを「顔/手/目/小物の補修プリセット」に拡張し、Prompt Helperが顔・手の注意を出した時に対応unitを提案する。</td>
+            <td><span class="tag ok">P0</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/Zyin055/Config-Presets">Config-Presets</a><br><span class="tag">MIT</span></td>
+            <td><span class="tag warn">無効</span></td>
+            <td>WebUI上の生成設定をプリセット化し、custom fieldsも保存できる。Flux/Forge対応の更新履歴あり。</td>
+            <td>QuickPresetとは別に「Parameter Preset」を追加し、steps/cfg/size/sampler/scheduler/VAE/ControlNet/ADetailerの組み合わせを保存する。</td>
+            <td><span class="tag info">P1</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/rifeWithKaiju/model_preset_manager">model_preset_manager</a><br><span class="tag bad">ライセンス未明示</span></td>
+            <td><span class="tag warn">無効</span></td>
+            <td>モデルごとのprompt、negative、CFG、解像度、sampler、clip skip等をJSON preset化し、Civitai thumbnail/trigger wordsも扱う。</td>
+            <td>Model Libraryに「Model Recipe」タブを追加。Civitai推奨値、履歴でよく使う設定、LoRA trigger、Workspace保存を1枚のカードにまとめる。</td>
+            <td><span class="tag ok">P0</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/blue-pen5805/sdweb-easy-prompt-selector">sdweb-easy-prompt-selector</a><br><span class="tag">MIT</span></td>
+            <td><span class="tag warn">無効</span></td>
+            <td>YAMLで定義したタグボタン、カテゴリ、ランダム入力、wildcard連携、元promptのPNG Info保存。</td>
+            <td>Prompt Libraryに「タグパック」形式を追加。YAML/JSONでキャラ・髪・表情・衣装・構図のボタンセットを作り、ランダム展開結果もmetadataへ保存する。</td>
+            <td><span class="tag info">P1</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/eideehi/sd-webui-better-prompt">sd-webui-better-prompt</a><br><span class="tag">MIT</span></td>
+            <td><span class="tag ok">有効</span></td>
+            <td>Prompt追加フォーム、Textual Inversion/LoRA/Danbooru候補、Fuse.js類似検索、タグのドラッグ並び替え、重みGUI、My Prompt登録。</td>
+            <td>タグチップ編集にドラッグ並び替え、Shift削除、右クリック重みメニュー、My Prompt登録を追加。LoRAカードのtrigger wordsも候補に混ぜる。</td>
+            <td><span class="tag ok">P0</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/Physton/sd-webui-prompt-all-in-one">sd-webui-prompt-all-in-one</a><br><span class="tag">MIT</span></td>
+            <td><span class="tag warn">無効</span></td>
+            <td>自動翻訳、履歴、お気に入り、重み調整、削除、無効化、batch操作、blacklist、LoRA/Textual Inversion強調、テーマ。</td>
+            <td>外部翻訳API依存ではなく、ローカル辞書+Prompt Library+任意設定APIキーの二段構えへ。Prompt履歴・お気に入り・blacklistをWorkspace/Historyと共有する。</td>
+            <td><span class="tag ok">P0</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/zixaphir/Stable-Diffusion-Webui-Civitai-Helper">Stable-Diffusion-Webui-Civitai-Helper</a><br><span class="tag bad">ライセンス未明示</span></td>
+            <td><span class="tag warn">無効</span></td>
+            <td>モデルscan、Civitai info/preview取得、URLからdownload、resume、version check、trigger words追加、生成画像metadata補強。</td>
+            <td>既存Model Library復旧を拡張し、Civitai page URL紐付け、version更新、preview prompt読込、PNG resource metadata付与をToolsに集約する。</td>
+            <td><span class="tag info">P1</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/L4Ph/stable-diffusion-webui-localization-ja_JP">stable-diffusion-webui-localization-ja_JP</a><br><span class="tag">CC0</span></td>
+            <td><span class="tag warn">無効</span></td>
+            <td>AUTOMATIC1111 WebUI向け日本語化、Crowdin翻訳、Bilingual Localization併用。</td>
+            <td>Yoitomoshi側のi18n辞書とPrompt Library日本語ラベルを統一する用語集として参照。Forge UI翻訳自体は不要。</td>
+            <td><span class="tag">P2</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/picobyte/stable-diffusion-webui-wd14-tagger">stable-diffusion-webui-wd14-tagger</a><br><span class="tag bad">ライセンス未明示</span></td>
+            <td><span class="tag ok">有効</span></td>
+            <td>画像ラベリング拡張。DeepDanbooru/WD系モデルで画像からタグを抽出する。</td>
+            <td>InputImagePanelの「タグ抽出」をPrompt Helperに接続し、抽出タグをタグチップ、ControlNet用途、LoRA候補、History検索キーへ流す。</td>
+            <td><span class="tag ok">P0</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/Coyote-A/ultimate-upscale-for-automatic1111">ultimate-upscale-for-automatic1111</a><br><span class="tag bad">GPL</span></td>
+            <td><span class="tag ok">有効</span></td>
+            <td>タイル分割による高解像度化。A1111/Forgeのscriptとして使われ、denoise/tile/seam設定が重要。</td>
+            <td>既存Upscale比較を発展させ、Tile ControlNet ON/OFF、denoise、seam fix、tile sizeの採用基準を素材別Recipeとして保存する。</td>
+            <td><span class="tag info">P1</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>3. Forge同梱拡張群の扱い</h2>
+      <div class="grid cols-2">
+        <article class="card">
+          <h3>API専用起動で使うべき中核</h3>
+          <p>
+            Forge本体はStable Diffusion WebUI上の開発基盤で、資源管理、推論高速化、実験機能を目的としている。
+            現在のYoitomoshiではGradio UIを開かず、Forge APIとalwayson_scripts/script_argsを直接使う。
+          </p>
+          <div class="tags">
+            <span class="tag ok">sd_forge_controlnet</span>
+            <span class="tag ok">sd_forge_multidiffusion</span>
+            <span class="tag ok">sd_forge_dynamic_thresholding</span>
+            <span class="tag ok">sd_forge_freeu</span>
+            <span class="tag ok">sd_forge_lora</span>
+            <span class="tag ok">SwinIR / ScuNET</span>
+          </div>
+        </article>
+        <article class="card">
+          <h3>Yoitomoshi側で強化する入口</h3>
+          <p>
+            Forge同梱のpreprocessor群はControlNet Builderから使うのが最適。normalbae、tile、reference、inpaint、recolor、revision、marigoldなどは、
+            「用途カード」と「画像プレビュー」を増やせばユーザーが直接理解できる。
+          </p>
+          <div class="tags">
+            <span class="tag info">ControlNet Builder</span>
+            <span class="tag info">Input Image Insight</span>
+            <span class="tag info">Upscale Compare</span>
+            <span class="tag info">Tools Catalog Health</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>4. 優先実装案</h2>
+      <div class="priority">
+        <div class="rank">P0-1</div>
+        <div><strong>Prompt Intelligence Hub</strong><br>TagComplete + Prompt All in ONE + Better Prompt + Easy Prompt Selector</div>
+        <div>タグチップのドラッグ並び替え、無効化、batch選択、blacklist、My Prompt登録、Prompt履歴を1つのパネルへ統合する。既存PromptPanelに最も近く、即効性が高い。</div>
+
+        <div class="rank">P0-2</div>
+        <div><strong>Model Recipe Card</strong><br>Model Preset Manager + Config Presets + Civitai Helper</div>
+        <div>モデル選択時に、推奨prompt、negative、trigger words、VAE、sampler、steps、CFG、サイズ、LoRA組み合わせを提示し、Workspaceとして保存できるようにする。</div>
+
+        <div class="rank">P0-3</div>
+        <div><strong>Image to Prompt to Control Flow</strong><br>WD14 Tagger + ControlNet + ADetailer</div>
+        <div>画像ドロップ後、タグ抽出、Prompt候補、ControlNet role提案、ADetailer補修unit提案までを1本化する。img2img初心者の導線として効果が大きい。</div>
+
+        <div class="rank">P1-1</div>
+        <div><strong>Model Library Recovery Plus</strong><br>Civitai Helper思想の継承</div>
+        <div>既存復旧機能へ、Civitai URL再紐付け、preview prompt再取得、更新通知、resource metadata付与を追加する。ダウンロード管理の信頼性を上げる。</div>
+
+        <div class="rank">P1-2</div>
+        <div><strong>Upscale Recipe Lab</strong><br>Ultimate Upscale + Tile ControlNet + Forge preprocessors</div>
+        <div>denoise/tile/seam/ControlNetの比較結果を素材タイプ別Recipeとして残す。人物、背景、線画、写真で既定値を分ける。</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>5. 既存機能とのシナジーマップ</h2>
+      <div class="grid cols-2">
+        <article class="card flat">
+          <h3>Prompt Library / Prompt Helper</h3>
+          <ul>
+            <li>TagCompleteのタグ辞書を検索候補へ追加する。</li>
+            <li>Prompt All in ONEの履歴・お気に入り・blacklistを、YoitomoshiのPrompt Recipeとして保存する。</li>
+            <li>Better PromptのMy Promptを、Prompt Libraryのユーザーカテゴリに統合する。</li>
+          </ul>
+        </article>
+        <article class="card flat">
+          <h3>LoRA / Civitai / Model Library</h3>
+          <ul>
+            <li>LoRA trigger wordsをタグ補完とModel Recipeに流す。</li>
+            <li>Civitai preview画像とmetadataをModel Libraryのカードに表示する。</li>
+            <li>履歴でよく使ったLoRAをモデル別にスコアリングし、Recipe候補へ昇格する。</li>
+          </ul>
+        </article>
+        <article class="card flat">
+          <h3>ControlNet Builder</h3>
+          <ul>
+            <li>WD14タグ抽出結果から、pose/depth/lineart/reference/tileの候補を出す。</li>
+            <li>Forge同梱preprocessorを用途カードとして整理する。</li>
+            <li>preprocessor出力をWorkspace参照として保存し、再実行なしで復元する。</li>
+          </ul>
+        </article>
+        <article class="card flat">
+          <h3>History / Workspace / Upscale</h3>
+          <ul>
+            <li>生成時promptだけでなく「展開前prompt」「ランダムseed」「採用Recipe」をmetadataに残す。</li>
+            <li>Upscale比較結果をHistoryラベルと連動させ、採用候補/素材化済みに分類する。</li>
+            <li>Workspace保存時にModel RecipeとPrompt Recipeをまとめて再現可能にする。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>6. 実装しない/慎重に扱う案</h2>
+      <table>
+        <thead>
+          <tr><th>案</th><th>理由</th><th>代替</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Prompt All in ONEを再有効化してGradio UIで使う</td>
+            <td>YoitomoshiはForge API専用起動で、Gradio UI系拡張は起動遅延・互換エラーの原因になる。</td>
+            <td>機能思想だけをReact側に実装する。</td>
+          </tr>
+          <tr>
+            <td>AGPL/GPL拡張のコードを直接移植する</td>
+            <td>将来公開時のライセンス影響が大きい。</td>
+            <td>公開READMEから分かる仕様を参考に独自実装する。Forge API呼び出しは既存連携の範囲で使う。</td>
+          </tr>
+          <tr>
+            <td>外部翻訳APIを必須にする</td>
+            <td>ローカル創作ツールとして、APIキー・通信・料金・レート制限が障害になる。</td>
+            <td>ローカル辞書を既定にし、任意で翻訳プロバイダを追加可能にする。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>7. GitHub調査ソース</h2>
+      <ul>
+        <li><a href="https://github.com/DominikDoom/a1111-sd-webui-tagcomplete">DominikDoom/a1111-sd-webui-tagcomplete</a></li>
+        <li><a href="https://github.com/Bing-su/adetailer">Bing-su/adetailer</a></li>
+        <li><a href="https://github.com/Zyin055/Config-Presets">Zyin055/Config-Presets</a></li>
+        <li><a href="https://github.com/rifeWithKaiju/model_preset_manager">rifeWithKaiju/model_preset_manager</a></li>
+        <li><a href="https://github.com/blue-pen5805/sdweb-easy-prompt-selector">blue-pen5805/sdweb-easy-prompt-selector</a></li>
+        <li><a href="https://github.com/eideehi/sd-webui-better-prompt">eideehi/sd-webui-better-prompt</a></li>
+        <li><a href="https://github.com/Physton/sd-webui-prompt-all-in-one">Physton/sd-webui-prompt-all-in-one</a></li>
+        <li><a href="https://github.com/zixaphir/Stable-Diffusion-Webui-Civitai-Helper">zixaphir/Stable-Diffusion-Webui-Civitai-Helper</a></li>
+        <li><a href="https://github.com/L4Ph/stable-diffusion-webui-localization-ja_JP">L4Ph/stable-diffusion-webui-localization-ja_JP</a></li>
+        <li><a href="https://github.com/picobyte/stable-diffusion-webui-wd14-tagger">picobyte/stable-diffusion-webui-wd14-tagger</a></li>
+        <li><a href="https://github.com/Coyote-A/ultimate-upscale-for-automatic1111">Coyote-A/ultimate-upscale-for-automatic1111</a></li>
+        <li><a href="https://github.com/lllyasviel/stable-diffusion-webui-forge">lllyasviel/stable-diffusion-webui-forge</a></li>
+      </ul>
+    </section>
+
+    <footer>
+      <p>
+        作成先: <code>docs/EXTENSION_GITHUB_SYNERGY_REPORT_2026-05-13.html</code>。
+        このレポートは2026-05-13時点のGitHub README/リポジトリメタデータと、ローカル導入状態を突き合わせて作成した。
+      </p>
+    </footer>
+  </main>
+</body>
+</html>

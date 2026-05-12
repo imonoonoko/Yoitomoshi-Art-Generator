@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, BoxSelect, CheckCircle2, Clock3, Crosshair, Layers3, Play, ScanLine, Search, Sparkles, Upload, Wand2, X } from 'lucide-react'
+import { AlertTriangle, BoxSelect, CheckCircle2, Clock3, Crosshair, Layers3, Play, Plus, ScanLine, Search, Sparkles, Upload, Wand2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore, type ControlNetUnitState } from '@/lib/store'
 import { useT, t as tStatic } from '@/lib/i18n'
@@ -125,6 +125,11 @@ const ROLE_PRESETS: RolePreset[] = [
 
 const DETECT_PROCESSOR_RES = 512
 
+interface DetectionResult {
+  image: string
+  module: string
+}
+
 export function ControlNetBuilderPanel(): JSX.Element {
   const controlnet = useStore((s) => s.controlnet)
   const status = useStore((s) => s.forgeStatus)
@@ -133,6 +138,7 @@ export function ControlNetBuilderPanel(): JSX.Element {
   const setControlnetCatalogs = useStore((s) => s.setControlnetCatalogs)
   const patchControlnet = useStore((s) => s.patchControlnet)
   const patchUnit = useStore((s) => s.patchControlnetUnit)
+  const addUnit = useStore((s) => s.addControlnetUnit)
   const openCivitaiSearch = useStore((s) => s.openCivitaiSearch)
   const t = useT()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -142,6 +148,7 @@ export function ControlNetBuilderPanel(): JSX.Element {
   const [sourcePath, setSourcePath] = useState<string | null>(null)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [previewModule, setPreviewModule] = useState<string | null>(null)
+  const [targetUnitIndex, setTargetUnitIndex] = useState(0)
   const [detecting, setDetecting] = useState(false)
   const [detectStartedAt, setDetectStartedAt] = useState<number | null>(null)
   const [detectNow, setDetectNow] = useState(Date.now())
@@ -167,6 +174,11 @@ export function ControlNetBuilderPanel(): JSX.Element {
     return () => window.clearInterval(interval)
   }, [detecting, detectStartedAt])
 
+  useEffect(() => {
+    if (targetUnitIndex < controlnet.units.length) return
+    setTargetUnitIndex(Math.max(0, controlnet.units.length - 1))
+  }, [controlnet.units.length, targetUnitIndex])
+
   function applyPreset(preset: RolePreset): void {
     setSelectedRole(preset.id)
     const resolved = resolvePreset(preset, modules, models)
@@ -185,11 +197,14 @@ export function ControlNetBuilderPanel(): JSX.Element {
       guidanceEnd: 1
     }
     patchControlnet({ enabled: true })
-    patchUnit(0, unitPatch)
+    patchUnit(targetUnitIndex, unitPatch)
     if (resolved.modelMissing) {
       toast(tStatic('cnBuilder.modelMissing'), { icon: '!' })
     } else {
-      toast.success(tStatic('cnBuilder.applied', { role: tStatic(`cnBuilder.role.${preset.id}`) }))
+      toast.success(tStatic('cnBuilder.appliedToUnit', {
+        role: tStatic(`cnBuilder.role.${preset.id}`),
+        unit: targetUnitIndex + 1
+      }))
     }
   }
 
@@ -209,14 +224,14 @@ export function ControlNetBuilderPanel(): JSX.Element {
     reader.readAsDataURL(file)
   }
 
-  async function runPreprocessor(): Promise<void> {
+  async function runPreprocessor(showSuccessToast = true): Promise<DetectionResult | null> {
     if (!sourceImage) {
       toast.error(tStatic('cnBuilder.needImage'))
-      return
+      return null
     }
     if (status.kind !== 'ready') {
       toast.error(tStatic('inputImage.waitForge'))
-      return
+      return null
     }
     const preset = ROLE_PRESETS.find((item) => item.id === selectedRole) ?? ROLE_PRESETS[0]
     const resolved = resolvePreset(preset, modules, models)
@@ -225,9 +240,11 @@ export function ControlNetBuilderPanel(): JSX.Element {
     setDetectNow(startedAt)
     setDetecting(true)
     try {
+      let result: DetectionResult
       if (resolved.module === 'None' || preset.id === 'reference') {
         setPreviewImage(sourceImage)
         setPreviewModule(resolved.module)
+        result = { image: sourceImage, module: resolved.module }
       } else {
         const detected = await api.forge.controlnetDetect({
           image: sourceImage,
@@ -239,28 +256,33 @@ export function ControlNetBuilderPanel(): JSX.Element {
         })
         setPreviewImage(detected.image)
         setPreviewModule(detected.module)
+        result = { image: detected.image, module: detected.module }
       }
-      toast.success(tStatic('cnBuilder.detected'))
+      if (showSuccessToast) toast.success(tStatic('cnBuilder.detected'))
+      return result
     } catch (e) {
       toast.error(tStatic('cnBuilder.detectFailed', { message: (e as Error).message }))
+      return null
     } finally {
       setDetecting(false)
       setDetectStartedAt(null)
     }
   }
 
-  function applyPreviewToUnit(): void {
+  function applyPreviewToUnit(preprocessed?: DetectionResult, showSuccessToast = true): boolean {
     if (!sourceImage && !previewImage) {
       toast.error(tStatic('cnBuilder.needImage'))
-      return
+      return false
     }
     const preset = ROLE_PRESETS.find((item) => item.id === selectedRole) ?? ROLE_PRESETS[0]
     const resolved = resolvePreset(preset, modules, models)
-    const useProcessedMap = previewImage && shouldUseProcessedMap(preset.id, previewModule ?? resolved.module)
-    const image = useProcessedMap ? previewImage : (sourceImage ?? previewImage)
-    if (!image) return
+    const candidatePreviewImage = preprocessed?.image ?? previewImage
+    const candidatePreviewModule = preprocessed?.module ?? previewModule ?? resolved.module
+    const useProcessedMap = candidatePreviewImage && shouldUseProcessedMap(preset.id, candidatePreviewModule)
+    const image = useProcessedMap ? candidatePreviewImage : (sourceImage ?? candidatePreviewImage)
+    if (!image) return false
     patchControlnet({ enabled: true })
-    patchUnit(0, {
+    patchUnit(targetUnitIndex, {
       enabled: true,
       module: useProcessedMap ? 'None' : resolved.module,
       model: resolved.model,
@@ -276,12 +298,30 @@ export function ControlNetBuilderPanel(): JSX.Element {
       guidanceStart: 0,
       guidanceEnd: 1
     })
-    toast.success(tStatic('cnBuilder.previewApplied', { role: tStatic(`cnBuilder.role.${preset.id}`) }))
+    if (showSuccessToast) {
+      toast.success(tStatic('cnBuilder.previewApplied', {
+        role: tStatic(`cnBuilder.role.${preset.id}`),
+        unit: targetUnitIndex + 1
+      }))
+    }
+    return true
+  }
+
+  async function runAndApply(): Promise<void> {
+    const result = await runPreprocessor(false)
+    if (!result) return
+    const applied = applyPreviewToUnit(result, false)
+    if (!applied) return
+    toast.success(tStatic('cnBuilder.runAndApplyDone', {
+      role: tStatic(`cnBuilder.role.${selectedRole}`),
+      unit: targetUnitIndex + 1
+    }))
   }
 
   const detectElapsedSeconds = detecting && detectStartedAt
     ? Math.max(0, Math.floor((detectNow - detectStartedAt) / 1000))
     : null
+  const targetUnit = controlnet.units[targetUnitIndex] ?? controlnet.units[0]
 
   return (
     <CollapsiblePanel
@@ -346,13 +386,48 @@ export function ControlNetBuilderPanel(): JSX.Element {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-1 rounded-md border border-line bg-bg-2/50 p-1.5">
+        <span className="mr-1 text-[10px] text-ink-3">{t('cnBuilder.targetUnit')}</span>
+        {controlnet.units.map((_unit, index) => (
+          <button
+            key={index}
+            type="button"
+            className={cn(
+              'rounded border px-2 py-1 text-[10px] transition-colors',
+              targetUnitIndex === index
+                ? 'border-accent bg-accent/15 text-ink-0'
+                : 'border-line text-ink-3 hover:bg-bg-3 hover:text-ink-1'
+            )}
+            onClick={() => setTargetUnitIndex(index)}
+          >
+            {t('cn.unitLabel', { n: index + 1 })}
+          </button>
+        ))}
+        {controlnet.units.length < 3 && (
+          <button
+            type="button"
+            className="ml-auto inline-flex h-7 items-center gap-1 rounded border border-line px-2 text-[10px] text-ink-3 transition-colors hover:bg-bg-3 hover:text-ink-1"
+            onClick={() => {
+              const nextIndex = controlnet.units.length
+              patchControlnet({ enabled: true })
+              addUnit()
+              setTargetUnitIndex(nextIndex)
+            }}
+            title={t('cnBuilder.addTargetUnit')}
+          >
+            <Plus className="h-3 w-3" />
+            {t('cnBuilder.addTargetUnit')}
+          </button>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-2">
         {ROLE_PRESETS.map((preset) => {
           const resolved = resolvePreset(preset, modules, models)
           const active = controlnet.enabled &&
-            controlnet.units[0]?.enabled &&
-            controlnet.units[0]?.module === resolved.module &&
-            controlnet.units[0]?.model === resolved.model
+            targetUnit?.enabled &&
+            targetUnit.module === resolved.module &&
+            targetUnit.model === resolved.model
           return (
             <button
               key={preset.id}
@@ -406,7 +481,7 @@ export function ControlNetBuilderPanel(): JSX.Element {
               <span>{t('cnBuilder.detectElapsed', { seconds: detectElapsedSeconds })}</span>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               className="btn justify-center text-xs"
@@ -420,10 +495,19 @@ export function ControlNetBuilderPanel(): JSX.Element {
               type="button"
               className="btn btn-primary justify-center text-xs"
               disabled={!sourceImage || detecting}
-              onClick={applyPreviewToUnit}
+              onClick={() => { applyPreviewToUnit() }}
             >
               <Play className="h-3.5 w-3.5" />
-              {t('cnBuilder.applyPreview')}
+              {t('cnBuilder.applyPreview', { unit: targetUnitIndex + 1 })}
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary justify-center text-xs"
+              disabled={!sourceImage || detecting || status.kind !== 'ready'}
+              onClick={() => { void runAndApply() }}
+            >
+              <Sparkles className={cn('h-3.5 w-3.5', detecting && 'animate-pulse')} />
+              {t('cnBuilder.runAndApply')}
             </button>
           </div>
         </div>
