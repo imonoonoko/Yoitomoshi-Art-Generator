@@ -12,6 +12,7 @@
 - [次作業優先度レポート 2026-05-12](docs/NEXT_ACTION_REPORT_2026-05-12.html)
 - [全体機能・シナジー精査レポート 2026-05-13](docs/FULL_FEATURE_SYNERGY_REPORT_2026-05-13.html)
 - [ブラッシュアップ実装レポート 2026-05-13](docs/FULL_FEATURE_BRUSHUP_REPORT_2026-05-13.html)
+- [AIキャラ追加ワークフロー実装レポート 2026-05-13](docs/CHARACTER_COMPOSITE_WORKFLOW_REPORT_2026-05-13.html)
 - [ロードマップ](docs/ROADMAP.md)
 - [ファイル / フォルダ構造](docs/PROJECT_STRUCTURE.md)
 - QA証跡:

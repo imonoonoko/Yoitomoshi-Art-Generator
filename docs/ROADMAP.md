@@ -168,6 +168,9 @@
 - Historyのラベル整理とFABRICを接続。お気に入り / 採用候補 / 素材化済みはFABRIC positive、没はFABRIC negativeへまとめて送れるようにし、`history:{id}` で重複投入を防ぐ。
 - PromptPanelに生成前チェックを追加。Forge ready、モデル未選択、非生成タブ、img2img入力画像、拡張ガード、VAE/LoRAのカタログ不一致、ControlNet画像/モデル、FABRIC feedback、ADetailer検出モデルを生成直前に見える化する。
 - 検証: `npm.cmd run typecheck` と `npm.cmd run build` はPASS。Electron実機での目視QAは次回、履歴ラベル付き実データとControlNet/FABRICを使って確認する。
+- img2imgに「AIキャラ追加」パネルを追加。元写真の上へ透明PNG/キャラ画像を配置し、ドラッグ位置・サイズ・回転・左右反転・mask拡張/ぼかしを調整できる。`馴染ませ準備` で合成画像をimg2img入力へ、キャラalpha由来の白黒maskをInpaint maskへ、lineart/canny系ControlNet Unit 1を自動設定し、prompt/negative/denoiseもプリセットに合わせて追記する。
+- AIキャラ追加プリセットは `写真にアニメ / 夜写真 / しっかり描く / 境界修正` の4種。サンプルのような夜・低照度写真には `夜写真` を既定にし、暗さ・粒状感・赤い光・自然な影をpromptと仮配置フィルタへ反映する。
+- 参考調査は Inpaint + ControlNet、ControlNet reference_only、IP-Adapter、LayerDiffuse、IC-Light、Inpaint Anything、Replacer、GLIGEN/Add-it/Paint-by-Example に整理し、まずはForge APIで即実装できる「置く→マスク→ControlNet/Inpaint準備」をP0として採用した。詳細は [`CHARACTER_COMPOSITE_WORKFLOW_REPORT_2026-05-13.html`](CHARACTER_COMPOSITE_WORKFLOW_REPORT_2026-05-13.html)。
 
 残タスク更新:
 
@@ -177,6 +180,7 @@
 - Upscale比較保存は実素材QA済み。比較結果を1セット保存し、drift / seam / detail の採用基準と推奨denoiseを確定した。
 - Promptタグ編集は文字列プロンプトを正本にした軽量実装まで完了。次の拡張は、タグ無効化を含む構造化Prompt RecipeとしてWorkspace/Historyに保存するかどうかを決めてから進める。
 - 生成前チェックは初期版。次はチェック結果をGenerateボタンのdisabled理由と連動させ、警告はクリックで該当パネルへ移動できるようにする。
+- AIキャラ追加はP0導線まで完了。次は実写真+透明PNGでのElectron目視QA、採用案のBefore/After保存、LayerDiffuse透明生成・IP-Adapter参照・IC-Light照明合わせの段階統合を進める。
 - Format Converter は `.ckpt/.pt/.pth` の checkpoint 実ファイルが環境にないため、次に該当ファイルが `webui/models/Stable-diffusion/` に入った時点で実変換を1回確認する。
 
 以下は2026-05-11に完了済み。

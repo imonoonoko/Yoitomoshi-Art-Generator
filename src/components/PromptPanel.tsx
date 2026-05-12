@@ -22,6 +22,7 @@ import { ADetailerPanel } from './extensions/ADetailerPanel'
 import { ControlNetBuilderPanel } from './extensions/ControlNetBuilderPanel'
 import { ControlNetPanel } from './extensions/ControlNetPanel'
 import { GenerationPreflightPanel } from './GenerationPreflightPanel'
+import { CharacterComposePanel } from './CharacterComposePanel'
 
 interface Props {
   onGenerate(): Promise<void>
@@ -73,6 +74,7 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
     <aside className="flex flex-col gap-3 p-3 overflow-y-auto bg-bg-1 border-r border-line w-[380px] shrink-0">
       <RecommendationCard />
       {currentTab === 'img2img' && <InputImagePanel />}
+      {currentTab === 'img2img' && <CharacterComposePanel onGenerate={onGenerate} />}
       <LoraSuggestionStrip />
       <PromptHelperPanel />
 

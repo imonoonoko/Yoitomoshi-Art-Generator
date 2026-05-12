@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIキャラ追加ワークフロー実装レポート 2026-05-13</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0f13;
+      --panel: #141b24;
+      --panel-2: #19232e;
+      --line: #2b3746;
+      --ink: #eef5fc;
+      --soft: #cad7e5;
+      --muted: #96a7ba;
+      --accent: #7fb2ff;
+      --accent-2: #67d4b8;
+      --ok: #66d993;
+      --warn: #efbf63;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.65;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: rgba(255,255,255,.045);
+      padding: .12rem .35rem;
+      color: #dce8ff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: .92em;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(127,178,255,.14), rgba(11,15,19,0) 72%),
+        #10161f;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    .hero { padding-top: 42px; padding-bottom: 38px; }
+    .eyebrow {
+      color: var(--accent-2);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.25; letter-spacing: 0; }
+    h1 { margin-top: 10px; font-size: clamp(30px, 5vw, 50px); }
+    h2 { margin-bottom: 14px; font-size: 23px; }
+    h3 { font-size: 16px; }
+    p { margin: .55rem 0 0; color: var(--soft); }
+    main { padding: 28px 0 64px; }
+    section { margin-top: 20px; }
+    .lead { max-width: 920px; color: #dbe6f2; font-size: 16px; }
+    .grid { display: grid; gap: 14px; }
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 16px;
+    }
+    .card.alt { background: var(--panel-2); }
+    .tag {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .tag.ok { color: var(--ok); border-color: rgba(102,217,147,.5); }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 11px 12px;
+      text-align: left;
+      vertical-align: top;
+      color: var(--soft);
+      font-size: 14px;
+    }
+    th {
+      color: var(--ink);
+      background: rgba(255,255,255,.045);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    tr:last-child td { border-bottom: 0; }
+    ol, ul { margin: 8px 0 0; padding-left: 20px; color: var(--soft); }
+    li { margin: 5px 0; }
+    .muted { color: var(--muted); }
+    @media (max-width: 860px) {
+      .cols-2, .cols-3 { grid-template-columns: 1fr; }
+      .wrap { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap hero">
+      <div class="eyebrow">Character Compositing Workflow</div>
+      <h1>AIキャラを元画像へ追加するための簡単ワークフロー</h1>
+      <p class="lead">
+        GitHub/記事調査で得た「LayerDiffuseで透明キャラ」「Inpaint + ControlNetで馴染ませ」
+        「IP-Adapterで参照」「IC-Lightで照明合わせ」の流れを、まずForge APIだけで使える
+        <strong>置く → マスク → ControlNet/Inpaint準備</strong> のUIとして実装した。
+      </p>
+      <div class="chips">
+        <span class="tag ok">typecheck PASS</span>
+        <span class="tag ok">build PASS</span>
+        <span class="tag">2026-05-13</span>
+        <span class="tag">img2img / Inpaint / ControlNet</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <h2>ユーザー操作</h2>
+      <div class="card">
+        <ol>
+          <li>img2imgタブで元写真を読み込む。</li>
+          <li>「AIキャラ追加」を開き、透明PNGまたはキャラ画像を読み込む。</li>
+          <li>プレビュー上でキャラ位置をドラッグし、サイズ・回転・左右反転を調整する。</li>
+          <li>プリセットを選ぶ。夜の写真なら「夜写真」が既定。</li>
+          <li>「馴染ませ準備」または「準備して生成」を押す。</li>
+        </ol>
+      </div>
+    </section>
+
+    <section>
+      <h2>内部で行うこと</h2>
+      <div class="grid cols-3">
+        <article class="card">
+          <h3>合成入力を作る</h3>
+          <p>元画像へキャラレイヤーを描画し、暗さ・彩度・ぼかし・影をプリセットで仮適用する。</p>
+        </article>
+        <article class="card">
+          <h3>Inpaint maskを作る</h3>
+          <p>キャラ画像のalphaを白黒mask化し、拡張と境界ぼかしをかけて周辺だけ再描画できるようにする。</p>
+        </article>
+        <article class="card">
+          <h3>ControlNetを自動設定</h3>
+          <p>lineart/canny/softedge系を優先してUnit 1へ設定し、配置の輪郭を生成時に維持する。</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>実装範囲</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>実装内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>UI</td>
+            <td><code>src/components/CharacterComposePanel.tsx</code> を追加し、<code>PromptPanel</code> のimg2img時だけ表示。</td>
+          </tr>
+          <tr>
+            <td>配置</td>
+            <td>キャラ画像の読み込み、ドラッグ移動、サイズ、回転、左右反転。</td>
+          </tr>
+          <tr>
+            <td>マスク</td>
+            <td>alpha由来のmask生成、mask拡張、境界ぼかし。</td>
+          </tr>
+          <tr>
+            <td>プリセット</td>
+            <td>写真にアニメ、夜写真、しっかり描く、境界修正。</td>
+          </tr>
+          <tr>
+            <td>生成準備</td>
+            <td>img2img入力、Inpaint mask、denoise、prompt/negative、ControlNet Unitを一括設定。</td>
+          </tr>
+          <tr>
+            <td>検証</td>
+            <td><code>npm.cmd run typecheck</code> と <code>npm.cmd run build</code> はPASS。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>調査ソースからの採用判断</h2>
+      <div class="grid cols-2">
+        <article class="card alt">
+          <h3>今すぐ採用</h3>
+          <ul>
+            <li><a href="https://www.ipentec.com/document/ai-image/stable-diffusion-generate-objects-using-inpaint-and-controlnet">Inpaint + ControlNet</a>: ラフ配置をControlNetで支えながらinpaintする考え方。</li>
+            <li><a href="https://github.com/Mikubill/sd-webui-controlnet">sd-webui-controlnet</a>: img2img/inpaintとmask対応、Pixel Perfect、preprocessor preview。</li>
+            <li><a href="https://github.com/light-and-ray/sd-webui-replacer">Replacer</a>: mask + inpaintの一体化UIの参考。</li>
+          </ul>
+        </article>
+        <article class="card alt">
+          <h3>次段階で統合</h3>
+          <ul>
+            <li><a href="https://github.com/lllyasviel/sd-forge-layerdiffuse">sd-forge-layerdiffuse</a>: 透明キャラ生成とレイヤー合成。</li>
+            <li><a href="https://github.com/tencent-ailab/IP-Adapter">IP-Adapter</a>: キャラ参照/顔・雰囲気保持。</li>
+            <li><a href="https://github.com/lllyasviel/IC-Light">IC-Light</a>: 背景に合わせた照明調整。</li>
+            <li><a href="https://github.com/Uminosachi/sd-webui-inpaint-anything">Inpaint Anything</a>: SAM由来のmask作成。</li>
+            <li><a href="https://github.com/gligen/GLIGEN">GLIGEN</a> / <a href="https://github.com/NVlabs/addit">Add-it</a>: bbox/object insertion系の研究枠。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>次の改善</h2>
+      <div class="card">
+        <ul>
+          <li>実写真と透明PNGでElectron目視QAを行い、スクリーンショットを保存する。</li>
+          <li>生成候補のBefore / 仮配置 / Afterを履歴またはWorkspaceへまとめて保存する。</li>
+          <li>LayerDiffuseで透明キャラを直接生成し、そのままAIキャラ追加へ送るボタンを追加する。</li>
+          <li>IP-Adapter / reference_onlyを「同じキャラを保つ」スロットとして追加する。</li>
+          <li>IC-Lightまたは簡易色調推定で、暗さ・色温度・粒状感の自動合わせを強化する。</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
