@@ -38,7 +38,8 @@ const GROUPS: ShortcutGroup[] = [
   {
     titleKey: 'shortcuts.section.promptEditor',
     items: [
-      { keys: ['Tab'], descriptionKey: 'shortcuts.acAccept' },
+      { keys: ['Ctrl', 'Space'], descriptionKey: 'shortcuts.acOpen' },
+      { keys: ['Tab', 'Enter'], descriptionKey: 'shortcuts.acAccept' },
       { keys: ['↑', '↓'], descriptionKey: 'shortcuts.acNav' },
       { keys: ['Esc'], descriptionKey: 'shortcuts.acClose' }
     ]

@@ -36,7 +36,7 @@
 | Phase 1 | ✅ | scaffold / Forge 自動起動 / txt2img / モデル選択 / Civitai 推奨 / プロンプトライブラリ / 履歴 / プリセット |
 | Phase 1.5 | ✅ | サブカテゴリ複数トグル / お気に入り / クイックプリセット / トークンカウンター / ショートカット / モデル取込 |
 | Phase 1.6 | ✅ | img2img / D&D + クリップボード / deepdanbooru タグ抽出 / 結果を入力へ戻す連続編集 |
-| Phase 2 | ✅ | 生成中プレビュー / 履歴検索 / シンタックスハイライト / ショートカットモーダル / 拡張無効化 |
+| Phase 2 | ✅ | 生成中プレビュー / 履歴検索 / プロンプト編集補助 / ショートカットモーダル / 拡張無効化 |
 | Phase 3 | ✅ | LoRA カード UI / 複数 LoRA / 自動提案 / トリガーワード自動挿入 |
 | Phase 4 | ✅ | PNG/JPEG/WebP メタデータ抽出 / ラベル形式テキスト解析 / Civitai 照合 / 推奨 VAE 自動 DL |
 | Phase 5 | ✅ | `setup.bat` / `run.bat` / `update.bat` / Node.js + Forge 同梱 share フォルダ |
@@ -179,6 +179,7 @@
 - OpenPose / Depth / Lineart の候補を再調査し、`xinsir-controlnet-openpose-sdxl-1.0.safetensors`、`xinsir-controlnet-depth-sdxl-1.0.safetensors`、`mistoline-lineart-rank256.safetensors` を導入した。SHA検証、Forge `model_list`、Electron UI smoke、Model Library反映まで確認済み。詳細は [`CONTROLNET_MODEL_INSTALLATION_REPORT_2026-05-13.html`](CONTROLNET_MODEL_INSTALLATION_REPORT_2026-05-13.html)。
 - Goal 1-5を完了。実素材でControlNet preprocessor / txt2img実生成を baseline、pose、depth、lineart、tile で検証し、AIキャラ追加は夜景写真 + 透明PNG + mask + img2img/inpaint + MistoLine/reference_only でAfter画像まで保存した。ControlNet BuilderはHF由来モデル名を役割カードへ表示し、Model LibraryにはrepoId/pageUrl/expectedSha256を追記した。次の追加候補は `xinsir/controlnet-canny-sdxl-1.0` をP0、`h94/IP-Adapter` SDXLをP1に整理。詳細は [`GOAL_1_5_EXECUTION_REPORT_2026-05-13.html`](GOAL_1_5_EXECUTION_REPORT_2026-05-13.html)。
 - 生成設定のシンプル化を開始。ParametersPanel に「おすすめ設定」4種(高速確認 / 標準 / 高品質 / AIキャラ追加)を追加し、Sampler / Scheduler / VAE / Seed / Batch / Clip Skip は詳細設定の折りたたみに移した。普段は目的別プリセット、Steps / CFG / サイズだけで調整できる導線にする。
+- Prompt Editorの表示ズレ対策として、textarea上のミラー式シンタックスハイライトを外し、実文字をそのまま表示する方式へ変更。オートコンプリートは自動表示をやめ、Ctrl+Spaceで手動起動、候補一覧は入力欄下に配置して本文に重ならないようにした。
 
 残タスク更新:
 
@@ -187,6 +188,7 @@
 - Model Library復旧は実データQA済み。既存の約21.3GBライブラリで復旧ボタンを実行し、SHA queueがUI操作を阻害しないこととmetadata/preview再取得を確認した。
 - Upscale比較保存は実素材QA済み。比較結果を1セット保存し、drift / seam / detail の採用基準と推奨denoiseを確定した。
 - Promptタグ編集は文字列プロンプトを正本にした軽量実装まで完了。次の拡張は、タグ無効化を含む構造化Prompt RecipeとしてWorkspace/Historyに保存するかどうかを決めてから進める。
+- Prompt Editorの色分けを再導入する場合は、textareaミラー方式ではなく、ズレが出にくい専用エディタ採用かタグチップ側の視覚化で行う。
 - 生成前チェックは初期版。次はチェック結果をGenerateボタンのdisabled理由と連動させ、警告はクリックで該当パネルへ移動できるようにする。
 - AIキャラ追加はP0導線、比較保存、連携診断まで完了。次はIP-Adapter model配置済み環境でのUnit 2効果確認、実写真+透明PNGでのトーンON/OFF比較、LayerDiffuse透明生成・IC-Light照明合わせの段階統合を進める。
 - Format Converter は `.ckpt/.pt/.pth` の checkpoint 実ファイルが環境にないため、次に該当ファイルが `webui/models/Stable-diffusion/` に入った時点で実変換を1回確認する。

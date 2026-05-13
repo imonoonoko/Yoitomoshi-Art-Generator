@@ -1,15 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import { adjustTokenWeight } from '@/lib/prompt-utils'
-import { highlightPrompt } from '@/lib/prompt-highlight'
 
 interface Props {
   value: string
   onChange(v: string): void
   placeholder?: string
   rows?: number
-  /** Visual variant — negative prompts get a slight reddish tint. */
+  /** Visual variant. Negative prompts get a slight reddish tint. */
   tone?: 'positive' | 'negative'
   ariaLabel: string
   onSubmit?(): void
@@ -23,9 +22,8 @@ interface Suggestion {
 const MAX_SUGGESTIONS = 8
 
 /**
- * Textarea with inline autocomplete fed from the prompt library's tag dictionary.
- * The user types, and when the last token (split on comma/newline/parenthesis) has
- * 2+ chars, we show a popover of matching tags. Tab or Enter accepts.
+ * Textarea with opt-in autocomplete fed from the prompt library tag dictionary.
+ * Ctrl+Space opens suggestions for the current token; Tab or Enter accepts.
  */
 export function PromptEditor({
   value,
@@ -43,15 +41,13 @@ export function PromptEditor({
   const [highlighted, setHighlighted] = useState(0)
   const [open, setOpen] = useState(false)
 
-  function recompute(text: string, caret: number): void {
+  function findSuggestions(text: string, caret: number): Suggestion[] {
     const before = text.slice(0, caret)
     // Last token = portion after the most recent boundary char.
     const m = before.match(/([^\s,()\n]+)$/)
     const token = m?.[1] ?? ''
-    if (token.length < 2 || autocomplete.size === 0) {
-      setOpen(false)
-      return
-    }
+    if (token.length < 2 || autocomplete.size === 0) return []
+
     const lc = token.toLowerCase()
     const out: Suggestion[] = []
     for (const [en, ja] of autocomplete.entries()) {
@@ -63,7 +59,7 @@ export function PromptEditor({
       }
     }
     if (out.length === 0) {
-      // Fallback: substring search
+      // Fallback: substring search.
       for (const [en, ja] of autocomplete.entries()) {
         const enLower = en.toLowerCase()
         const jaLower = ja.toLowerCase()
@@ -73,12 +69,28 @@ export function PromptEditor({
         }
       }
     }
+    return out
+  }
+
+  function showAutocomplete(): void {
+    const ta = ref.current
+    if (!ta) return
+    const out = findSuggestions(value, ta.selectionStart)
     setSuggestions(out)
     setHighlighted(0)
     setOpen(out.length > 0)
   }
 
-  function accept(s: Suggestion): void {
+  function refreshAutocomplete(text = value, caret = ref.current?.selectionStart ?? 0): void {
+    if (!open) return
+    const out = findSuggestions(text, caret)
+    setSuggestions(out)
+    setHighlighted(0)
+    setOpen(out.length > 0)
+  }
+
+  function accept(s: Suggestion | undefined): void {
+    if (!s) return
     const ta = ref.current
     if (!ta) return
     const caret = ta.selectionStart
@@ -97,6 +109,11 @@ export function PromptEditor({
     })
   }
 
+  function onTextChange(e: React.ChangeEvent<HTMLTextAreaElement>): void {
+    onChange(e.target.value)
+    if (open) refreshAutocomplete(e.target.value, e.target.selectionStart)
+  }
+
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     // Ctrl+Enter submits even when autocomplete is open.
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -105,8 +122,12 @@ export function PromptEditor({
       onSubmit?.()
       return
     }
-    // Ctrl+ArrowUp/Down adjusts the weight of the token under the caret —
-    // matches A1111's keyboard shortcut for parens-weight.
+    if ((e.ctrlKey || e.metaKey) && (e.key === ' ' || e.code === 'Space')) {
+      e.preventDefault()
+      showAutocomplete()
+      return
+    }
+    // Ctrl+ArrowUp/Down adjusts the weight of the token under the caret.
     if ((e.ctrlKey || e.metaKey) && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
       e.preventDefault()
       const ta = ref.current
@@ -122,6 +143,10 @@ export function PromptEditor({
     }
 
     if (!open) return
+    if (suggestions.length === 0) {
+      setOpen(false)
+      return
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setHighlighted((h) => (h + 1) % suggestions.length)
@@ -137,62 +162,34 @@ export function PromptEditor({
   }
 
   useEffect(() => {
-    if (!ref.current) return
-    recompute(value, ref.current.selectionStart)
+    refreshAutocomplete()
+    // refreshAutocomplete intentionally reads the current caret from ref.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value])
-
-  const tokens = useMemo(() => highlightPrompt(value), [value])
-
-  // Keep the syntax-highlighting <pre> scrolled in lockstep with the textarea.
-  const mirrorRef = useRef<HTMLPreElement>(null)
-  function syncScroll(): void {
-    const t = ref.current
-    const m = mirrorRef.current
-    if (!t || !m) return
-    m.scrollTop = t.scrollTop
-    m.scrollLeft = t.scrollLeft
-  }
+  }, [value, autocomplete])
 
   return (
-    <div className="relative">
-      {/*
-        Mirror layer renders the styled prompt; the textarea on top has
-        transparent text and a visible caret. Both use identical font/padding/
-        line-height so character positions match pixel-for-pixel. If they ever
-        drift, check the .input + textarea-class CSS first.
-      */}
-      <pre
-        ref={mirrorRef}
-        aria-hidden
-        className={cn(
-          'absolute inset-0 input pointer-events-none overflow-hidden',
-          'font-mono text-[13px] leading-relaxed whitespace-pre-wrap break-words m-0'
-        )}
-      >
-        {tokens.map((t, i) => (
-          <span key={i} className={t.className}>{t.text}</span>
-        ))}
-      </pre>
+    <div>
       <textarea
         ref={ref}
         rows={rows}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onTextChange}
         onKeyDown={onKeyDown}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
-        onScroll={syncScroll}
+        onClick={() => refreshAutocomplete()}
+        onSelect={() => refreshAutocomplete()}
         placeholder={placeholder}
         aria-label={ariaLabel}
+        aria-keyshortcuts="Control+Space"
         spellCheck={false}
         className={cn(
-          'input resize-none font-mono text-[13px] leading-relaxed relative bg-transparent',
-          'text-transparent caret-ink-0 selection:bg-accent/40 selection:text-ink-0',
+          'input resize-none font-mono text-[13px] leading-relaxed',
+          'text-ink-0 caret-ink-0 selection:bg-accent/40 selection:text-ink-0',
           tone === 'negative' && 'border-line/60'
         )}
       />
-      {open && (
-        <div className="absolute z-30 mt-1 left-0 right-0 max-h-[260px] overflow-auto card shadow-2xl">
+      {open && suggestions.length > 0 && (
+        <div className="mt-1 max-h-[180px] overflow-auto card shadow-xl">
           {suggestions.map((s, i) => (
             <button
               key={s.en}
