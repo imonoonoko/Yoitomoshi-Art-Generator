@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>必要モデル・実素材リサーチ 2026-05-13</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101114;
+      --panel: #181b20;
+      --panel2: #20242c;
+      --line: #333946;
+      --text: #eff2f7;
+      --muted: #aab1bf;
+      --ok: #79d18b;
+      --warn: #ffd36a;
+      --bad: #ff8f8f;
+      --info: #8cb9ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      line-height: 1.65;
+    }
+    header, main { max-width: 1200px; margin: 0 auto; padding: 28px; }
+    header { padding-top: 44px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 36px 0 14px; font-size: 21px; }
+    h3 { margin: 22px 0 8px; font-size: 16px; }
+    p { margin: 8px 0; }
+    a { color: #9cc7ff; }
+    code { background: #0d0f13; border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+    table { width: 100%; border-collapse: collapse; margin: 14px 0 24px; }
+    th, td { border: 1px solid var(--line); padding: 10px 12px; vertical-align: top; }
+    th { background: #242936; text-align: left; }
+    td { background: var(--panel); }
+    ul { margin: 8px 0 18px 22px; padding: 0; }
+    li { margin: 6px 0; }
+    .lead { color: var(--muted); max-width: 920px; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+    .k { color: var(--muted); font-size: 12px; }
+    .v { font-size: 22px; font-weight: 700; margin-top: 4px; }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    .info { color: var(--info); }
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      background: var(--panel2);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .note { color: var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    @media (max-width: 900px) {
+      header, main { padding: 20px; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      table { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="pill">2026-05-13 research</p>
+    <h1>必要モデル・実素材リサーチ</h1>
+    <p class="lead">
+      前回残った未検証項目を進めるために、現環境で不足しているモデル、拡張、検証素材を調査した。
+      現在の ControlNet は Tile のみ配置済みなので、次のQAは pose / depth / lineart / character reference を揃えるのが最短。
+      モデルは複数GBのため、このレポートでは勝手にダウンロードせず、入れる順番と配置先を確定する。
+    </p>
+  </header>
+
+  <main>
+    <section class="grid">
+      <div class="card"><div class="k">現配置ControlNet</div><div class="v">Tileのみ</div></div>
+      <div class="card"><div class="k">最小追加容量</div><div class="v warn">約6GB+</div></div>
+      <div class="card"><div class="k">推奨追加容量</div><div class="v warn">約11GB+</div></div>
+      <div class="card"><div class="k">素材QA</div><div class="v info">自前素材優先</div></div>
+    </section>
+
+    <h2>最短で入れるモデル</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>優先</th>
+          <th>用途</th>
+          <th>モデル / 配布元</th>
+          <th>入れるファイル</th>
+          <th>配置先 / 注意</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill">P0</span></td>
+          <td>人物ポーズ固定</td>
+          <td>
+            <a href="https://huggingface.co/xinsir/controlnet-openpose-sdxl-1.0">xinsir/controlnet-openpose-sdxl-1.0</a><br>
+            Apache-2.0。SDXL向け OpenPose ControlNet。Hugging Face上のファイル一覧では本体が約2.5GB。
+          </td>
+          <td>
+            <code>diffusion_pytorch_model.safetensors</code><br>
+            推奨リネーム: <code>xinsir-controlnet-openpose-sdxl-1.0.safetensors</code>
+          </td>
+          <td>
+            <code>runtime/forge/webui/models/ControlNet/</code><br>
+            まず Unit 1 + <code>openpose_full</code> で「手・顔込み」と「体だけ」を比較。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="pill">P0</span></td>
+          <td>奥行き固定</td>
+          <td>
+            <a href="https://huggingface.co/xinsir/controlnet-depth-sdxl-1.0">xinsir/controlnet-depth-sdxl-1.0</a><br>
+            Apache-2.0。<code>zoe</code> / <code>midas</code> 系Depth入力を想定。ファイル一覧では本体約2.5GB。
+          </td>
+          <td>
+            <code>diffusion_pytorch_model.safetensors</code><br>
+            推奨リネーム: <code>xinsir-controlnet-depth-sdxl-1.0.safetensors</code>
+          </td>
+          <td>
+            <code>runtime/forge/webui/models/ControlNet/</code><br>
+            既存QAで <code>depth_midas</code> はPASS済みなので、このモデルで実生成QAへ進める。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="pill">P0</span></td>
+          <td>AIキャラの輪郭なじませ</td>
+          <td>
+            <a href="https://huggingface.co/TheMistoAI/MistoLine">TheMistoAI/MistoLine</a><br>
+            OpenRAIL++。多種類の線画入力に対応するSDXL ControlNet。README上では <code>rank256</code> 版が推奨されている。
+          </td>
+          <td>
+            <code>mistoLine_rank256.safetensors</code> 約774MB<br>
+            代替: <code>mistoLine_fp16.safetensors</code> 約2.5GB
+          </td>
+          <td>
+            <code>runtime/forge/webui/models/ControlNet/</code><br>
+            商用/公開配布時は TheMisto.ai への明示的クレジットが必要。まず <code>lineart_standard</code> と <code>canny</code> 出力で比較。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="pill">P1</span></td>
+          <td>硬い輪郭 / 背景構造</td>
+          <td>
+            <a href="https://huggingface.co/xinsir/controlnet-canny-sdxl-1.0">xinsir/controlnet-canny-sdxl-1.0</a><br>
+            Apache-2.0。Canny用途のSDXL ControlNet。V2ファイルも公開されている。
+          </td>
+          <td>
+            <code>diffusion_pytorch_model_V2.safetensors</code> 約2.5GB<br>
+            推奨リネーム: <code>xinsir-controlnet-canny-sdxl-1.0-v2.safetensors</code>
+          </td>
+          <td>
+            <code>runtime/forge/webui/models/ControlNet/</code><br>
+            写真背景の柵・建物・人物輪郭を保つ比較に使う。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="pill">P1</span></td>
+          <td>ラフ / softedge / 線画汎用</td>
+          <td>
+            <a href="https://huggingface.co/xinsir/controlnet-scribble-sdxl-1.0">xinsir/controlnet-scribble-sdxl-1.0</a><br>
+            Apache-2.0。scribble / HED / PIDI / lineart系の比較に使える。
+          </td>
+          <td>
+            <code>diffusion_pytorch_model.safetensors</code> 約2.5GB<br>
+            推奨リネーム: <code>xinsir-controlnet-scribble-sdxl-1.0.safetensors</code>
+          </td>
+          <td>
+            <code>runtime/forge/webui/models/ControlNet/</code><br>
+            MistoLineで足りない場合の比較候補。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="pill">P2</span></td>
+          <td>複数Controlを1モデルに集約</td>
+          <td>
+            <a href="https://huggingface.co/xinsir/controlnet-union-sdxl-1.0">xinsir/controlnet-union-sdxl-1.0</a><br>
+            Apache-2.0。README上では10+ control、ProMaxは12 control + 5 advanced editing。
+          </td>
+          <td>
+            <code>diffusion_pytorch_model.safetensors</code> 約2.51GB<br>
+            代替: <code>diffusion_pytorch_model_promax.safetensors</code> 約2.51GB
+          </td>
+          <td>
+            <code>runtime/forge/webui/models/ControlNet/</code><br>
+            Forge/API側で union control type 指定が必要になる可能性があるため、まず通常モデルでQAを通してから実験。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>AIキャラ追加を強くするモデル / 拡張</h2>
+    <table>
+      <thead>
+        <tr><th>優先</th><th>用途</th><th>候補</th><th>必要ファイル</th><th>判断</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill">P0.5</span></td>
+          <td>キャラ参照 / 画風参照</td>
+          <td>
+            <a href="https://huggingface.co/h94/IP-Adapter">h94/IP-Adapter</a><br>
+            Apache-2.0。SDXL向けは <code>sdxl_models/</code> にまとまっている。
+          </td>
+          <td>
+            最小候補: <code>sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors</code> 約848MB<br>
+            顔寄せ候補: <code>sdxl_models/ip-adapter-plus-face_sdxl_vit-h.safetensors</code> 約848MB<br>
+            環境によって <code>sdxl_models/image_encoder/model.safetensors</code> 約3.69GB が必要。
+          </td>
+          <td>
+            本アプリのUnit 2参照強化に直結。ただし Forge の ControlNet catalog に IP-Adapter module が見えるか先に確認する。
+            見えない場合は <code>reference_only</code> を先に使い、IP-Adapterは別導入スライスに分ける。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="pill">P1</span></td>
+          <td>透明PNGキャラ生成</td>
+          <td>
+            <a href="https://github.com/lllyasviel/sd-forge-layerdiffuse">lllyasviel/sd-forge-layerdiffuse</a><br>
+            Forge向けLayerDiffuse拡張。透明画像とレイヤー生成用。
+          </td>
+          <td>
+            READMEではモデル選択/ダウンロードは基本自動。手動確認対象は
+            <code>layer_xl_transparent_attn.safetensors</code>、
+            <code>vae_transparent_encoder.safetensors</code>、
+            <code>vae_transparent_decoder.safetensors</code> など。
+          </td>
+          <td>
+            <code>runtime/forge/webui/extensions/sd-forge-layerdiffuse/</code> に拡張を入れてForge再起動。
+            まず「透明キャラを作る」用途だけ検証し、合成なじませとは分ける。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="pill">P2</span></td>
+          <td>照明合わせ</td>
+          <td>
+            <a href="https://github.com/lllyasviel/IC-Light">lllyasviel/IC-Light</a><br>
+            公式READMEはこのGitHubが唯一の公式だと注意している。Hugging Face Spaceにモデルあり。
+          </td>
+          <td>
+            <a href="https://huggingface.co/spaces/lllyasviel/IC-Light/tree/main/models"><code>models/iclight_sd15_fc.safetensors</code></a> 約1.72GB
+          </td>
+          <td>
+            SD1.5系の外部Relightワークフローとして扱うのが現実的。Forge内統合より先に、外部runnerで「赤い街灯 / 夜写真 / 左右光源」の効果を確認する。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>実素材セット</h2>
+    <table>
+      <thead>
+        <tr><th>セット</th><th>必要素材</th><th>判定したいこと</th><th>保管案</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AIキャラ追加 夜写真</td>
+          <td>
+            自分で撮影した夜/薄暗い写真 2枚。片側にキャラを置ける空き、柵・木・街灯など細部あり。
+            透明PNGキャラ 2枚。半身と全身、髪や服のalphaが綺麗なもの。
+          </td>
+          <td>
+            トーン自動合わせON/OFF、mask拡張/ぼかし、denoise 0.35/0.55、MistoLine/Cannyの輪郭保持。
+            人物の顔・煙草・背景の赤い光などを壊さずキャラだけ馴染むか。
+          </td>
+          <td><code>userdata/qa-materials/character-night/</code></td>
+        </tr>
+        <tr>
+          <td>AIキャラ追加 昼/室内</td>
+          <td>
+            昼屋外 1枚、暖色室内 1枚。影方向が分かるもの。
+            同じキャラPNGを使い回す。
+          </td>
+          <td>
+            夜写真専用プリセットに寄りすぎていないか。明るい背景で境界が黒くならないか。
+          </td>
+          <td><code>userdata/qa-materials/character-day-indoor/</code></td>
+        </tr>
+        <tr>
+          <td>ControlNet pose</td>
+          <td>
+            全身立ち、座り、ピース/手上げの人物写真または自作棒人間pose画像 3枚。
+            顔が不要なら後ろ姿やシルエットでよい。
+          </td>
+          <td>
+            <code>openpose_full</code> + OpenPose SDXLモデルで、手足位置が固定されるか。
+          </td>
+          <td><code>userdata/qa-materials/controlnet-pose/</code></td>
+        </tr>
+        <tr>
+          <td>ControlNet depth</td>
+          <td>
+            前景/中景/背景が明確な写真 3枚。室内廊下、階段、人物+背景など。
+          </td>
+          <td>
+            <code>depth_midas</code> + Depth SDXLモデルで、奥行きと構図が保たれるか。
+          </td>
+          <td><code>userdata/qa-materials/controlnet-depth/</code></td>
+        </tr>
+        <tr>
+          <td>ControlNet lineart/canny</td>
+          <td>
+            建物/柵/小物の硬い輪郭写真 2枚、キャラ線画または白背景黒線 2枚。
+          </td>
+          <td>
+            MistoLine rank256、xinsir Canny、既存 lineart preprocessor の相性。
+            AIキャラ追加の境界修正にも使う。
+          </td>
+          <td><code>userdata/qa-materials/controlnet-line/</code></td>
+        </tr>
+        <tr>
+          <td>IP-Adapter</td>
+          <td>
+            同一キャラの顔寄り、半身、全身の参照 3枚。透過PNGと白背景版を両方用意。
+          </td>
+          <td>
+            Unit 2参照がキャラの顔/服/色味をどれだけ保持するか。
+            reference_onlyとの差が出るか。
+          </td>
+          <td><code>userdata/qa-materials/ip-adapter/</code></td>
+        </tr>
+        <tr>
+          <td>LayerDiffuse</td>
+          <td>
+            apple、glass/cup、messy hair character の3プロンプト。必要なら既存SDXL checkpointで生成。
+          </td>
+          <td>
+            透明PNGのalphaが本当に保存されるか。髪・半透明・発光の境界が通常背景除去より自然か。
+          </td>
+          <td><code>userdata/qa-materials/layerdiffuse/</code></td>
+        </tr>
+        <tr>
+          <td>IC-Light</td>
+          <td>
+            透明キャラPNG + 背景3枚。赤い街灯、青い夜光、暖色室内。
+          </td>
+          <td>
+            左右光源、色温度、影の方向が背景に近づくか。
+          </td>
+          <td><code>userdata/qa-materials/ic-light/</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>素材の入手方針</h2>
+    <ul>
+      <li>最優先は自分で撮影した写真と、自分で生成/制作したキャラPNG。人物の顔が写る場合は本人同意がある素材に限定する。</li>
+      <li>公開レポートに載せる可能性がある素材は、人物・ブランド・看板・作品が写り込まないものを使う。</li>
+      <li>外部素材を使う場合、<a href="https://unsplash.com/license">Unsplash License</a> と <a href="https://www.pexels.com/license/">Pexels License</a> は無料利用を許すが、未加工販売や人物/ブランドの推奨表示には制限がある。QA用途でも出典URLと取得日を <code>manifest.json</code> に残す。</li>
+      <li>Wikimedia Commonsはファイルごとにライセンスが違うため、CC BY / CC BY-SA / Public Domain の条件を個別に確認する。</li>
+    </ul>
+
+    <h2>導入順</h2>
+    <ol>
+      <li><strong>P0 ControlNet QAセット:</strong> OpenPose、Depth、MistoLine rank256を入れる。容量は約5.8GB。</li>
+      <li><strong>P0 実素材QA:</strong> 夜写真2枚、昼/室内2枚、透明PNGキャラ2枚を自前で用意し、AIキャラ追加のBefore/Afterパッケージを1セット保存する。</li>
+      <li><strong>P1 輪郭比較:</strong> xinsir Canny V2を追加し、MistoLineとの境界/背景保持差を比較する。</li>
+      <li><strong>P1 参照強化:</strong> Forge側にIP-Adapter moduleが出ることを確認してから、IP-Adapter SDXL safetensorsを入れる。</li>
+      <li><strong>P1 透明生成:</strong> LayerDiffuse拡張を導入し、透明PNG生成だけを単独QAする。</li>
+      <li><strong>P2 照明:</strong> IC-LightはForge直接統合ではなく、外部runnerの効果確認から始める。</li>
+      <li><strong>P2 実験:</strong> xinsir ControlNet Union / ProMaxは通常モデルQA後に、API payload差分を調べてから試す。</li>
+    </ol>
+
+    <h2>参考ソース</h2>
+    <ul>
+      <li><a href="https://huggingface.co/xinsir/controlnet-openpose-sdxl-1.0">xinsir/controlnet-openpose-sdxl-1.0</a></li>
+      <li><a href="https://huggingface.co/xinsir/controlnet-depth-sdxl-1.0">xinsir/controlnet-depth-sdxl-1.0</a></li>
+      <li><a href="https://huggingface.co/xinsir/controlnet-canny-sdxl-1.0">xinsir/controlnet-canny-sdxl-1.0</a></li>
+      <li><a href="https://huggingface.co/xinsir/controlnet-scribble-sdxl-1.0">xinsir/controlnet-scribble-sdxl-1.0</a></li>
+      <li><a href="https://huggingface.co/xinsir/controlnet-union-sdxl-1.0">xinsir/controlnet-union-sdxl-1.0</a></li>
+      <li><a href="https://huggingface.co/TheMistoAI/MistoLine">TheMistoAI/MistoLine</a></li>
+      <li><a href="https://huggingface.co/h94/IP-Adapter">h94/IP-Adapter</a></li>
+      <li><a href="https://github.com/Mikubill/sd-webui-controlnet/wiki/Model-download">sd-webui-controlnet Model download wiki</a></li>
+      <li><a href="https://github.com/lllyasviel/sd-forge-layerdiffuse">lllyasviel/sd-forge-layerdiffuse</a></li>
+      <li><a href="https://github.com/lllyasviel/IC-Light">lllyasviel/IC-Light</a></li>
+      <li><a href="https://unsplash.com/license">Unsplash License</a> / <a href="https://www.pexels.com/license/">Pexels License</a></li>
+    </ul>
+  </main>
+</body>
+</html>
