@@ -177,10 +177,11 @@
 - 未検証項目の棚卸しを実施。`typecheck` / `build` / Forge API smoke / AIキャラ追加UI+IPC / Model Library整合性 / DownloadJob現況 / Workspace参照保存 / Upscale比較保存 / 配布版EXE smokeを確認した。配布ビルドは `runtime/forge` の巨大モデル混入と Windows通常権限の `winCodeSign` 展開失敗を検出し、electron-builder設定で除外・未署名個人配布ビルドへ修正したうえで `npm.cmd run dist` PASS。詳細は [`PROJECT_UNVERIFIED_VALIDATION_REPORT_2026-05-13.html`](PROJECT_UNVERIFIED_VALIDATION_REPORT_2026-05-13.html)。
 - 必要モデル・実素材を調査。最短QAセットは OpenPose SDXL、Depth SDXL、MistoLine rank256 と、自前の夜写真/昼写真/透明PNGキャラ素材。追加比較は xinsir Canny V2、IP-Adapter SDXL、LayerDiffuse、IC-Light、ControlNet Union。詳細は [`MODEL_AND_ASSET_RESEARCH_REPORT_2026-05-13.html`](MODEL_AND_ASSET_RESEARCH_REPORT_2026-05-13.html)。
 - OpenPose / Depth / Lineart の候補を再調査し、`xinsir-controlnet-openpose-sdxl-1.0.safetensors`、`xinsir-controlnet-depth-sdxl-1.0.safetensors`、`mistoline-lineart-rank256.safetensors` を導入した。SHA検証、Forge `model_list`、Electron UI smoke、Model Library反映まで確認済み。詳細は [`CONTROLNET_MODEL_INSTALLATION_REPORT_2026-05-13.html`](CONTROLNET_MODEL_INSTALLATION_REPORT_2026-05-13.html)。
+- Goal 1-5を完了。実素材でControlNet preprocessor / txt2img実生成を baseline、pose、depth、lineart、tile で検証し、AIキャラ追加は夜景写真 + 透明PNG + mask + img2img/inpaint + MistoLine/reference_only でAfter画像まで保存した。ControlNet BuilderはHF由来モデル名を役割カードへ表示し、Model LibraryにはrepoId/pageUrl/expectedSha256を追記した。次の追加候補は `xinsir/controlnet-canny-sdxl-1.0` をP0、`h94/IP-Adapter` SDXLをP1に整理。詳細は [`GOAL_1_5_EXECUTION_REPORT_2026-05-13.html`](GOAL_1_5_EXECUTION_REPORT_2026-05-13.html)。
 
 残タスク更新:
 
-- ControlNet入力生成はUI/IPC実装とUI QAまで完了し、pose / lineart / depth のP0モデルも導入済み。次は実素材で preprocessor 結果を各ControlNet modelに渡す実生成QAを行う。
+- ControlNet入力生成はUI/IPC実装、UI QA、pose / lineart / depth / tile の実生成QAまで完了。次は canny モデル導入後に建物・小物・硬い輪郭の保持を追加比較する。
 - Workspace参照保存は実素材QA済み。参照先が存在しない共有Workspaceの差し替えUIと、相対パス化の是非は後続で検討する。
 - Model Library復旧は実データQA済み。既存の約21.3GBライブラリで復旧ボタンを実行し、SHA queueがUI操作を阻害しないこととmetadata/preview再取得を確認した。
 - Upscale比較保存は実素材QA済み。比較結果を1セット保存し、drift / seam / detail の採用基準と推奨denoiseを確定した。

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Goal 1-5 実行レポート - 2026-05-13</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111317;
+      --panel: #1a1f25;
+      --panel2: #15191f;
+      --line: #303844;
+      --ink: #eef2f7;
+      --muted: #aeb8c4;
+      --accent: #7fd7c4;
+      --ok: #8ee6a8;
+      --warn: #ffd27a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Segoe UI", sans-serif; line-height: 1.6; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    header { margin-bottom: 22px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 0 0 12px; font-size: 18px; }
+    h3 { margin: 0 0 8px; font-size: 15px; }
+    p { margin: 0 0 10px; color: var(--muted); }
+    a { color: var(--accent); }
+    code { color: var(--accent); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 16px; }
+    .status { display: inline-flex; align-items: center; border: 1px solid rgba(142,230,168,.35); color: var(--ok); border-radius: 999px; padding: 2px 9px; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; }
+    th { color: var(--ink); background: var(--panel2); font-size: 13px; }
+    td { color: var(--muted); font-size: 13px; }
+    .ok { color: var(--ok); font-weight: 600; }
+    .warn { color: var(--warn); font-weight: 600; }
+    .path { word-break: break-all; }
+    ul { margin: 8px 0 0 18px; padding: 0; color: var(--muted); }
+    li { margin: 4px 0; }
+    .links { display: flex; flex-wrap: wrap; gap: 8px; }
+    .links a { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; background: var(--panel2); text-decoration: none; font-size: 12px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Goal 1-5 実行レポート</h1>
+    <p>作成日: 2026-05-13 / 対象: Yoitomoshi Art Generator</p>
+    <p><span class="status">5項目 実施済み</span></p>
+  </header>
+
+  <section class="grid">
+    <div class="card">
+      <h2>1. ControlNet実生成QA</h2>
+      <p>Forge APIで preprocessor と txt2img を実行し、baseline / pose / depth / lineart / tile の5系統を同一素材で比較した。</p>
+      <p class="path"><code>output/controlnet-real-qa-2026-05-13/</code></p>
+    </div>
+    <div class="card">
+      <h2>2. AIキャラ追加QA</h2>
+      <p>実写真 + 透明PNGキャラ + mask + ControlNet + inpaint の流れでAfter画像まで生成し、保存パッケージに追記した。</p>
+      <p class="path"><code>userdata/character-composites/qa-goal-2026-05-13-336b754c/</code></p>
+    </div>
+    <div class="card">
+      <h2>3. Model Libraryメタ情報</h2>
+      <p>導入済みControlNet 4件へ Hugging Face 由来の provider / repoId / pageUrl / expectedSha256 を保存した。</p>
+      <p class="path"><code>userdata/model-library/index.json</code></p>
+    </div>
+    <div class="card">
+      <h2>4. Builder候補表示</h2>
+      <p>ControlNet Builderの役割カードに、選択されるモデル名とHF由来ヒントを表示するよう改善した。</p>
+      <p class="path"><code>src/components/extensions/ControlNetBuilderPanel.tsx</code></p>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top: 16px;">
+    <h2>ControlNet QA 結果</h2>
+    <table>
+      <thead>
+        <tr><th>項目</th><th>module / model</th><th>結果</th><th>証跡</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>preprocessor: pose</td>
+          <td><code>openpose_full</code></td>
+          <td class="ok">成功。人物の骨格が検出された。</td>
+          <td class="path"><code>detect-pose.png</code></td>
+        </tr>
+        <tr>
+          <td>preprocessor: depth</td>
+          <td><code>depth_midas</code></td>
+          <td class="ok">成功。人物と背景の距離差が確認できる。</td>
+          <td class="path"><code>detect-depth.png</code></td>
+        </tr>
+        <tr>
+          <td>preprocessor: lineart</td>
+          <td><code>lineart_standard (from white bg &amp; black line)</code></td>
+          <td class="ok">成功。古い写真の輪郭を抽出できた。</td>
+          <td class="path"><code>detect-lineart.png</code></td>
+        </tr>
+        <tr>
+          <td>txt2img baseline</td>
+          <td>ControlNetなし</td>
+          <td class="ok">成功。比較用として構図が大きく変わることを確認。</td>
+          <td class="path"><code>gen-baseline.png</code></td>
+        </tr>
+        <tr>
+          <td>txt2img pose</td>
+          <td><code>None</code> + <code>xinsir-controlnet-openpose-sdxl-1.0 [d0333a45]</code></td>
+          <td class="ok">成功。立ち姿を維持。人物生成の基準に使える。</td>
+          <td class="path"><code>gen-pose.png</code></td>
+        </tr>
+        <tr>
+          <td>txt2img depth</td>
+          <td><code>None</code> + <code>xinsir-controlnet-depth-sdxl-1.0 [e590f04c]</code></td>
+          <td class="ok">成功。前後関係の固定に有効。</td>
+          <td class="path"><code>gen-depth.png</code></td>
+        </tr>
+        <tr>
+          <td>txt2img lineart</td>
+          <td><code>None</code> + <code>mistoline-lineart-rank256 [0f320932]</code></td>
+          <td class="warn">成功。輪郭固定は強いが、古写真素材ではweight調整が必要。</td>
+          <td class="path"><code>gen-lineart.png</code></td>
+        </tr>
+        <tr>
+          <td>txt2img tile</td>
+          <td><code>tile_resample</code> + <code>xinsir-controlnet-tile-sdxl-1.0 [4d6257d3]</code></td>
+          <td class="ok">成功。入力写真の構造保持が強く、Upscale/再生成向けに継続採用。</td>
+          <td class="path"><code>gen-tile.png</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top: 10px;">一覧画像: <code>detect-contact-sheet.png</code> / <code>generation-contact-sheet.png</code></p>
+  </section>
+
+  <section class="card" style="margin-top: 16px;">
+    <h2>AIキャラ追加QA 結果</h2>
+    <table>
+      <thead>
+        <tr><th>工程</th><th>結果</th><th>証跡</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>実素材準備</td>
+          <td class="ok">夜景写真のEXIF向きを補正し、透明PNGキャラ、配置合成、inpaint maskを作成。</td>
+          <td class="path"><code>userdata/qa-materials/goal-2026-05-13/</code></td>
+        </tr>
+        <tr>
+          <td>保存パッケージ</td>
+          <td class="ok">アプリの保存スキーマに合わせて manifest とHTMLを保存。</td>
+          <td class="path"><code>character-composite.json</code> / <code>character-composite-report.html</code></td>
+        </tr>
+        <tr>
+          <td>Forge img2img</td>
+          <td class="ok">denoise 0.35、MistoLine、reference_onlyでAfter画像を生成。</td>
+          <td class="path"><code>generated-after.png</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top: 10px;">一覧画像: <code>output/character-composite-real-qa-2026-05-13/character-composite-contact-sheet.png</code></p>
+  </section>
+
+  <section class="card" style="margin-top: 16px;">
+    <h2>Hugging Face メタ情報</h2>
+    <table>
+      <thead>
+        <tr><th>ローカルファイル</th><th>repoId</th><th>用途</th><th>sourceMeta</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>xinsir-controlnet-openpose-sdxl-1.0.safetensors</code></td><td><code>xinsir/controlnet-openpose-sdxl-1.0</code></td><td>pose</td><td class="ok">保存済み</td></tr>
+        <tr><td><code>xinsir-controlnet-depth-sdxl-1.0.safetensors</code></td><td><code>xinsir/controlnet-depth-sdxl-1.0</code></td><td>depth</td><td class="ok">保存済み</td></tr>
+        <tr><td><code>mistoline-lineart-rank256.safetensors</code></td><td><code>TheMistoAI/MistoLine</code></td><td>lineart</td><td class="ok">保存済み</td></tr>
+        <tr><td><code>xinsir-controlnet-tile-sdxl-1.0.safetensors</code></td><td><code>xinsir/controlnet-tile-sdxl-1.0</code></td><td>tile / upscale</td><td class="ok">保存済み</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top: 10px;">確認用エクスポート: <code>userdata/model-library/huggingface-controlnet-meta-2026-05-13.json</code></p>
+  </section>
+
+  <section class="card" style="margin-top: 16px;">
+    <h2>次の追加モデル判断</h2>
+    <table>
+      <thead>
+        <tr><th>優先度</th><th>候補</th><th>判断</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>P0</td>
+          <td><a href="https://huggingface.co/xinsir/controlnet-canny-sdxl-1.0">xinsir/controlnet-canny-sdxl-1.0</a></td>
+          <td>次に入れるならこれ。Builderのcanny役割が未充足で、建物・小物・硬い輪郭保持に直接効く。Hugging Face上でもApache-2.0、Canny用SDXLとして公開されている。</td>
+        </tr>
+        <tr>
+          <td>P1</td>
+          <td><a href="https://huggingface.co/h94/IP-Adapter/tree/main/sdxl_models">h94/IP-Adapter SDXL safetensors</a></td>
+          <td>AIキャラ追加の「同一キャラ維持」を強めたい時に導入。Forge側のIPAdapter moduleとimage encoderの組み合わせ検証が必要なため、Cannyの後。</td>
+        </tr>
+        <tr>
+          <td>P2</td>
+          <td><a href="https://huggingface.co/xinsir/controlnet-scribble-sdxl-1.0">xinsir/controlnet-scribble-sdxl-1.0</a></td>
+          <td>ラフ固定や手描き構図の需要が出た段階で追加。現状はpose / depth / lineart / tileで主要QAを満たせる。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card" style="margin-top: 16px;">
+    <h2>参照元</h2>
+    <div class="links">
+      <a href="https://commons.wikimedia.org/wiki/File:African_American_man_standing_(6843245207).jpg">Wikimedia: standing man</a>
+      <a href="https://commons.wikimedia.org/wiki/File:Empty_night_street.jpg">Wikimedia: Empty night street</a>
+      <a href="https://huggingface.co/xinsir/controlnet-openpose-sdxl-1.0">HF OpenPose SDXL</a>
+      <a href="https://huggingface.co/xinsir/controlnet-depth-sdxl-1.0">HF Depth SDXL</a>
+      <a href="https://huggingface.co/TheMistoAI/MistoLine">HF MistoLine</a>
+      <a href="https://huggingface.co/xinsir/controlnet-tile-sdxl-1.0">HF Tile SDXL</a>
+      <a href="https://huggingface.co/xinsir/controlnet-canny-sdxl-1.0">HF Canny SDXL</a>
+      <a href="https://huggingface.co/h94/IP-Adapter/tree/main/sdxl_models">HF IP-Adapter SDXL</a>
+    </div>
+  </section>
+</main>
+</body>
+</html>

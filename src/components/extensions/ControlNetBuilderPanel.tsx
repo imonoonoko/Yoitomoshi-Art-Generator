@@ -15,10 +15,18 @@ interface RolePreset {
   icon: JSX.Element
   moduleCandidates: string[]
   modelKeywords: string[]
+  preferredModelKeywordGroups?: string[][]
   fallbackModel: string
   weight: number
   controlMode: 0 | 1 | 2
   hintKey: string
+}
+
+interface ControlNetModelHint {
+  roles: BuilderRole[]
+  keywordGroups: string[][]
+  label: string
+  sourceUrl: string
 }
 
 const ROLE_PRESETS: RolePreset[] = [
@@ -27,6 +35,7 @@ const ROLE_PRESETS: RolePreset[] = [
     icon: <Crosshair className="h-3.5 w-3.5" />,
     moduleCandidates: ['openpose_full', 'openpose', 'dw_openpose_full', 'dw_openpose'],
     modelKeywords: ['openpose', 'pose'],
+    preferredModelKeywordGroups: [['xinsir', 'openpose'], ['openpose', 'sdxl']],
     fallbackModel: 'None',
     weight: 1,
     controlMode: 2,
@@ -37,6 +46,7 @@ const ROLE_PRESETS: RolePreset[] = [
     icon: <ScanLine className="h-3.5 w-3.5" />,
     moduleCandidates: ['lineart_anime', 'lineart_realistic', 'lineart_standard'],
     modelKeywords: ['lineart'],
+    preferredModelKeywordGroups: [['mistoline'], ['lineart']],
     fallbackModel: 'None',
     weight: 0.8,
     controlMode: 1,
@@ -47,6 +57,7 @@ const ROLE_PRESETS: RolePreset[] = [
     icon: <ScanLine className="h-3.5 w-3.5" />,
     moduleCandidates: ['canny'],
     modelKeywords: ['canny'],
+    preferredModelKeywordGroups: [['xinsir', 'canny'], ['canny', 'sdxl']],
     fallbackModel: 'None',
     weight: 0.75,
     controlMode: 1,
@@ -77,6 +88,7 @@ const ROLE_PRESETS: RolePreset[] = [
     icon: <Layers3 className="h-3.5 w-3.5" />,
     moduleCandidates: ['depth_midas', 'depth_anything', 'depth_zoe'],
     modelKeywords: ['depth'],
+    preferredModelKeywordGroups: [['xinsir', 'depth'], ['depth', 'sdxl']],
     fallbackModel: 'None',
     weight: 0.75,
     controlMode: 1,
@@ -107,6 +119,7 @@ const ROLE_PRESETS: RolePreset[] = [
     icon: <BoxSelect className="h-3.5 w-3.5" />,
     moduleCandidates: ['tile_resample', 'tile_colorfix', 'None'],
     modelKeywords: ['tile'],
+    preferredModelKeywordGroups: [['xinsir', 'tile'], ['tile', 'sdxl']],
     fallbackModel: 'None',
     weight: 0.6,
     controlMode: 2,
@@ -121,6 +134,39 @@ const ROLE_PRESETS: RolePreset[] = [
     weight: 0.65,
     controlMode: 1,
     hintKey: 'cnBuilder.role.reference.hint'
+  }
+]
+
+const CONTROLNET_MODEL_HINTS: ControlNetModelHint[] = [
+  {
+    roles: ['pose'],
+    keywordGroups: [['xinsir', 'openpose'], ['openpose', 'sdxl']],
+    label: 'xinsir OpenPose SDXL',
+    sourceUrl: 'https://huggingface.co/xinsir/controlnet-openpose-sdxl-1.0'
+  },
+  {
+    roles: ['depth'],
+    keywordGroups: [['xinsir', 'depth'], ['depth', 'sdxl']],
+    label: 'xinsir Depth SDXL',
+    sourceUrl: 'https://huggingface.co/xinsir/controlnet-depth-sdxl-1.0'
+  },
+  {
+    roles: ['lineart'],
+    keywordGroups: [['mistoline'], ['lineart', 'rank256']],
+    label: 'MistoLine rank256',
+    sourceUrl: 'https://huggingface.co/TheMistoAI/MistoLine'
+  },
+  {
+    roles: ['tile'],
+    keywordGroups: [['xinsir', 'tile'], ['tile', 'sdxl']],
+    label: 'xinsir Tile SDXL',
+    sourceUrl: 'https://huggingface.co/xinsir/controlnet-tile-sdxl-1.0'
+  },
+  {
+    roles: ['canny'],
+    keywordGroups: [['xinsir', 'canny'], ['canny', 'sdxl']],
+    label: 'xinsir Canny SDXL',
+    sourceUrl: 'https://huggingface.co/xinsir/controlnet-canny-sdxl-1.0'
   }
 ]
 
@@ -430,6 +476,7 @@ export function ControlNetBuilderPanel(): JSX.Element {
       <div className="grid grid-cols-2 gap-2">
         {ROLE_PRESETS.map((preset) => {
           const resolved = resolvePreset(preset, modules, models)
+          const modelLabel = resolved.model === 'None' ? null : compactModelName(resolved.model)
           const blockedByFabric = preset.id === 'reference' && fabricFeedbackActive
           const active = controlnet.enabled &&
             targetUnit?.enabled &&
@@ -440,7 +487,7 @@ export function ControlNetBuilderPanel(): JSX.Element {
               key={preset.id}
               type="button"
               className={cn(
-                'min-h-[74px] rounded-md border border-line bg-bg-2 p-2 text-left transition-colors hover:border-accent/60',
+                'min-h-[88px] rounded-md border border-line bg-bg-2 p-2 text-left transition-colors hover:border-accent/60',
                 resolved.modelMissing && 'border-warn/50 bg-warn/5',
                 blockedByFabric && 'cursor-not-allowed opacity-60 hover:border-line',
                 (active || selectedRole === preset.id) && 'border-accent bg-accent/10'
@@ -459,11 +506,19 @@ export function ControlNetBuilderPanel(): JSX.Element {
                 )}
               </div>
               <p className="mt-1 h-7 overflow-hidden text-[10px] leading-tight text-ink-3">{t(preset.hintKey)}</p>
-              <div className="mt-1 flex items-center gap-1 text-[10px]">
-                <span className="truncate text-ink-3">{resolved.module}</span>
-                <span className={cn('ml-auto shrink-0', resolved.modelMissing ? 'text-warn' : 'text-ink-2')}>
-                  {blockedByFabric ? t('cnBuilder.fabricBlocked') : resolved.modelMissing ? t('cnBuilder.modelNeeded') : t('cnBuilder.ready')}
-                </span>
+              <div className="mt-1 grid gap-0.5 text-[10px]">
+                <div className="flex min-w-0 items-center gap-1">
+                  <span className="truncate text-ink-3">{resolved.module}</span>
+                  <span className={cn('ml-auto shrink-0', resolved.modelMissing ? 'text-warn' : 'text-ink-2')}>
+                    {blockedByFabric ? t('cnBuilder.fabricBlocked') : resolved.modelMissing ? t('cnBuilder.modelNeeded') : t('cnBuilder.ready')}
+                  </span>
+                </div>
+                {modelLabel && (
+                  <div className="flex min-w-0 items-center gap-1" title={resolved.modelHint ? `${resolved.modelHint.label} - ${resolved.modelHint.sourceUrl}` : resolved.model}>
+                    {resolved.modelHint && <span className="shrink-0 rounded border border-accent/35 px-1 text-[9px] leading-4 text-accent">HF</span>}
+                    <span className="truncate font-mono text-[9px] text-ink-3">{modelLabel}</span>
+                  </div>
+                )}
               </div>
             </button>
           )
@@ -552,13 +607,15 @@ function resolvePreset(
   preset: RolePreset,
   modules: string[],
   models: string[]
-): { module: string; model: string; modelMissing: boolean } {
+): { module: string; model: string; modelMissing: boolean; modelHint: ControlNetModelHint | null } {
   const module = chooseFirstAvailable(preset.moduleCandidates, modules) ?? preset.moduleCandidates[0] ?? 'None'
-  const model = chooseModel(preset.modelKeywords, models) ?? preset.fallbackModel
+  const model = chooseModel(preset, models) ?? preset.fallbackModel
+  const modelHint = getModelHint(preset.id, model)
   return {
     module,
     model,
-    modelMissing: model === 'None' && preset.id !== 'reference'
+    modelMissing: model === 'None' && preset.id !== 'reference',
+    modelHint
   }
 }
 
@@ -598,13 +655,48 @@ function chooseFirstAvailable(candidates: string[], available: string[]): string
   return null
 }
 
-function chooseModel(keywords: string[], models: string[]): string | null {
-  for (const keyword of keywords) {
+function chooseModel(preset: RolePreset, models: string[]): string | null {
+  const available = models.filter((model) => model !== 'None')
+  const preferred = chooseModelByKeywordGroups(preset.preferredModelKeywordGroups ?? [], available)
+  if (preferred) return preferred
+  const hinted = CONTROLNET_MODEL_HINTS
+    .filter((hint) => hint.roles.includes(preset.id))
+    .map((hint) => chooseModelByKeywordGroups(hint.keywordGroups, available))
+    .find((model): model is string => Boolean(model))
+  if (hinted) return hinted
+  for (const keyword of preset.modelKeywords) {
     const lower = keyword.toLowerCase()
-    const found = models.find((model) => model.toLowerCase().includes(lower))
+    const found = available.find((model) => model.toLowerCase().includes(lower))
     if (found) return found
   }
   return null
+}
+
+function chooseModelByKeywordGroups(keywordGroups: string[][], models: string[]): string | null {
+  for (const keywords of keywordGroups) {
+    const found = models.find((model) => matchesAllKeywords(model, keywords))
+    if (found) return found
+  }
+  return null
+}
+
+function getModelHint(role: BuilderRole, model: string): ControlNetModelHint | null {
+  if (model === 'None') return null
+  return CONTROLNET_MODEL_HINTS.find((hint) =>
+    hint.roles.includes(role) &&
+    hint.keywordGroups.some((keywords) => matchesAllKeywords(model, keywords))
+  ) ?? null
+}
+
+function matchesAllKeywords(value: string, keywords: string[]): boolean {
+  const normalized = value.toLowerCase()
+  return keywords.every((keyword) => normalized.includes(keyword.toLowerCase()))
+}
+
+function compactModelName(model: string): string {
+  return model
+    .replace(/\s+\[[^\]]+\]$/, '')
+    .replace(/\.safetensors$/i, '')
 }
 
 function shouldUseProcessedMap(role: BuilderRole, module: string): boolean {
