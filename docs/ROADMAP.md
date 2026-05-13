@@ -178,6 +178,7 @@
 - 必要モデル・実素材を調査。最短QAセットは OpenPose SDXL、Depth SDXL、MistoLine rank256 と、自前の夜写真/昼写真/透明PNGキャラ素材。追加比較は xinsir Canny V2、IP-Adapter SDXL、LayerDiffuse、IC-Light、ControlNet Union。詳細は [`MODEL_AND_ASSET_RESEARCH_REPORT_2026-05-13.html`](MODEL_AND_ASSET_RESEARCH_REPORT_2026-05-13.html)。
 - OpenPose / Depth / Lineart の候補を再調査し、`xinsir-controlnet-openpose-sdxl-1.0.safetensors`、`xinsir-controlnet-depth-sdxl-1.0.safetensors`、`mistoline-lineart-rank256.safetensors` を導入した。SHA検証、Forge `model_list`、Electron UI smoke、Model Library反映まで確認済み。詳細は [`CONTROLNET_MODEL_INSTALLATION_REPORT_2026-05-13.html`](CONTROLNET_MODEL_INSTALLATION_REPORT_2026-05-13.html)。
 - Goal 1-5を完了。実素材でControlNet preprocessor / txt2img実生成を baseline、pose、depth、lineart、tile で検証し、AIキャラ追加は夜景写真 + 透明PNG + mask + img2img/inpaint + MistoLine/reference_only でAfter画像まで保存した。ControlNet BuilderはHF由来モデル名を役割カードへ表示し、Model LibraryにはrepoId/pageUrl/expectedSha256を追記した。次の追加候補は `xinsir/controlnet-canny-sdxl-1.0` をP0、`h94/IP-Adapter` SDXLをP1に整理。詳細は [`GOAL_1_5_EXECUTION_REPORT_2026-05-13.html`](GOAL_1_5_EXECUTION_REPORT_2026-05-13.html)。
+- 生成設定のシンプル化を開始。ParametersPanel に「おすすめ設定」4種(高速確認 / 標準 / 高品質 / AIキャラ追加)を追加し、Sampler / Scheduler / VAE / Seed / Batch / Clip Skip は詳細設定の折りたたみに移した。普段は目的別プリセット、Steps / CFG / サイズだけで調整できる導線にする。
 
 残タスク更新:
 
