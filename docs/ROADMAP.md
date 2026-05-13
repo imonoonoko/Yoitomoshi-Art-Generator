@@ -180,6 +180,7 @@
 - Goal 1-5を完了。実素材でControlNet preprocessor / txt2img実生成を baseline、pose、depth、lineart、tile で検証し、AIキャラ追加は夜景写真 + 透明PNG + mask + img2img/inpaint + MistoLine/reference_only でAfter画像まで保存した。ControlNet BuilderはHF由来モデル名を役割カードへ表示し、Model LibraryにはrepoId/pageUrl/expectedSha256を追記した。次の追加候補は `xinsir/controlnet-canny-sdxl-1.0` をP0、`h94/IP-Adapter` SDXLをP1に整理。詳細は [`GOAL_1_5_EXECUTION_REPORT_2026-05-13.html`](GOAL_1_5_EXECUTION_REPORT_2026-05-13.html)。
 - 生成設定のシンプル化を開始。ParametersPanel に「おすすめ設定」4種(高速確認 / 標準 / 高品質 / AIキャラ追加)を追加し、Sampler / Scheduler / VAE / Seed / Batch / Clip Skip は詳細設定の折りたたみに移した。普段は目的別プリセット、Steps / CFG / サイズだけで調整できる導線にする。
 - Prompt Editorの表示ズレ対策として、textarea上のミラー式シンタックスハイライトを外し、実文字をそのまま表示する方式へ変更。オートコンプリートは自動表示をやめ、Ctrl+Spaceで手動起動、候補一覧は入力欄下に配置して本文に重ならないようにした。
+- X投稿参考メモを追加。Stable Diffusion設定で初心者が迷いやすいという問題提起を、現在の「おすすめ設定 / 詳細設定折りたたみ / 数値説明の簡略化」方針の根拠として記録した。詳細は [`X_STABLE_DIFFUSION_SETTINGS_REFERENCE_2026-05-13.html`](X_STABLE_DIFFUSION_SETTINGS_REFERENCE_2026-05-13.html)。
 
 残タスク更新:
 

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>X参考メモ — Stable Diffusion設定導線</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0c10;
+      --panel: #151821;
+      --panel-2: #1c202b;
+      --line: #2b3140;
+      --text: #f4f6fb;
+      --muted: #aab2c4;
+      --accent: #8aa2ff;
+      --ok: #6fe0a4;
+      --warn: #ffd166;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.7 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 40px 20px 56px;
+    }
+    h1, h2, h3 { line-height: 1.25; }
+    h1 { font-size: 28px; margin: 0 0 12px; }
+    h2 { font-size: 18px; margin: 28px 0 12px; }
+    h3 { font-size: 15px; margin: 0 0 8px; }
+    p { margin: 0 0 12px; }
+    a { color: var(--accent); }
+    .lead { color: var(--muted); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      margin-right: 6px;
+    }
+    .tag.ok { color: var(--ok); }
+    .tag.warn { color: var(--warn); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { width: 160px; color: var(--muted); font-weight: 600; }
+    tr:last-child th, tr:last-child td { border-bottom: 0; }
+    code {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: 12px;
+    }
+    ul { margin: 8px 0 0; padding-left: 20px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>X参考メモ — Stable Diffusion設定導線</h1>
+    <p class="lead">
+      2026-05-13時点で、X公式oEmbedから取得できた範囲を記録する。全文はoEmbed上で省略されていたため、ここでは確認済み情報とYoitomoshi Art Generatorへの示唆を分けて扱う。
+    </p>
+
+    <section>
+      <h2>ソース</h2>
+      <table>
+        <tr>
+          <th>投稿URL</th>
+          <td><a href="https://x.com/jjjContinue/status/2054169730723000695?s=20">https://x.com/jjjContinue/status/2054169730723000695?s=20</a></td>
+        </tr>
+        <tr>
+          <th>投稿者</th>
+          <td>じくにーさん / <a href="https://x.com/jjjContinue">@jjjContinue</a></td>
+        </tr>
+        <tr>
+          <th>投稿日</th>
+          <td>2026-05-12</td>
+        </tr>
+        <tr>
+          <th>取得方法</th>
+          <td>X公式oEmbed。Xのドキュメント上、oEmbedは認証なしのJSON取得に対応している。</td>
+        </tr>
+        <tr>
+          <th>取得制限</th>
+          <td>oEmbedの本文は冒頭のみで、後半は省略記号になっていた。必要ならログイン済みブラウザで全文を目視確認する。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>確認できた投稿要旨</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>問題提起</h3>
+          <p>Stable Diffusionの設定について、初心者が「何をどう設定すればいいか」で迷いやすいという内容。</p>
+          <span class="tag warn">初心者の設定迷子</span>
+        </article>
+        <article class="card">
+          <h3>情報のばらつき</h3>
+          <p>設定値に絶対的な正解が見えづらく、人によって説明や推奨が分かれる点を問題として扱っている。</p>
+          <span class="tag warn">正解が見えにくい</span>
+        </article>
+        <article class="card">
+          <h3>操作の実態</h3>
+          <p>特に初心者は、意味を理解しきれないまま数値を触る状態になりやすい、という観察。</p>
+          <span class="tag warn">数字だけを触るUX</span>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>プロジェクトへの示唆</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>おすすめ設定の方向性は維持</h3>
+          <p>直近で追加した「高速確認 / 標準 / 高品質 / AIキャラ追加」の目的別プリセットは、この問題提起と相性が良い。初心者にはSamplerやSchedulerより、目的から選ばせるほうが迷いにくい。</p>
+          <span class="tag ok">既存改善と合致</span>
+        </article>
+        <article class="card">
+          <h3>数値の意味を短く見せる</h3>
+          <p>Steps / CFG / denoise / size は残すが、各スライダーの横に「何が増えるか」「失敗しやすい範囲」を短いヒントで出すと、数字いじりから判断へ移れる。</p>
+          <span class="tag ok">次のUX候補</span>
+        </article>
+        <article class="card">
+          <h3>素材別の初期値を増やす</h3>
+          <p>txt2img、img2img、AIキャラ追加、Upscaleで同じ数字を使い回さず、作業別に安全な初期値を固定する。特にdenoiseは用途差が大きい。</p>
+          <span class="tag ok">用途別プリセット</span>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>次に反映する候補</h2>
+      <ul>
+        <li>ParametersPanelのおすすめ設定カードに「この設定で何が安定するか」を1行だけ追加する。</li>
+        <li>denoise / CFG / Stepsに、初心者向けの安全範囲をUI上で表示する。</li>
+        <li>AIキャラ追加では、夜写真・昼写真・透明PNG素材の3系統で既定値を分ける。</li>
+        <li>全文確認後、投稿が具体的な設定値を提示している場合は、既存プリセットとの差分だけ追記する。</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
