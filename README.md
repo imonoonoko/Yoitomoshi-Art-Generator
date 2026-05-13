@@ -17,6 +17,7 @@
 - [AIキャラ追加 連携診断レポート 2026-05-13](docs/CHARACTER_COMPOSITE_INTEGRATION_STATUS_REPORT_2026-05-13.html)
 - [未検証項目 棚卸し・検証レポート 2026-05-13](docs/PROJECT_UNVERIFIED_VALIDATION_REPORT_2026-05-13.html)
 - [必要モデル・実素材リサーチ 2026-05-13](docs/MODEL_AND_ASSET_RESEARCH_REPORT_2026-05-13.html)
+- [ControlNet追加モデル導入レポート 2026-05-13](docs/CONTROLNET_MODEL_INSTALLATION_REPORT_2026-05-13.html)
 - [ロードマップ](docs/ROADMAP.md)
 - [ファイル / フォルダ構造](docs/PROJECT_STRUCTURE.md)
 - QA証跡:

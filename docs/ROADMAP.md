@@ -176,11 +176,11 @@
 - AIキャラ追加パネルに連携診断を追加。Forge拡張フォルダ、`disabled_extensions`、ControlNetモデルフォルダをIPCでスキャンし、LayerDiffuse / IP-Adapter / ControlNetモデル / IC-Light の導入状態と不足点を表示する。現環境ではControlNet Tileのみ検出し、LayerDiffuse / IP-Adapter model / IC-Light は未導入。詳細は [`CHARACTER_COMPOSITE_INTEGRATION_STATUS_REPORT_2026-05-13.html`](CHARACTER_COMPOSITE_INTEGRATION_STATUS_REPORT_2026-05-13.html)。
 - 未検証項目の棚卸しを実施。`typecheck` / `build` / Forge API smoke / AIキャラ追加UI+IPC / Model Library整合性 / DownloadJob現況 / Workspace参照保存 / Upscale比較保存 / 配布版EXE smokeを確認した。配布ビルドは `runtime/forge` の巨大モデル混入と Windows通常権限の `winCodeSign` 展開失敗を検出し、electron-builder設定で除外・未署名個人配布ビルドへ修正したうえで `npm.cmd run dist` PASS。詳細は [`PROJECT_UNVERIFIED_VALIDATION_REPORT_2026-05-13.html`](PROJECT_UNVERIFIED_VALIDATION_REPORT_2026-05-13.html)。
 - 必要モデル・実素材を調査。最短QAセットは OpenPose SDXL、Depth SDXL、MistoLine rank256 と、自前の夜写真/昼写真/透明PNGキャラ素材。追加比較は xinsir Canny V2、IP-Adapter SDXL、LayerDiffuse、IC-Light、ControlNet Union。詳細は [`MODEL_AND_ASSET_RESEARCH_REPORT_2026-05-13.html`](MODEL_AND_ASSET_RESEARCH_REPORT_2026-05-13.html)。
+- OpenPose / Depth / Lineart の候補を再調査し、`xinsir-controlnet-openpose-sdxl-1.0.safetensors`、`xinsir-controlnet-depth-sdxl-1.0.safetensors`、`mistoline-lineart-rank256.safetensors` を導入した。SHA検証、Forge `model_list`、Electron UI smoke、Model Library反映まで確認済み。詳細は [`CONTROLNET_MODEL_INSTALLATION_REPORT_2026-05-13.html`](CONTROLNET_MODEL_INSTALLATION_REPORT_2026-05-13.html)。
 
 残タスク更新:
 
-- ControlNet入力生成はUI/IPC実装とUI QAまで完了。pose / lineart / depth モデルが揃った環境で、preprocessor結果をControlNet modelに渡す実生成QAが必要。
-- 次の導入順は `xinsir-controlnet-openpose-sdxl-1.0`、`xinsir-controlnet-depth-sdxl-1.0`、`mistoLine_rank256` を優先し、容量を抑えた最小QAセットから始める。
+- ControlNet入力生成はUI/IPC実装とUI QAまで完了し、pose / lineart / depth のP0モデルも導入済み。次は実素材で preprocessor 結果を各ControlNet modelに渡す実生成QAを行う。
 - Workspace参照保存は実素材QA済み。参照先が存在しない共有Workspaceの差し替えUIと、相対パス化の是非は後続で検討する。
 - Model Library復旧は実データQA済み。既存の約21.3GBライブラリで復旧ボタンを実行し、SHA queueがUI操作を阻害しないこととmetadata/preview再取得を確認した。
 - Upscale比較保存は実素材QA済み。比較結果を1セット保存し、drift / seam / detail の採用基準と推奨denoiseを確定した。
