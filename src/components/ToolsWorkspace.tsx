@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Activity, AlertTriangle, ChevronDown, Database, Download, FileSearch, FolderOpen, GitMerge, Package, Play, RefreshCw, Save, Search, ShieldCheck, Square, Trash2, Wrench } from 'lucide-react'
+import { Activity, AlertTriangle, ChevronDown, Database, Download, ExternalLink, FileSearch, FolderOpen, GitMerge, Package, Play, RefreshCw, Save, Search, ShieldCheck, Square, Tag, Trash2, Wrench } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore } from '@/lib/store'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { api } from '@/lib/ipc'
 import { cn } from '@/lib/utils'
+import { promptAppend } from '@/lib/prompt-utils'
 import { buildWorkspaceSnapshot } from '@/lib/workspace-snapshot'
+import { TAGGER_CATALOG, taggerTierLabel, type TaggerCatalogItem } from '@/lib/tagger-catalog'
+import { DEFAULT_TAGGER_BLACKLIST, DEFAULT_TAGGER_MIN_SCORE, parseTaggerBlacklist } from '@shared/tagger-filter'
 import type {
   DownloadJob,
+  HuggingFaceSearchFile,
   LibraryIntegrityReport,
   ModelFormatConversionResult,
   ModelLibrarySummary,
@@ -18,6 +22,7 @@ import type {
   ModelMergerSupportReport,
   StartupMetrics,
   StartupMetricsSample,
+  TaggerRunResult,
   WorkspaceImageReference,
   WorkspaceImageSaveMode,
   WorkspaceSummary
@@ -55,7 +60,10 @@ export function ToolsWorkspace(): JSX.Element {
         <ToolSection title={t('tools.health.title')} icon={<ShieldCheck className="h-4 w-4" />} defaultOpen>
           <CatalogHealthCard />
         </ToolSection>
-        <ToolSection title={t('tools.library.title')} icon={<Database className="h-4 w-4" />}>
+        <ToolSection title={t('tools.tagger.title')} icon={<Tag className="h-4 w-4" />} defaultOpen testId="tagger">
+          <TaggerCatalogCard />
+        </ToolSection>
+        <ToolSection title={t('tools.library.title')} icon={<Database className="h-4 w-4" />} testId="library">
           <ModelLibraryCard />
         </ToolSection>
         <ToolSection title={t('tools.modelHealth.title')} icon={<AlertTriangle className="h-4 w-4" />}>
@@ -79,11 +87,13 @@ function ToolSection({
   title,
   icon,
   defaultOpen = false,
+  testId,
   children
 }: {
   title: string
   icon: React.ReactNode
   defaultOpen?: boolean
+  testId?: string
   children: React.ReactNode
 }): JSX.Element {
   const [open, setOpen] = useState(defaultOpen)
@@ -92,6 +102,7 @@ function ToolSection({
       <button
         className="w-full flex items-center gap-2 rounded border border-line bg-bg-1 px-3 py-2 text-left text-sm text-ink-1 hover:bg-bg-2"
         onClick={() => setOpen((value) => !value)}
+        data-testid={testId ? `tool-section-${testId}-toggle` : undefined}
       >
         <span className="text-accent">{icon}</span>
         <span className="font-semibold">{title}</span>
@@ -281,7 +292,11 @@ function WorkspaceCard(): JSX.Element {
       {workspaces.length > 0 && (
         <div className="border-t border-line pt-3 space-y-1.5">
           {workspaces.slice(0, 6).map((workspace) => (
-            <div key={workspace.id} className="rounded-md border border-line bg-bg-2/50 p-2 text-xs">
+            <div
+              key={workspace.id}
+              className="rounded-md border border-line bg-bg-2/50 p-2 text-xs"
+              data-testid={`workspace-row-${workspace.id}`}
+            >
               <div className="flex items-center gap-2 min-w-0">
                 <span className="font-medium text-ink-1 truncate">{workspace.name}</span>
                 <span className="ml-auto font-mono text-[10px] text-ink-3 shrink-0">
@@ -292,10 +307,20 @@ function WorkspaceCard(): JSX.Element {
                 {workspace.model ?? t('titlebar.modelNotSelected')} / {workspace.promptPreview || '-'}
               </div>
               <div className="mt-2 flex gap-1">
-                <button className="btn btn-ghost text-[10px] py-0.5" onClick={() => { void restore(workspace.id) }} disabled={busy}>
+                <button
+                  className="btn btn-ghost text-[10px] py-0.5"
+                  onClick={() => { void restore(workspace.id) }}
+                  disabled={busy}
+                  data-testid={`workspace-restore-${workspace.id}`}
+                >
                   {t('history.restore')}
                 </button>
-                <button className="btn btn-ghost text-[10px] py-0.5 ml-auto" onClick={() => { void remove(workspace.id) }} disabled={busy}>
+                <button
+                  className="btn btn-ghost text-[10px] py-0.5 ml-auto"
+                  onClick={() => { void remove(workspace.id) }}
+                  disabled={busy}
+                  data-testid={`workspace-delete-${workspace.id}`}
+                >
                   <Trash2 className="h-3 w-3" />
                   {t('history.delete')}
                 </button>
@@ -487,6 +512,311 @@ function StartupDiagnosticsCard(): JSX.Element {
   )
 }
 
+function TaggerCatalogCard(): JSX.Element {
+  const t = useT()
+  const inputImage = useStore((s) => s.inputImage)
+  const lastImage = useStore((s) => s.lastImage)
+  const prompt = useStore((s) => s.prompt)
+  const setPrompt = useStore((s) => s.setPrompt)
+  const setExtractedTags = useStore((s) => s.setExtractedTags)
+  const [checkingId, setCheckingId] = useState<string | null>(null)
+  const [fileResults, setFileResults] = useState<Record<string, HuggingFaceSearchFile[]>>({})
+  const [running, setRunning] = useState(false)
+  const [runResult, setRunResult] = useState<TaggerRunResult | null>(null)
+  const [minScore, setMinScore] = useState(DEFAULT_TAGGER_MIN_SCORE)
+  const [excludeMeta, setExcludeMeta] = useState(true)
+  const [blacklistText, setBlacklistText] = useState(DEFAULT_TAGGER_BLACKLIST.join(', '))
+  const currentImage = inputImage ?? lastImage
+
+  async function checkFiles(item: TaggerCatalogItem): Promise<void> {
+    if (checkingId) return
+    setCheckingId(item.id)
+    try {
+      const result = await api.huggingface.search({
+        query: item.repoId,
+        assetTypes: ['Tagger'],
+        limit: 8
+      })
+      const matched = result.items.find((candidate) => candidate.repoId.toLowerCase() === item.repoId.toLowerCase()) ?? result.items[0]
+      const files = matched?.files ?? []
+      setFileResults((prev) => ({ ...prev, [item.id]: files }))
+      if (files.length > 0) {
+        toast.success(tStatic('tools.tagger.filesFound', { count: files.length }))
+      } else {
+        toast(tStatic('tools.tagger.filesMissing'), { icon: '!' })
+      }
+    } catch (e) {
+      toast.error(tStatic('tools.tagger.fileCheckFailed', { message: (e as Error).message }))
+    } finally {
+      setCheckingId(null)
+    }
+  }
+
+  async function runLocalPixAi(): Promise<void> {
+    if (running) return
+    if (!currentImage) {
+      toast(tStatic('tools.tagger.noImage'), { icon: '!' })
+      return
+    }
+    setRunning(true)
+    try {
+      const result = await api.tools.runTagger({
+        image: currentImage,
+        modelId: 'pixai-onnx',
+        generalThreshold: 0.3,
+        characterThreshold: 0.85,
+        minScore,
+        excludeMeta,
+        blacklist: parseTaggerBlacklist(blacklistText),
+        limit: 60
+      })
+      setRunResult(result)
+      if (result.ok) {
+        setExtractedTags(result.promptTags)
+        toast.success(tStatic('tools.tagger.runDone', { count: result.promptTags.length }))
+      } else {
+        toast.error(tStatic('tools.tagger.runFailed', { message: result.message }))
+      }
+    } catch (e) {
+      toast.error(tStatic('tools.tagger.runFailed', { message: (e as Error).message }))
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  function addTagToPrompt(tag: string): void {
+    setPrompt(promptAppend(prompt, tag))
+  }
+
+  function addAllRunTags(): void {
+    if (!runResult?.promptTags.length) return
+    const next = runResult.promptTags.reduce((value, tag) => promptAppend(value, tag), prompt)
+    setPrompt(next)
+    toast.success(tStatic('tools.tagger.tagsAdded', { count: runResult.promptTags.length }))
+  }
+
+  return (
+    <div className="card p-4 space-y-3" data-testid="tagger-catalog">
+      <div className="flex items-center gap-2">
+        <Tag className="h-5 w-5 text-accent" />
+        <h3 className="text-sm font-semibold text-ink-1">{t('tools.tagger.title')}</h3>
+      </div>
+      <p className="text-xs text-ink-3 leading-relaxed">{t('tools.tagger.body')}</p>
+      <div className="rounded-md border border-line bg-bg-2/50 p-2 text-[11px] text-ink-3">
+        <div className="font-mono text-ink-2">{t('tools.tagger.activePath')}</div>
+        <div className="mt-1">{t('tools.tagger.safeRule')}</div>
+      </div>
+      <div className="rounded-md border border-line bg-bg-2/50 p-2 text-xs space-y-2" data-testid="tagger-run-panel">
+        <div className="flex items-center gap-2">
+          <Play className={cn('h-3.5 w-3.5 text-accent', running && 'animate-pulse')} />
+          <span className="font-semibold text-ink-1">{t('tools.tagger.localRun')}</span>
+          <span className="ml-auto text-[10px] text-ink-3">
+            {currentImage ? t('tools.tagger.imageReady') : t('tools.tagger.noImageShort')}
+          </span>
+        </div>
+        <div className="rounded border border-line bg-bg-1/60 p-2 space-y-2" data-testid="tools-tagger-filter">
+          <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+            <label className="min-w-0">
+              <div className="flex items-baseline justify-between text-[10px] text-ink-3">
+                <span>{t('taggerFilter.minScore')}</span>
+                <span className="font-mono text-ink-1">{minScore.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min={0.3}
+                max={0.8}
+                step={0.01}
+                value={minScore}
+                onChange={(e) => setMinScore(parseFloat(e.target.value))}
+                className="w-full accent-accent"
+              />
+            </label>
+            <label className="flex items-center gap-1.5 text-[10px] text-ink-2">
+              <input
+                type="checkbox"
+                checked={excludeMeta}
+                onChange={(e) => setExcludeMeta(e.target.checked)}
+                className="accent-accent"
+              />
+              {t('taggerFilter.excludeMeta')}
+            </label>
+          </div>
+          <label className="block">
+            <span className="text-[10px] text-ink-3">{t('taggerFilter.blacklist')}</span>
+            <textarea
+              className="input mt-1 min-h-12 text-[10px] font-mono"
+              value={blacklistText}
+              onChange={(e) => setBlacklistText(e.target.value)}
+            />
+          </label>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className="btn btn-primary flex-1 justify-center text-xs gap-1.5"
+            onClick={() => { void runLocalPixAi() }}
+            disabled={running || !currentImage}
+            data-testid="tagger-run-current-image"
+          >
+            <Play className="h-3.5 w-3.5" />
+            {running ? t('tools.tagger.running') : t('tools.tagger.runLocal')}
+          </button>
+          {runResult?.ok && runResult.promptTags.length > 0 && (
+            <button type="button" className="btn text-xs" onClick={addAllRunTags}>
+              {t('tools.tagger.addAll')}
+            </button>
+          )}
+        </div>
+        {runResult && (
+          <div className="border-t border-line/70 pt-2 space-y-2" data-testid="tagger-run-result" data-tagger-status={runResult.status}>
+            <div className={cn('text-[11px] leading-relaxed', runResult.ok ? 'text-ok' : 'text-warn')}>
+              {runResult.message}
+              {runResult.provider && ` / ${runResult.provider}`}
+              {runResult.elapsedMs != null && ` / ${runResult.elapsedMs}ms`}
+            </div>
+            <div className="font-mono text-[10px] text-ink-3 truncate">{runResult.modelPath ?? runResult.modelDir}</div>
+            {runResult.filter && (
+              <div className="text-[10px] text-ink-3" data-testid="tagger-run-filter-summary">
+                {t('taggerFilter.keptSuppressed', { kept: runResult.filter.kept, suppressed: runResult.filter.suppressed })}
+              </div>
+            )}
+            {runResult.promptTags.length > 0 && (
+              <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto">
+                {runResult.promptTags.slice(0, 40).map((tag, index) => (
+                  <button
+                    key={`${tag}-${index}`}
+                    type="button"
+                    className="rounded border border-line px-1.5 py-0.5 text-[10px] text-ink-1 hover:border-accent hover:bg-bg-3"
+                    onClick={() => addTagToPrompt(tag)}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            )}
+            {(runResult.suppressedTags?.length ?? 0) > 0 && (
+              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto" data-testid="tagger-run-suppressed">
+                {runResult.suppressedTags?.slice(0, 32).map((tag, index) => (
+                  <span key={`${tag.name}-${index}`} className="rounded border border-line bg-bg-3 px-1.5 py-0.5 text-[10px] text-ink-3">
+                    {tag.name.replace(/_/g, ' ')}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="space-y-2">
+        {TAGGER_CATALOG.map((item, index) => {
+          const files = fileResults[item.id]
+          return (
+            <div key={item.id} className="rounded-md border border-line bg-bg-2/40 p-3 text-xs space-y-2">
+              <div className="flex items-start gap-2 min-w-0">
+                <div className="h-6 w-6 rounded bg-bg-3 border border-line flex items-center justify-center font-mono text-[11px] text-ink-2 shrink-0">
+                  {index + 1}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-ink-1">{item.name}</span>
+                    <span className={cn('rounded px-1.5 py-0.5 text-[10px] border', taggerTierClass(item.tier))}>
+                      {taggerTierLabel(item.tier)}
+                    </span>
+                    <span className="rounded border border-line bg-bg-3 px-1.5 py-0.5 text-[10px] text-ink-2">
+                      {item.license}
+                    </span>
+                    <span className={cn(
+                      'rounded border px-1.5 py-0.5 text-[10px]',
+                      item.access === 'public' ? 'border-ok/40 text-ok bg-ok/10' : 'border-warn/40 text-warn bg-warn/10'
+                    )}>
+                      {item.access}
+                    </span>
+                  </div>
+                  <div className="mt-1 font-mono text-[10px] text-ink-3 truncate">{item.repoId}</div>
+                </div>
+                <button
+                  className="btn btn-icon btn-ghost shrink-0"
+                  onClick={() => api.app.openExternal(`https://huggingface.co/${item.repoId}`)}
+                  title={t('tools.tagger.openModel')}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <Stat label="runtime" value={item.runtime} />
+                <Stat label="tags" value={item.tagCount} />
+                <Stat label="data" value={item.dataSnapshot} />
+                <Stat label={t('tools.tagger.threshold')} value={item.thresholdHint} />
+              </div>
+              <p className="text-[11px] text-ink-2 leading-relaxed">{item.role}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <TaggerList title={t('tools.tagger.strengths')} items={item.strengths} />
+                <TaggerList title={t('tools.tagger.cautions')} items={item.cautions} />
+              </div>
+              <div className="border-t border-line/70 pt-2 space-y-2">
+                <button
+                  className="btn btn-ghost text-[11px] py-1 gap-1.5"
+                  onClick={() => { void checkFiles(item) }}
+                  disabled={!!checkingId}
+                >
+                  <RefreshCw className={cn('h-3.5 w-3.5', checkingId === item.id && 'animate-spin')} />
+                  {t('tools.tagger.checkFiles')}
+                </button>
+                {files && (
+                  <div className="space-y-1">
+                    {files.length === 0 ? (
+                      <div className="text-[11px] text-ink-3">{t('tools.tagger.filesMissing')}</div>
+                    ) : (
+                      files.slice(0, 5).map((file) => (
+                        <div key={file.path} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 font-mono text-[10px] text-ink-3">
+                          <span className="truncate">{file.path}</span>
+                          <span>{file.sizeBytes ? formatBytes(file.sizeBytes) : '-'}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function TaggerList({ title, items }: { title: string; items: string[] }): JSX.Element {
+  return (
+    <div className="rounded-md border border-line/70 bg-bg-1/40 p-2">
+      <div className="text-[10px] text-ink-3 mb-1">{title}</div>
+      <div className="space-y-1">
+        {items.map((item) => (
+          <div key={item} className="text-[11px] text-ink-2 leading-relaxed">{item}</div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function taggerTierClass(tier: TaggerCatalogItem['tier']): string {
+  switch (tier) {
+    case 'standard': return 'border-ok/40 bg-ok/10 text-ok'
+    case 'baseline': return 'border-accent/40 bg-accent-dim/40 text-accent'
+    case 'experiment': return 'border-warn/40 bg-warn/10 text-warn'
+    case 'research': return 'border-line bg-bg-3 text-ink-2'
+    case 'defer': return 'border-err/40 bg-err/10 text-err'
+  }
+}
+
+function isPartialIntegrityIssue(issue: LibraryIntegrityReport['issues'][number]): boolean {
+  return Boolean(
+    issue.path &&
+    !issue.jobId &&
+    issue.path.toLowerCase().includes('.partial') &&
+    issue.message.toLowerCase().includes('partial')
+  )
+}
+
 function ModelLibraryCard(): JSX.Element {
   const t = useT()
   const [busy, setBusy] = useState(false)
@@ -494,6 +824,7 @@ function ModelLibraryCard(): JSX.Element {
   const [jobs, setJobs] = useState<DownloadJob[]>([])
   const [integrity, setIntegrity] = useState<LibraryIntegrityReport | null>(null)
   const [hashingId, setHashingId] = useState<string | null>(null)
+  const [deletingPartialPath, setDeletingPartialPath] = useState<string | null>(null)
   const [libraryQuery, setLibraryQuery] = useState('')
   const [libraryType, setLibraryType] = useState('all')
 
@@ -591,6 +922,27 @@ function ModelLibraryCard(): JSX.Element {
     }
   }
 
+  async function deletePartial(path: string): Promise<void> {
+    if (deletingPartialPath) return
+    setDeletingPartialPath(path)
+    try {
+      const result = await api.tools.deletePartialFile(path)
+      const [nextReport, nextSummary, nextJobs] = await Promise.all([
+        api.tools.checkLibraryIntegrity(),
+        api.tools.listModelLibrary(),
+        api.tools.listDownloadJobs()
+      ])
+      setIntegrity(nextReport)
+      setSummary(nextSummary)
+      setJobs(nextJobs)
+      toast.success(tStatic('tools.library.partialDeleted', { size: formatBytes(result.sizeBytes) }))
+    } catch (e) {
+      toast.error(tStatic('tools.library.partialDeleteFailed', { message: (e as Error).message }))
+    } finally {
+      setDeletingPartialPath(null)
+    }
+  }
+
   async function hashEntry(entryId: string): Promise<void> {
     if (hashingId) return
     setHashingId(entryId)
@@ -647,7 +999,7 @@ function ModelLibraryCard(): JSX.Element {
   const recentJobs = jobs.slice(0, 5)
 
   return (
-    <div className="card p-4 space-y-3">
+    <div className="card p-4 space-y-3" data-testid="model-library-card">
       <div className="flex items-center gap-2">
         <Database className="h-5 w-5 text-accent" />
         <h3 className="text-sm font-semibold text-ink-1">{t('tools.library.title')}</h3>
@@ -712,8 +1064,28 @@ function ModelLibraryCard(): JSX.Element {
             <Stat label={t('tools.library.partialDownloads')} value={String(integrity.totals.partialDownloads)} />
           </div>
           {integrity.issues.slice(0, 5).map((issue, index) => (
-            <div key={`${issue.entryId ?? issue.jobId ?? issue.path ?? 'issue'}-${index}`} className="font-mono text-[10px] text-ink-3 truncate">
-              [{issue.severity}] {issue.message}
+            <div
+              key={`${issue.entryId ?? issue.jobId ?? issue.path ?? 'issue'}-${index}`}
+              className="flex items-start gap-2 rounded border border-line/70 bg-bg-1/40 p-1.5"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="font-mono text-[10px] text-ink-3 truncate">
+                  [{issue.severity}] {issue.message}
+                </div>
+                {issue.path && <div className="font-mono text-[9px] text-ink-3 truncate">{issue.path}</div>}
+              </div>
+              {isPartialIntegrityIssue(issue) && issue.path && (
+                <button
+                  type="button"
+                  className="btn btn-ghost shrink-0 px-1.5 py-0.5 text-[10px] gap-1"
+                  onClick={() => { void deletePartial(issue.path!) }}
+                  disabled={deletingPartialPath === issue.path}
+                  data-testid={`library-delete-partial-${index}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  {deletingPartialPath === issue.path ? t('tools.library.deletingPartial') : t('tools.library.deletePartial')}
+                </button>
+              )}
             </div>
           ))}
         </div>

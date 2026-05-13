@@ -1,6 +1,6 @@
 # Yoitomoshi Art Generator — ロードマップ
 
-最終更新: 2026-05-13
+最終更新: 2026-05-14
 
 現在の作業フォルダ: `C:\宵灯工房アート\Yoitomoshi-Art-Generator`
 
@@ -9,6 +9,12 @@
 - [`SESSION_HANDOFF_2026-05-11.md`](SESSION_HANDOFF_2026-05-11.md): 最新の実装ログ。Phase 8 と i18n フェーズ 2 の進捗はこれを正とする。
 - [`PROJECT_REPORT.md`](PROJECT_REPORT.md): 設計思想、技術選定、調査ログの長期保管場所。一部の Phase 記述は古い。
 - [`NEXT_ACTION_REPORT_2026-05-12.html`](NEXT_ACTION_REPORT_2026-05-12.html): 次にやる作業を優先度順に整理した運用レポート。
+- [`AI_ART_CREATOR_WORKFLOW_RESEARCH_REPORT_2026-05-14.html`](AI_ART_CREATOR_WORKFLOW_RESEARCH_REPORT_2026-05-14.html): AIアート制作のプロンプト作法、設定、拡張機能、Yoitomoshiへの実装提案を一次情報中心に整理した調査レポート。
+- [`AI_ART_SECONDARY_SOURCE_RESEARCH_REPORT_2026-05-14.html`](AI_ART_SECONDARY_SOURCE_RESEARCH_REPORT_2026-05-14.html): 講座、Creator記事、Civitai系workflow共有、日本語プロンプト集、Reddit失敗談から制作作法と摩擦点を整理した二次情報補足レポート。
+- [`AI_ART_RESEARCH_IMPLEMENTATION_STATUS_2026-05-14.md`](AI_ART_RESEARCH_IMPLEMENTATION_STATUS_2026-05-14.md): 調査結果を採用済み / 実装中 / 後回しに分けた実装ステータス。
+- [`UNVERIFIED_DEEP_VALIDATION_REPORT_2026-05-14.html`](UNVERIFIED_DEEP_VALIDATION_REPORT_2026-05-14.html): P2後の未検証項目、Model Library整合性、Electron実機生成、docs整理を再検証したレポート。
+- [`TAGGER_ACCURACY_COMPARISON_2026-05-14.md`](TAGGER_ACCURACY_COMPARISON_2026-05-14.md): PixAI ONNX / WD14 / DeepDanbooru / CLIPのローカル精度比較。
+- [`QA_DOM_GUIDE_2026-05-14.md`](QA_DOM_GUIDE_2026-05-14.md): Electron DOM QAの安定セレクタ、CDP実行手順、Preflight mismatch fixtureの運用手順。
 - [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md): GitHub に載せる範囲、`runtime/`、`userdata/`、Electron profile、将来の model-library/download/workspace 領域の整理ルール。
 - [`../README.md`](../README.md) / `README.{en,ru,pt}.md` / `はじめに.txt`: 利用者向けの起動・運用説明。
 
@@ -52,6 +58,8 @@
 | Phase 9E 初期 | ✅ | Stability Matrix参考の Model Library index / DownloadJob manifest / `.partial` HTTP Range再開 / Tools表示 |
 | Phase 9E-2 | ✅ 主要部 / 残あり | DownloadJob再開/破棄/保存先UI、manifest normalize、Civitai metadata/preview保存、Hugging Face検索 |
 | 運用整備 | ✅ | デスクトップ起動ショートカット更新 / 毎回最新ビルド起動 / Electron 終了時 Forge 停止 / 二重起動防止 / stale pid cleanup |
+| AIアート制作調査 | ✅ | 一次情報中心のプロンプト作法 / 設定 / 拡張機能 / Yoitomoshi実装提案レポート |
+| AIアート二次情報調査 | ✅ | 講座 / Creator記事 / Civitai系workflow / 日本語prompt集 / Reddit失敗談から、再現性・互換性・段階的workflowの重要性を整理 |
 | P0.8 | 🟡 新規 | 起動時ロード高速化 / 初期描画軽量化 / 遅延ロード / 不要スキャン抑制 / バンドル分割 |
 
 ---
@@ -182,6 +190,34 @@
 - Prompt Editorの表示ズレ対策として、textarea上のミラー式シンタックスハイライトを外し、実文字をそのまま表示する方式へ変更。オートコンプリートは自動表示をやめ、Ctrl+Spaceで手動起動、候補一覧は入力欄下に配置して本文に重ならないようにした。
 - X投稿参考メモを追加。Stable Diffusion設定で初心者が迷いやすいという問題提起を、現在の「おすすめ設定 / 詳細設定折りたたみ / 数値説明の簡略化」方針の根拠として記録した。詳細は [`X_STABLE_DIFFUSION_SETTINGS_REFERENCE_2026-05-13.html`](X_STABLE_DIFFUSION_SETTINGS_REFERENCE_2026-05-13.html)。
 
+2026-05-14 追加進捗:
+
+- 画像Tagger一次情報を再整理し、標準候補を `deepghs/pixai-tagger-v0.9-onnx`、比較基準を `SmilingWolf/wd-eva02-large-tagger-v3`、実験枠を `Grio43/OppaiOracle` にした。GPL/gatedの `camie-tagger-v2` / `convnextv2_huge.dbv4-full` は既定同梱しない。詳細は [`TAGGER_IMPLEMENTATION_PLAN_2026-05-14.md`](TAGGER_IMPLEMENTATION_PLAN_2026-05-14.md)。
+- Tools に `Tagger Catalog` を追加。一次情報ベースの採用順、ライセンス、runtime、タグ数、threshold方針、強み/注意点、HFモデルカードへのリンク、HFファイル候補確認を表示する。
+- `Tagger` を Model Library / Hugging Face検索 / ダウンロード保存先へ追加し、`.onnx` / `.bin` をモデル候補に含めた。保存先は `runtime/forge/webui/models/Tagger`。
+- img2img の現行タグ抽出UIに `DeepDanbooru` / `CLIP caption` の選択を追加し、精度改善は Tools の Tagger Catalog へ誘導する導線にした。ONNX実行統合は次スライスで、PixAI ONNXの最小実行パスから入る。
+- Prompt Library の内蔵タグを上流風ベース辞書と宵灯工房追加辞書に分離した。`prompt-library.yoitomoshi.ja.yaml` に品質・仕上げ、構図、照明、雰囲気、背景、衣装、表情、ポーズ、小物、AIキャラ合成、ネガティブ品質/人体崩れ/不要物を追加し、合計334タグを既存カテゴリへマージする。
+- AIアート制作レポートの一次/二次情報をPrompt側の実用UIへ反映。`ResearchWorkflowPanel` を追加し、現在のprompt構造、negative不足、seed固定、全身絵のADetailer候補、ControlNet候補、SDXL解像度を診断し、信頼度A/B付きの「構図探索 / 全身キャラ顔補修 / Prompt構造の土台 / ポーズ固定 / 仕上げUpscale」レシピを適用できるようにした。
+- `ResearchWorkflowPanel` を既存機能と接続強化。診断カードから構図/絵柄/照明/negative/LoRA trigger追加、重複整理、主題の前方移動、ADetailer顔補修、ControlNet Unit準備、SDXL解像度補正を直接実行できるようにし、各制作レシピは現在のPrompt/Negativeを既存Preset一覧へ保存できるようにした。
+- P2: 仕上げ・運用品質として、制作レシピに `一次+講座一致` / `複数講座一致` / `Creator実例` のReliability Badgeを追加し、Civitai recommendation由来の `Model Prompt Contract` を表示・適用できるようにした。
+- PreflightのCompatibility Guardを強化。Prompt長、LoRA base model mismatch、LoRA trigger不足、SDXL小解像度、ControlNet base mismatchを生成前に警告する。
+- Prompt Libraryに `制作レシピ` カテゴリを追加し、比較・探索 / 参照・制御 / 仕上げ・検査タグを追加。Quick Presetにも `構図探索` / `全身構図` / `カメラ角度` を追加した。
+- 調査結果の実装状態を [`AI_ART_RESEARCH_IMPLEMENTATION_STATUS_2026-05-14.md`](AI_ART_RESEARCH_IMPLEMENTATION_STATUS_2026-05-14.md) に整理し、採用済み / 実装中 / 後回しを分けた。
+- P2 QAとして、typecheck / build / YAML parse / diff check / Electron DOM smokeを確認。証跡は [`QA_CREATOR_WORKFLOW_P2_2026-05-14.md`](QA_CREATOR_WORKFLOW_P2_2026-05-14.md)。
+- P2後の未検証項目を追加検証。Model Prompt Contract適用、Quick Fix、Recipe保存、SDXL小解像度Preflight、LoRA base/trigger警告、ControlNet base mismatch、最小txt2img生成をElectron実機で確認した。Model Library整合性チェックは、DownloadJobに紐づかない孤立partialも検出するよう修正し、現環境の6.4GB partialは安全削除後にIntegrity `issues=0` を確認した。証跡は [`UNVERIFIED_DEEP_VALIDATION_REPORT_2026-05-14.html`](UNVERIFIED_DEEP_VALIDATION_REPORT_2026-05-14.html) と [`QA_UNVERIFIED_DEEP_VALIDATION_2026-05-14.md`](QA_UNVERIFIED_DEEP_VALIDATION_2026-05-14.md)。
+- DOM QAを整理。上部タブ、サイドタブ、Preflight、Workspace復元に `data-testid` を追加し、`scripts/dom-qa.cjs` と `npm run qa:dom` / `npm run qa:dom:preflight` で再利用できるCDP fixtureへ移した。運用手順は [`QA_DOM_GUIDE_2026-05-14.md`](QA_DOM_GUIDE_2026-05-14.md)。
+- Preflightを操作に接続。blockerはGenerateボタンのdisabled理由へ入り、警告行の「確認」からPrompt/Params/LoRA/ControlNet/FABRIC/ADetailerへ移動できる。LoRA trigger不足とSDXL小解像度は「修正」で即時反映できる。
+- PixAI ONNXの最小実行パスを追加。`runtime/forge/webui/models/Tagger/model.onnx` と `selected_tags.csv` を配置し、Forge Python + ONNX Runtimeでローカルタグ抽出できることを確認済み。DOM smokeは `status=ok`。
+- Tagger精度比較を実施。ローカルQA画像5件で PixAI ONNX / WD14 / DeepDanbooru / CLIP を比較し、除外ルール適用後はPixAI ONNXがScore 67.7%、WD14が65.5%で僅差。PixAIは期待ラベル回収率、WD14は速度とprecision proxyが強い。詳細は [`TAGGER_ACCURACY_COMPARISON_2026-05-14.md`](TAGGER_ACCURACY_COMPARISON_2026-05-14.md)。
+- PixAI ONNXの余分なタグを抑えるため、最低confidence、blacklist、meta除外をTagger IPCとimg2img/Tools UIへ接続した。除外タグは `suppressedTags` として表示できる。
+- Historyに正解タグレビューを追加。履歴画像ごとにPixAI候補を抽出し、正解タグ/除外タグを `tagReview` として保存できる。DOM QAは `qa:dom:history-review`。
+- Tagger精度比較をHistoryレビューへ接続。保存済み `tagReview.acceptedTags` は期待タグ、`rejectedTags` は除外タグとして評価し、blacklist候補とPixAI推奨minScoreを `historyReview` セクションへ出力する。現在の実データは保存済みレビュー0件のため、固定QA5件での比較値を維持している。
+- Historyレビューパネルを実用化。候補タグ検索、表示分の一括採用/除外、保存済みレビューサマリー、正解タグ→Prompt、除外タグ→Negativeを追加した。
+- Prompt Helperにレビュー済みHistoryタグを接続。保存済み正解タグをPositive候補、除外タグをNegative候補として再利用できる。
+- DOM QA fixtureを拡張。`qa:dom:tagger-blacklist`、`qa:dom:history-review-persistence`、`qa:dom:history-review-prompt`、`qa:dom:history-review-report-source`、`qa:dom:prompt-helper-review` でblacklist反映、reload後復元、Prompt連携、比較ソース読込、Prompt Helper再利用を確認する。
+- ToolsのModel Library整合性表示に、孤立partial削除ボタンを追加。対象はDownloadJobに紐づかないpartialだけで、IPC側でもForgeモデルフォルダ配下かつ `.partial` を含むファイルに限定する。
+- DOM QA fixtureを拡張。`qa:dom:p2` はGenerate disabled理由、Preflight Open/Quick Fix、Tools Tagger/Model Library API surfaceを確認し、`qa:dom:tagger` はTagger IPCの `ok` / `missing-model` / `missing-runtime` 返却を確認する。`qa:dom:partial-delete` は `yoitomoshi-dom-qa-*` のテストpartialだけを削除して、孤立partial削除IPCを検証する。
+
 残タスク更新:
 
 - ControlNet入力生成はUI/IPC実装、UI QA、pose / lineart / depth / tile の実生成QAまで完了。次は canny モデル導入後に建物・小物・硬い輪郭の保持を追加比較する。
@@ -190,10 +226,11 @@
 - Upscale比較保存は実素材QA済み。比較結果を1セット保存し、drift / seam / detail の採用基準と推奨denoiseを確定した。
 - Promptタグ編集は文字列プロンプトを正本にした軽量実装まで完了。次の拡張は、タグ無効化を含む構造化Prompt RecipeとしてWorkspace/Historyに保存するかどうかを決めてから進める。
 - Prompt Editorの色分けを再導入する場合は、textareaミラー方式ではなく、ズレが出にくい専用エディタ採用かタグチップ側の視覚化で行う。
-- 生成前チェックは初期版。次はチェック結果をGenerateボタンのdisabled理由と連動させ、警告はクリックで該当パネルへ移動できるようにする。
+- 生成前チェックはP2仕上げQA済み。SDXL小解像度、LoRA trigger / base mismatch、ControlNet base mismatchは実機DOM確認済み。Generate disabled理由、警告からのパネル移動、LoRA trigger / SDXL size Quick FixもDOM QA済み。
 - AIキャラ追加はP0導線、比較保存、連携診断まで完了。次はIP-Adapter model配置済み環境でのUnit 2効果確認、実写真+透明PNGでのトーンON/OFF比較、LayerDiffuse透明生成・IC-Light照明合わせの段階統合を進める。
 - Format Converter は `.ckpt/.pt/.pth` の checkpoint 実ファイルが環境にないため、次に該当ファイルが `webui/models/Stable-diffusion/` に入った時点で実変換を1回確認する。
 - 配布ビルドは個人配布向けの未署名NSIS installer生成まで確認済み。公開配布時はコード署名証明書、管理者権限または開発者モード、SmartScreen確認を別途検証する。
+- Model Library整合性は孤立partial検出まで対応済み。現環境で残っていた `waiIllustriousSDXL_v170.safetensors.partial` はプロジェクト配下確認後に削除し、Integrity `issues=0` を確認済み。削除UIは同種の大容量partialが頻発する場合の任意改善に回す。
 
 以下は2026-05-11に完了済み。
 

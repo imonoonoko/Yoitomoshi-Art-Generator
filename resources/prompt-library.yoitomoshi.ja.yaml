@@ -1,0 +1,471 @@
+# Yoitomoshi additions for the built-in prompt library.
+# Keep this file separate from prompt-library.ja.yaml so the upstream-style
+# base dictionary can be replaced without losing local app tags.
+
+- name: 画面
+  groups:
+    - name: 品質・仕上げ
+      color: rgba(124, 140, 255, .35)
+      tags:
+        best quality: 最高品質
+        high quality: 高品質
+        masterpiece: 傑作
+        detailed: 詳細な描写
+        highly detailed: 非常に詳細
+        ultra detailed: 超詳細
+        intricate details: 緻密なディテール
+        sharp focus: シャープな焦点
+        clean lineart: きれいな線画
+        polished illustration: 仕上げ済みイラスト
+        professional illustration: 商業イラスト風
+        high resolution: 高解像度
+        8k: 8K
+        absurdres: 超高解像度
+        ultra high res: 超高解像度
+        smooth shading: 滑らかな陰影
+        soft shading: 柔らかい陰影
+        painterly shading: 絵画的な陰影
+        crisp details: くっきりした細部
+        refined details: 整った細部
+
+    - name: 構図・見せ方
+      color: rgba(124, 140, 255, .35)
+      tags:
+        dynamic composition: 動きのある構図
+        cinematic composition: 映画的な構図
+        balanced composition: バランスの良い構図
+        centered composition: 中央構図
+        rule of thirds: 三分割構図
+        diagonal composition: 斜め構図
+        symmetrical composition: 対称構図
+        asymmetrical composition: 非対称構図
+        dramatic angle: ドラマチックな角度
+        low angle: ローアングル
+        high angle: ハイアングル
+        dutch angle: 傾いた構図
+        close-up: クローズアップ
+        medium shot: ミドルショット
+        full body: 全身
+        upper body: 上半身
+        wide shot: ワイドショット
+        establishing shot: 場所が分かる引き構図
+        negative space: 余白のある構図
+        depth of field: 被写界深度
+
+    - name: カメラ・レンズ効果
+      color: rgba(124, 140, 255, .35)
+      tags:
+        bokeh: ボケ
+        lens flare: レンズフレア
+        chromatic aberration: 色収差
+        film grain: フィルム粒子
+        motion blur: モーションブラー
+        radial blur: 放射状ブラー
+        shallow depth of field: 浅い被写界深度
+        telephoto lens: 望遠レンズ
+        wide angle lens: 広角レンズ
+        fisheye lens: 魚眼レンズ
+        macro shot: マクロ撮影
+        soft focus: ソフトフォーカス
+        vignette: 周辺減光
+        backlit: 逆光
+        rim light: リムライト
+
+- name: シーン
+  groups:
+    - name: 照明・色
+      color: rgba(255, 191, 71, .35)
+      tags:
+        soft lighting: 柔らかい光
+        dramatic lighting: 劇的な光
+        cinematic lighting: 映画的な照明
+        natural lighting: 自然光
+        studio lighting: スタジオ照明
+        volumetric lighting: ボリュームライト
+        rim lighting: 縁取り光
+        backlighting: 逆光
+        side lighting: 横からの光
+        low key lighting: 暗めの照明
+        high key lighting: 明るめの照明
+        golden hour: ゴールデンアワー
+        blue hour: ブルーアワー
+        sunset lighting: 夕焼けの光
+        moonlight: 月明かり
+        neon lighting: ネオン照明
+        candlelight: ろうそくの光
+        warm colors: 暖色
+        cool colors: 寒色
+        pastel colors: パステルカラー
+        vivid colors: 鮮やかな色
+        muted colors: 落ち着いた色
+        monochrome: モノクロ
+        high contrast: 高コントラスト
+        low contrast: 低コントラスト
+
+    - name: 雰囲気
+      color: rgba(255, 191, 71, .35)
+      tags:
+        cozy atmosphere: 居心地の良い雰囲気
+        calm atmosphere: 穏やかな雰囲気
+        mysterious atmosphere: 神秘的な雰囲気
+        nostalgic atmosphere: 懐かしい雰囲気
+        melancholic atmosphere: 物悲しい雰囲気
+        dreamy atmosphere: 夢のような雰囲気
+        ethereal atmosphere: 幻想的な雰囲気
+        romantic atmosphere: ロマンチックな雰囲気
+        tense atmosphere: 緊張感
+        quiet atmosphere: 静かな雰囲気
+        lively atmosphere: 賑やかな雰囲気
+        magical atmosphere: 魔法のような雰囲気
+        sacred atmosphere: 神聖な雰囲気
+        lonely atmosphere: 孤独な雰囲気
+        peaceful atmosphere: 平和な雰囲気
+
+    - name: AIキャラ合成
+      color: rgba(255, 191, 71, .35)
+      tags:
+        natural shadow: 自然な影
+        contact shadow: 接地影
+        ambient occlusion: 環境遮蔽
+        matching lighting: 光源を合わせる
+        matching perspective: パースを合わせる
+        integrated character: 背景に馴染んだキャラクター
+        character in real photo: 実写写真内のキャラクター
+        anime character in photo: 写真内のアニメキャラクター
+        realistic composite: 自然な合成
+        seamless composite: 境界の自然な合成
+        grounded character: 地面に接しているキャラクター
+        consistent scale: サイズ感が合っている
+        consistent lighting: 光の一貫性
+        soft edge blend: 柔らかい境界
+        subtle reflection: さりげない反射
+
+- name: 環境
+  groups:
+    - name: 日常背景
+      color: rgba(37, 178, 242, .35)
+      tags:
+        bedroom: 寝室
+        living room: リビング
+        kitchen: キッチン
+        cafe: カフェ
+        restaurant: レストラン
+        convenience store: コンビニ
+        train station: 駅
+        bus stop: バス停
+        classroom: 教室
+        library: 図書館
+        office: オフィス
+        studio apartment: ワンルーム
+        balcony: バルコニー
+        rooftop: 屋上
+        shopping street: 商店街
+        alley: 路地
+        park: 公園
+        riverside: 川沿い
+        seaside: 海辺
+        city street: 街路
+
+    - name: ファンタジー背景
+      color: rgba(37, 178, 242, .35)
+      tags:
+        fantasy forest: 幻想的な森
+        enchanted forest: 魔法の森
+        ancient ruins: 古代遺跡
+        magic academy: 魔法学校
+        castle town: 城下町
+        royal castle: 王城
+        shrine: 神社
+        temple: 寺院
+        cathedral: 大聖堂
+        floating island: 浮遊島
+        crystal cave: 水晶洞窟
+        underground city: 地下都市
+        steampunk city: スチームパンク都市
+        cyberpunk city: サイバーパンク都市
+        post-apocalyptic city: 終末後の都市
+        space station: 宇宙ステーション
+        alien planet: 異星
+        magical battlefield: 魔法の戦場
+
+    - name: 天候・空気感
+      color: rgba(37, 178, 242, .35)
+      tags:
+        clear sky: 快晴
+        cloudy sky: 曇り空
+        overcast: 曇天
+        light rain: 小雨
+        heavy rain: 大雨
+        after rain: 雨上がり
+        wet pavement: 濡れた路面
+        snowing: 雪
+        falling snow: 降る雪
+        fog: 霧
+        mist: もや
+        haze: 霞
+        windy: 風が強い
+        autumn leaves: 紅葉
+        cherry blossoms: 桜
+        falling petals: 舞う花びら
+        dust particles: 舞う塵
+        floating particles: 浮遊粒子
+
+- name: 衣服や装飾品
+  groups:
+    - name: 現代衣装
+      color: rgba(221, 145, 255, .35)
+      tags:
+        oversized hoodie: オーバーサイズパーカー
+        cropped hoodie: 短丈パーカー
+        zip hoodie: ジップパーカー
+        bomber jacket: ボンバージャケット
+        denim jacket: デニムジャケット
+        leather jacket: レザージャケット
+        cardigan: カーディガン
+        turtleneck: タートルネック
+        camisole: キャミソール
+        pleated skirt: プリーツスカート
+        pencil skirt: タイトスカート
+        wide pants: ワイドパンツ
+        cargo pants: カーゴパンツ
+        thighhighs: サイハイソックス
+        sneakers: スニーカー
+        loafers: ローファー
+        ankle boots: アンクルブーツ
+        beret: ベレー帽
+        choker: チョーカー
+        hair ribbon: ヘアリボン
+
+    - name: 和風・創作衣装
+      color: rgba(221, 145, 255, .35)
+      tags:
+        modern kimono: 現代風着物
+        kimono dress: 着物ドレス
+        haori: 羽織
+        hakama skirt: 袴スカート
+        miko outfit: 巫女服
+        shrine maiden outfit: 巫女装束
+        wafuku: 和服
+        japanese armor: 和風甲冑
+        fantasy kimono: ファンタジー着物
+        ornate kimono: 装飾的な着物
+        obi: 帯
+        obi ribbon: 帯リボン
+        kanzashi: かんざし
+        geta: 下駄
+        tabi: 足袋
+        fox mask: 狐面
+        paper umbrella: 和傘
+        folding fan: 扇子
+
+    - name: ファンタジー衣装
+      color: rgba(221, 145, 255, .35)
+      tags:
+        adventurer outfit: 冒険者衣装
+        mage robe: 魔導士ローブ
+        witch hat: 魔女帽子
+        cleric robe: 聖職者ローブ
+        knight armor: 騎士鎧
+        light armor: 軽装鎧
+        battle dress: 戦闘ドレス
+        royal dress: 王族ドレス
+        ceremonial outfit: 儀式衣装
+        hooded cloak: フード付きマント
+        capelet: ケープレット
+        corset: コルセット
+        arm guards: 腕当て
+        thigh boots: サイブーツ
+        magic staff: 魔法の杖
+        spellbook: 魔導書
+        gemstone necklace: 宝石の首飾り
+
+- name: 表情動作
+  groups:
+    - name: 感情ニュアンス
+      color: rgba(255, 123, 2, .35)
+      tags:
+        gentle smile: 優しい笑顔
+        soft smile: 柔らかい笑顔
+        shy smile: 照れ笑い
+        mischievous smile: いたずらっぽい笑顔
+        confident smile: 自信のある笑顔
+        calm expression: 穏やかな表情
+        serious expression: 真剣な表情
+        surprised expression: 驚いた表情
+        worried expression: 心配そうな表情
+        sleepy expression: 眠そうな表情
+        teary eyes: 涙目
+        sparkling eyes: 輝く瞳
+        determined expression: 決意した表情
+        embarrassed: 恥ずかしがる
+        flustered: 慌てる
+        relaxed: リラックス
+
+    - name: ポーズ補助
+      color: rgba(255, 123, 2, .35)
+      tags:
+        standing pose: 立ちポーズ
+        sitting pose: 座りポーズ
+        walking pose: 歩くポーズ
+        running pose: 走るポーズ
+        jumping pose: ジャンプポーズ
+        looking at viewer: カメラ目線
+        looking away: 視線を外す
+        looking back: 振り返る
+        hand on hip: 腰に手
+        hands behind back: 後ろ手
+        reaching out: 手を伸ばす
+        waving: 手を振る
+        peace sign: ピースサイン
+        holding object: 物を持つ
+        sitting on chair: 椅子に座る
+        leaning forward: 前かがみ
+        leaning against wall: 壁にもたれる
+        dynamic pose: 動きのあるポーズ
+
+- name: アイテム
+  groups:
+    - name: 小物・生活
+      color: rgba(119, 205, 122, .35)
+      tags:
+        smartphone: スマートフォン
+        headphones: ヘッドホン
+        camera: カメラ
+        laptop: ノートPC
+        tablet: タブレット
+        book: 本
+        notebook: ノート
+        pen: ペン
+        coffee cup: コーヒーカップ
+        teacup: ティーカップ
+        umbrella: 傘
+        shoulder bag: ショルダーバッグ
+        tote bag: トートバッグ
+        backpack: リュック
+        bouquet: 花束
+        plush toy: ぬいぐるみ
+        keychain: キーホルダー
+        lantern: ランタン
+        suitcase: スーツケース
+
+    - name: 魔法・SF小物
+      color: rgba(119, 205, 122, .35)
+      tags:
+        magic circle: 魔法陣
+        glowing runes: 光るルーン
+        magic crystal: 魔法の水晶
+        crystal orb: 水晶玉
+        potion bottle: ポーション瓶
+        floating book: 浮かぶ本
+        hologram: ホログラム
+        cybernetic parts: サイバネ部品
+        energy blade: エネルギーブレード
+        laser gun: レーザー銃
+        mechanical wings: 機械翼
+        floating screen: 浮遊ディスプレイ
+        drone: ドローン
+        power core: 動力炉
+
+- name: ネガティブなプロンプト
+  groups:
+    - name: 汎用品質低下
+      color: rgba(255, 91, 91, .35)
+      tags:
+        worst quality: 最低品質
+        low quality: 低品質
+        normal quality: 普通品質
+        lowres: 低解像度
+        blurry: ぼやけ
+        jpeg artifacts: JPEGノイズ
+        compression artifacts: 圧縮ノイズ
+        noisy: ノイズ
+        overexposed: 白飛び
+        underexposed: 黒つぶれ
+        oversaturated: 彩度過多
+        bad contrast: コントラスト不良
+        flat lighting: 平坦な照明
+        messy details: 乱れた細部
+        unfinished: 未完成
+
+    - name: 人体・構図崩れ
+      color: rgba(255, 91, 91, .35)
+      tags:
+        bad anatomy: 人体構造の崩れ
+        bad hands: 手の崩れ
+        bad fingers: 指の崩れ
+        extra fingers: 余分な指
+        missing fingers: 指の欠け
+        fused fingers: 指の癒着
+        extra limbs: 余分な手足
+        missing limbs: 手足の欠け
+        long neck: 長すぎる首
+        malformed face: 顔の崩れ
+        asymmetrical eyes: 左右非対称の目
+        cross-eye: 寄り目
+        deformed body: 体の変形
+        awkward pose: 不自然なポーズ
+        out of frame: フレーム外
+        cropped head: 頭が切れる
+
+    - name: 不要物・画面ノイズ
+      color: rgba(255, 91, 91, .35)
+      tags:
+        text: 文字
+        watermark: 透かし
+        logo: ロゴ
+        signature: 署名
+        username: ユーザー名
+        artist name: 作者名
+        speech bubble: 吹き出し
+        panel layout: コマ割り
+        duplicate: 重複
+        duplicate body: 体の重複
+        extra person: 余分な人物
+        extra face: 余分な顔
+        bad perspective: パース崩れ
+        distorted background: 背景の歪み
+        cluttered background: 背景が散らかりすぎ
+
+- name: 制作レシピ
+  groups:
+    - name: 比較・探索
+      color: rgba(143, 179, 255, .35)
+      tags:
+        prompt comparison: プロンプト比較
+        fixed seed comparison: seed固定比較
+        composition draft: 構図ラフ
+        variation study: バリエーション検討
+        rough concept: ラフ案
+        clean final pass: 仕上げパス
+        low denoise pass: 低denoiseパス
+        high detail pass: 高精細パス
+        subtle redraw: 控えめな再描画
+        strong redraw: しっかり再描画
+
+    - name: 参照・制御
+      color: rgba(98, 199, 184, .35)
+      tags:
+        pose reference: ポーズ参照
+        lineart reference: 線画参照
+        depth reference: Depth参照
+        style reference: 画風参照
+        face reference: 顔参照
+        controlnet pose: ControlNetポーズ
+        controlnet lineart: ControlNet線画
+        controlnet depth: ControlNet奥行き
+        controlnet tile: ControlNetタイル
+        ip-adapter reference: IP-Adapter参照
+
+    - name: 仕上げ・検査
+      color: rgba(242, 200, 109, .35)
+      tags:
+        face detail pass: 顔補修パス
+        hand detail pass: 手補修パス
+        artifact cleanup: 破綻修正
+        seam check: 継ぎ目チェック
+        upscale pass: アップスケールパス
+        final color check: 最終色確認
+        final anatomy check: 最終人体確認
+        source verified: 出典確認済み
+        workflow verified: ワークフロー確認済み
+        model compatible: モデル互換

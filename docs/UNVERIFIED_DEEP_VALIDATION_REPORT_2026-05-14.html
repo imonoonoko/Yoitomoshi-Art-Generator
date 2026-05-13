@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>未検証項目 徹底検証・修正レポート 2026-05-14</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111214;
+      --panel: #181a1f;
+      --panel-2: #20232a;
+      --line: #343842;
+      --text: #eff1f5;
+      --muted: #a9afbd;
+      --ok: #79d18b;
+      --warn: #ffd36a;
+      --bad: #ff8f8f;
+      --info: #8cb9ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      line-height: 1.62;
+    }
+    header, main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    header { padding-top: 44px; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 34px 0 14px; font-size: 20px; }
+    h3 { margin: 20px 0 8px; font-size: 16px; }
+    p { margin: 8px 0; }
+    code { background: #0d0e11; border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+    table { width: 100%; border-collapse: collapse; margin: 14px 0 24px; }
+    th, td { border: 1px solid var(--line); padding: 10px 12px; vertical-align: top; }
+    th { background: #222630; text-align: left; }
+    td { background: var(--panel); }
+    ul { margin: 8px 0 18px 22px; padding: 0; }
+    li { margin: 6px 0; }
+    .lead { color: var(--muted); max-width: 900px; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+    .k { color: var(--muted); font-size: 12px; }
+    .v { font-size: 22px; font-weight: 700; margin-top: 4px; }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    .info { color: var(--info); }
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      background: var(--panel-2);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .note { color: var(--muted); }
+    @media (max-width: 900px) {
+      header, main { padding: 20px; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      table { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="pill">2026-05-14 / complete</p>
+    <h1>未検証項目 徹底検証・修正レポート</h1>
+    <p class="lead">
+      P2実装後に残った未検証項目を、静的チェック、データ整合性、Electron実機DOM、
+      可能な範囲のForge実生成まで広げて再検証する。検証中に見つけた不具合は修正し、
+      README / ROADMAP / QAドキュメントも現在の状態に揃える。
+    </p>
+  </header>
+
+  <main>
+    <section class="grid">
+      <div class="card"><div class="k">静的検証</div><div class="v ok">PASS</div></div>
+      <div class="card"><div class="k">データ整合性</div><div class="v ok">PASS</div></div>
+      <div class="card"><div class="k">Electron実機</div><div class="v ok">PASS</div></div>
+      <div class="card"><div class="k">docs整理</div><div class="v ok">PASS</div></div>
+    </section>
+
+    <h2>検証対象</h2>
+    <table>
+      <thead>
+        <tr><th>対象</th><th>前回の未検証 / 弱い証跡</th><th>今回の確認方針</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>制作ナレッジ P2 UI</td>
+          <td>DOM smokeはPASSだが、Quick Fix / Recipe保存 / Model Prompt Contract適用の状態変化は未確認。</td>
+          <td>Electron上で状態を作り、ボタン操作後のPrompt/Negative/Params/Presets反映を確認する。</td>
+        </tr>
+        <tr>
+          <td>Compatibility Guard</td>
+          <td>長いPrompt警告のみDOM確認。LoRA base mismatch、trigger不足、SDXL小解像度、ControlNet mismatchは未確認。</td>
+          <td>実データまたはUI注入状態で各警告が出る条件を確認し、誤判定があれば修正する。</td>
+        </tr>
+        <tr>
+          <td>Model Prompt Contract</td>
+          <td>Civitai recommendationが読み込まれたモデル選択状態での表示確認が未実施。</td>
+          <td>既存Civitai cacheを使い、推奨値の表示と適用を確認する。必要なら契約情報をModel Libraryにも保存できるようにする。</td>
+        </tr>
+        <tr>
+          <td>実生成</td>
+          <td>P2スライスではUI、設定反映、Prompt資産整理のみ検証。実生成は未実施。</td>
+          <td>Forgeが起動できる場合は最小サイズ/少stepでtxt2imgを実行し、生成履歴とPreflightの整合を確認する。</td>
+        </tr>
+        <tr>
+          <td>Prompt Library / Quick Preset</td>
+          <td>YAML parseとDOM表示はPASS。読み込み統合、重複、docsリンク整理の追加確認が必要。</td>
+          <td>YAML構造、内蔵Quick Preset、docsリンク、古い未検証表現を横断確認する。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>実行ログ</h2>
+    <table>
+      <thead>
+        <tr><th>時刻</th><th>確認</th><th>結果</th><th>メモ</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>開始時</td>
+          <td>棚卸し</td>
+          <td><span class="info">DONE</span></td>
+          <td>
+            <code>AI_ART_RESEARCH_IMPLEMENTATION_STATUS_2026-05-14.md</code> と
+            <code>QA_CREATOR_WORKFLOW_P2_2026-05-14.md</code> から、P2の未実施項目を抽出。
+          </td>
+        </tr>
+        <tr>
+          <td>静的検証</td>
+          <td>TypeScript</td>
+          <td><span class="ok">PASS</span></td>
+          <td><code>npm.cmd run typecheck</code> が Node/Web とも成功。</td>
+        </tr>
+        <tr>
+          <td>静的検証</td>
+          <td>Prompt Library</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            <code>resources/prompt-library.yoitomoshi.ja.yaml</code> を parse。
+            制作レシピカテゴリの3グループ、30タグ、必須タグ
+            <code>prompt comparison</code> / <code>controlnet pose</code> /
+            <code>model compatible</code> などを確認。
+          </td>
+        </tr>
+        <tr>
+          <td>静的検証</td>
+          <td>README / ROADMAP docsリンク</td>
+          <td><span class="ok">PASS</span></td>
+          <td>Markdownリンクのローカル参照先は全件存在。</td>
+        </tr>
+        <tr>
+          <td>データ整合性</td>
+          <td>Model Library / DownloadJob</td>
+          <td><span class="warn">DETECTED</span></td>
+          <td>
+            Model Libraryは16件、実ファイル欠落0、SHA欠落0。
+            一方で <code>runtime/forge/webui/models/Stable-diffusion/waiIllustriousSDXL_v170.safetensors.partial</code>
+            がDownloadJobに紐づかない孤立partialとして残っていた。
+          </td>
+        </tr>
+        <tr>
+          <td>データ整合性</td>
+          <td>孤立partial削除 / Integrity再実行</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            対象pathがプロジェクト配下であることを確認後、6,418,390,528 bytesの孤立partialを削除。
+            <code>window.api.tools.checkLibraryIntegrity()</code> 再実行で
+            <code>partialDownloads=0</code> / <code>issues=0</code> を確認。
+          </td>
+        </tr>
+        <tr>
+          <td>ビルド</td>
+          <td>Production build</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            <code>npm.cmd run build</code> が main / preload / renderer とも成功。
+            修正したModel Library整合性チェックを <code>out/main/index.js</code> へ反映した。
+          </td>
+        </tr>
+        <tr>
+          <td>Electron実機</td>
+          <td>制作ナレッジ / Model Prompt Contract</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            remote debugging付きElectronで <code>制作ナレッジ</code> を開き、
+            <code>Model Prompt Contract</code>、<code>28 steps</code>、<code>CFG 5</code> を確認。
+            <code>モデル推奨を反映</code> 後、Steps=28 / CFG=5 がUIへ反映された。
+          </td>
+        </tr>
+        <tr>
+          <td>Electron実機</td>
+          <td>Quick Fix / Recipe保存</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            空PromptからQuick Fixを実行し、<code>portrait, looking at viewer</code> が追加されることを確認。
+            Recipe保存で <code>制作レシピ: 構図探索</code> のプリセット作成を確認し、
+            検証後に削除してユーザーデータを戻した。
+          </td>
+        </tr>
+        <tr>
+          <td>Electron実機</td>
+          <td>Compatibility Guard</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            Civitai recommendationが <code>NoobAI</code> 系として読まれた状態で
+            512×512を選択し、Preflightに
+            <code>SDXL系には解像度が小さめです (512×512)</code> が出ることを確認。
+          </td>
+        </tr>
+        <tr>
+          <td>Electron実機</td>
+          <td>LoRA / ControlNet mismatch fixture</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            LoRA Panelで <code>Hands v2.1</code> のCivitai metadataを読み込み、一時Workspace復元で
+            trigger word不足、LoRA base model不一致、SDXL小解像度、ControlNet SD1.5/SDXL mismatchを同時にDOM確認。
+            検証用Workspaceは削除済み。
+          </td>
+        </tr>
+        <tr>
+          <td>Electron実機</td>
+          <td>最小txt2img生成</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            <code>simple landscape, blue sky, small house</code> / Steps=1 / CFG=5 / 512×512で
+            UIのGenerateを実行。Historyが99件から100件へ増え、
+            <code>userdata/history/78b2125c-d03a-41a9-8537-f39c057e30af.png</code> が保存された。
+          </td>
+        </tr>
+        <tr>
+          <td>終了確認</td>
+          <td>プロセス / ポート</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            検証用Electronを終了後、Electron / Forge Pythonプロセス残留なし。
+            Forge port <code>7860</code> のlistenなし。remote debugging portはTimeWaitのみ。
+          </td>
+        </tr>
+        <tr>
+          <td>最終検証</td>
+          <td>docs整理後の再チェック</td>
+          <td><span class="ok">PASS</span></td>
+          <td>
+            docs更新後に <code>npm.cmd run typecheck</code>、
+            <code>npm.cmd run build</code>、Prompt Library YAML parse、
+            README/ROADMAP/QAリンク検証、<code>git diff --check</code> を再実行し、全て成功。
+            追補で <code>qa:dom:p2</code> と <code>qa:dom:tagger</code> も追加し、
+            Preflight操作接続、Tools API surface、Tagger配置後の <code>status=ok</code> を確認した。
+            さらに <code>qa:dom:partial-delete</code> でテスト用孤立partialのIPC削除も確認した。
+            Tagger精度比較は <code>qa:tagger:compare</code> で実行し、PixAI ONNX / WD14 /
+            DeepDanbooru / CLIP の同一サンプル比較を保存した。
+            追補でHistoryレビュータグを比較ソースへ接続し、保存済みレビューがある場合は
+            <code>acceptedTags</code> を期待タグ、<code>rejectedTags</code> を除外タグとして評価する。
+            現在の保存済みレビューは0件だが、一時レビューfixtureでは
+            <code>historyReviewSamples=1</code> の取り込みを確認した。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>修正ログ</h2>
+    <ul>
+      <li>
+        <code>electron/ipc-handlers.ts</code> のModel Library整合性チェックを強化し、
+        completed jobに残ったpartialと、モデルフォルダ内の孤立partialを検出するようにした。
+        これによりToolsの整合性チェックで隠れていた大容量partialを警告できる。
+      </li>
+      <li>
+        追補でToolsの整合性チェック結果に孤立partial削除ボタンを追加した。
+        UIはDownloadJobに紐づかないpartialだけに表示し、IPC側でもForgeモデルフォルダ配下かつ
+        <code>.partial</code> を含むファイルだけ削除できるように制限した。
+      </li>
+      <li>
+        Preflightは、blockerをGenerate disabled理由へ接続し、警告の「確認」から該当パネルへ移動できるようにした。
+        LoRA trigger不足とSDXL小解像度は「修正」で即時反映できる。
+      </li>
+      <li>
+        PixAI ONNXの最小実行IPCを追加し、モデル配置後に <code>qa:dom:tagger</code> が
+        <code>status=ok</code> を返すことを確認した。
+      </li>
+      <li>
+        <code>scripts/tagger-accuracy-compare.cjs</code> と <code>qa:tagger:compare</code> を追加し、
+        ローカルQA画像5件でPixAI ONNX / WD14 / DeepDanbooru / CLIPを比較した。
+        除外ルール適用後のPixAI ONNXはScore 67.7%、WD14は65.5%で僅差。
+        PixAIは期待ラベル回収率、WD14は速度とprecision proxyが強い。
+      </li>
+      <li>
+        Historyに正解タグレビューを追加した。履歴画像ごとにPixAI候補を抽出し、
+        正解タグ/除外タグを <code>tagReview</code> として保存できる。
+        候補タグ検索、一括採用/除外、保存済みレビューサマリー、正解タグ→Prompt、
+        除外タグ→Negative、Prompt Helperからの再利用も追加した。
+        <code>qa:dom:history-review</code>、<code>qa:dom:history-review-persistence</code>、
+        <code>qa:dom:history-review-prompt</code>、<code>qa:dom:prompt-helper-review</code> で
+        保存、reload後復元、Prompt連携、Prompt Helper再利用を確認した。
+      </li>
+    </ul>
+
+    <h2>Tagger精度比較</h2>
+    <table>
+      <thead>
+        <tr><th>Provider</th><th>Score</th><th>Coverage</th><th>Precision proxy</th><th>平均時間</th><th>判定</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>PixAI ONNX</td>
+          <td>67.7%</td>
+          <td>75.0%</td>
+          <td>50.8%</td>
+          <td>4735ms</td>
+          <td>既定候補。回収率が高い。Historyレビューが増えるとblacklist候補とminScore推奨値を更新する。</td>
+        </tr>
+        <tr>
+          <td>WD14</td>
+          <td>65.5%</td>
+          <td>68.0%</td>
+          <td>59.6%</td>
+          <td>906ms</td>
+          <td>高速な比較基準。PixAIの過剰検出を抑えるfallbackに向く。</td>
+        </tr>
+        <tr>
+          <td>DeepDanbooru</td>
+          <td>31.6%</td>
+          <td>37.5%</td>
+          <td>17.8%</td>
+          <td>404ms</td>
+          <td>軽いが今回のQA画像では期待ラベル回収が弱い。</td>
+        </tr>
+        <tr>
+          <td>CLIP</td>
+          <td>31.5%</td>
+          <td>33.0%</td>
+          <td>28.0%</td>
+          <td>5124ms</td>
+          <td>自然文captionとして別枠で扱う。</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">
+      詳細: <code>docs/TAGGER_ACCURACY_COMPARISON_2026-05-14.md</code> /
+      <code>output/tagger-accuracy-compare-2026-05-14/comparison.json</code>
+    </p>
+
+    <h2>残る外部条件</h2>
+    <table>
+      <thead>
+        <tr><th>項目</th><th>現状</th><th>次の確認条件</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>PixAI ONNX実タグ抽出</td>
+          <td>
+            実行IPC、UI導線、Python依存確認、モデル配置後の <code>status=ok</code> 応答はPASS。
+            <code>runtime/forge/webui/models/Tagger/model.onnx</code> と
+            <code>selected_tags.csv</code> を配置済み。
+          </td>
+          <td>保存済みレビュータグの比較スクリプト取り込み、blacklist候補集計、Prompt連携まで追加済み。次は実レビュー件数を増やして既定blacklist昇格を判断する。</td>
+        </tr>
+        <tr>
+          <td>別OS / 署名付き公開installer</td>
+          <td>Windowsローカル検証はPASS。Mac/Linux、コード署名、SmartScreen確認は実環境・証明書が必要。</td>
+          <td>対象OSまたは署名証明書を用意した公開配布フェーズで検証する。</td>
+        </tr>
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>

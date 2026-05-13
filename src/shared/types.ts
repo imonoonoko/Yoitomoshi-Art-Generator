@@ -299,6 +299,7 @@ export interface HistoryItem {
   id: string
   createdAt: number
   label?: HistoryLabel | null
+  tagReview?: HistoryTagReview | null
   prompt: string
   negativePrompt: string
   params: {
@@ -320,6 +321,13 @@ export interface HistoryItem {
 }
 
 export type HistoryLabel = 'favorite' | 'candidate' | 'rejected' | 'asset'
+
+export interface HistoryTagReview {
+  acceptedTags: string[]
+  rejectedTags: string[]
+  sourceModel: 'pixai-onnx' | 'manual'
+  updatedAt: number
+}
 
 export interface PromptPreset {
   id: string
@@ -393,6 +401,7 @@ export type CivitaiAssetType =
   | 'Hypernetwork'
   | 'VAE'
   | 'Controlnet'
+  | 'Tagger'
   | 'Other'
 
 export interface CivitaiSearchOptions {
@@ -682,10 +691,59 @@ export interface LibraryIntegrityReport {
   issues: LibraryIntegrityIssue[]
 }
 
+export interface PartialFileDeleteResult {
+  path: string
+  sizeBytes: number
+  deleted: boolean
+}
+
 export interface ModelHashResult {
   entryId: string
   path: string
   sha256: string
+}
+
+export interface TaggerRunRequest {
+  image: string
+  modelId?: 'pixai-onnx'
+  generalThreshold?: number
+  characterThreshold?: number
+  minScore?: number
+  blacklist?: string[]
+  excludeMeta?: boolean
+  limit?: number
+}
+
+export interface TaggerRunTag {
+  name: string
+  score: number
+  category: 'general' | 'character' | 'other'
+}
+
+export interface TaggerRunResult {
+  ok: boolean
+  status: 'ok' | 'missing-model' | 'missing-runtime' | 'failed'
+  modelDir: string
+  modelPath: string | null
+  tagsPath: string | null
+  provider: string | null
+  elapsedMs: number | null
+  tags: TaggerRunTag[]
+  suppressedTags?: TaggerRunSuppressedTag[]
+  promptTags: string[]
+  filter?: {
+    minScore: number
+    excludeMeta: boolean
+    blacklist: string[]
+    kept: number
+    suppressed: number
+  }
+  message: string
+  stderr?: string
+}
+
+export interface TaggerRunSuppressedTag extends TaggerRunTag {
+  reason: 'blacklist' | 'low-confidence' | 'meta'
 }
 
 export interface ModelFormatConversionResult {

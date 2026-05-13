@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, ScanLine, Image as ImageIcon, Plus, Upload, Paintbrush, RotateCcw } from 'lucide-react'
+import { X, ScanLine, Image as ImageIcon, Plus, Upload, Paintbrush, RotateCcw, ShieldX } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore } from '@/lib/store'
 import { api } from '@/lib/ipc'
 import { promptAppend } from '@/lib/prompt-utils'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { DEFAULT_TAGGER_BLACKLIST, DEFAULT_TAGGER_MIN_SCORE, parseTaggerBlacklist } from '@shared/tagger-filter'
+import type { TaggerRunResult } from '@shared/types'
+
+type InterrogateModel = 'deepdanbooru' | 'clip' | 'pixai-onnx'
 
 /**
  * img2img input image controls.
@@ -15,9 +19,9 @@ import { cn } from '@/lib/utils'
  *     this tab needs an input image and how to provide one.
  *   - Loaded state: thumbnail + filename + dismiss (×)
  *   - Denoising-strength slider (0 = identical, 1 = ignore source)
- *   - "タグ抽出" — calls Forge's interrogator to pull a danbooru-style tag list
- *     from the image, then renders them as clickable chips that splice into the
- *     positive prompt. Cheap way to seed a prompt from a reference image.
+ *   - "タグ抽出" — calls Forge's interrogator, then renders clickable chips
+ *     that splice into the positive prompt. Cheap way to seed a prompt from a
+ *     reference image.
  */
 export function InputImagePanel(): JSX.Element {
   const inputImage = useStore((s) => s.inputImage)
@@ -35,27 +39,57 @@ export function InputImagePanel(): JSX.Element {
   const t = useT()
 
   const [interrogating, setInterrogating] = useState(false)
+  const [interrogateModel, setInterrogateModel] = useState<InterrogateModel>('deepdanbooru')
+  const [taggerMinScore, setTaggerMinScore] = useState(DEFAULT_TAGGER_MIN_SCORE)
+  const [taggerExcludeMeta, setTaggerExcludeMeta] = useState(true)
+  const [taggerBlacklistText, setTaggerBlacklistText] = useState(DEFAULT_TAGGER_BLACKLIST.join(', '))
+  const [lastTaggerResult, setLastTaggerResult] = useState<TaggerRunResult | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   if (!inputImage) return <EmptyState fileInputRef={fileInputRef} dragOver={dragOver} setDragOver={setDragOver} setInputImage={setInputImage} />
 
   async function interrogate(): Promise<void> {
-    if (status.kind !== 'ready') {
+    const needsForge = interrogateModel !== 'pixai-onnx'
+    if (needsForge && status.kind !== 'ready') {
       toast.error(tStatic('inputImage.waitForge'))
       return
     }
     if (!inputImage) return
     setInterrogating(true)
     try {
-      const r = await api.forge.interrogate(inputImage, 'deepdanbooru')
-      setExtractedTags(r.tags)
-      if (r.tags.length === 0) toast(tStatic('inputImage.noTags'), { icon: 'ℹ' })
+      let tags: string[]
+      if (interrogateModel === 'pixai-onnx') {
+        const result = await runPixAiTagger(inputImage)
+        setLastTaggerResult(result)
+        tags = result.promptTags
+      } else {
+        setLastTaggerResult(null)
+        tags = (await api.forge.interrogate(inputImage, interrogateModel)).tags
+      }
+      setExtractedTags(tags)
+      if (tags.length === 0) toast(tStatic('inputImage.noTags'), { icon: 'ℹ' })
     } catch (e) {
       toast.error(tStatic('inputImage.interrogateFailed', { message: (e as Error).message }))
     } finally {
       setInterrogating(false)
     }
+  }
+
+  async function runPixAiTagger(image: string): Promise<TaggerRunResult> {
+    const result = await api.tools.runTagger({
+      image,
+      modelId: 'pixai-onnx',
+      generalThreshold: 0.3,
+      characterThreshold: 0.85,
+      minScore: taggerMinScore,
+      excludeMeta: taggerExcludeMeta,
+      blacklist: parseTaggerBlacklist(taggerBlacklistText),
+      limit: 60
+    })
+    if (!result.ok) throw new Error(result.message)
+    toast.success(tStatic('inputImage.taggerPixAiDone', { count: result.promptTags.length }))
+    return result
   }
 
   function addTag(tag: string): void {
@@ -75,7 +109,7 @@ export function InputImagePanel(): JSX.Element {
   }
 
   return (
-    <div className="card p-2 space-y-2">
+    <div className="card p-2 space-y-2" data-testid="input-image-panel">
       <div className="flex gap-2 items-start">
         <img
           src={inputImage}
@@ -126,11 +160,68 @@ export function InputImagePanel(): JSX.Element {
         onMaskChange={setInpaintMaskImage}
       />
 
+      <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+        <label className="flex items-center gap-1.5 text-[10px] text-ink-3 min-w-0">
+          <ScanLine className="h-3.5 w-3.5 text-accent shrink-0" />
+          <span className="shrink-0">{t('inputImage.taggerModel')}</span>
+          <select
+            className="input h-7 text-[11px] py-1 min-w-0"
+            value={interrogateModel}
+            onChange={(e) => setInterrogateModel(e.target.value as InterrogateModel)}
+            disabled={interrogating}
+          >
+            <option value="deepdanbooru">{t('inputImage.taggerDeepDanbooru')}</option>
+            <option value="clip">{t('inputImage.taggerClip')}</option>
+            <option value="pixai-onnx">{t('inputImage.taggerPixAiOnnx')}</option>
+          </select>
+        </label>
+      </div>
+
+      {interrogateModel === 'pixai-onnx' && (
+        <div className="rounded-md border border-line bg-bg-2/50 p-2 space-y-2" data-testid="input-image-tagger-filter">
+          <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+            <label className="min-w-0">
+              <div className="flex items-baseline justify-between text-[10px] text-ink-3">
+                <span>{t('taggerFilter.minScore')}</span>
+                <span className="font-mono text-ink-1">{taggerMinScore.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min={0.3}
+                max={0.8}
+                step={0.01}
+                value={taggerMinScore}
+                onChange={(e) => setTaggerMinScore(parseFloat(e.target.value))}
+                className="w-full accent-accent"
+              />
+            </label>
+            <label className="flex items-center gap-1.5 text-[10px] text-ink-2">
+              <input
+                type="checkbox"
+                checked={taggerExcludeMeta}
+                onChange={(e) => setTaggerExcludeMeta(e.target.checked)}
+                className="accent-accent"
+              />
+              {t('taggerFilter.excludeMeta')}
+            </label>
+          </div>
+          <label className="block">
+            <span className="text-[10px] text-ink-3">{t('taggerFilter.blacklist')}</span>
+            <textarea
+              className="input mt-1 min-h-12 text-[10px] font-mono"
+              value={taggerBlacklistText}
+              onChange={(e) => setTaggerBlacklistText(e.target.value)}
+              placeholder="blurry, watermark, text"
+            />
+          </label>
+        </div>
+      )}
+
       <div className="flex gap-1.5">
         <button
           className="btn flex-1 text-xs"
           onClick={interrogate}
-          disabled={interrogating || status.kind !== 'ready'}
+          disabled={interrogating || (interrogateModel !== 'pixai-onnx' && status.kind !== 'ready')}
         >
           <ScanLine className={cn('h-3.5 w-3.5', interrogating && 'animate-pulse')} />
           {interrogating ? t('inputImage.analyzing') : t('inputImage.interrogate')}
@@ -141,6 +232,21 @@ export function InputImagePanel(): JSX.Element {
             {t('inputImage.addAll')}
           </button>
         )}
+      </div>
+
+      <div className="rounded-md border border-line bg-bg-2/50 p-2 text-[10px] text-ink-3 flex items-center gap-2">
+        <ScanLine className="h-3.5 w-3.5 text-accent shrink-0" />
+        <div className="min-w-0 leading-relaxed">
+          <div>{t('inputImage.taggerCurrent')}</div>
+          <div className="truncate">{t('inputImage.taggerPlan')}</div>
+        </div>
+        <button
+          className="btn btn-ghost text-[10px] py-0.5 ml-auto shrink-0"
+          onClick={() => useStore.getState().setCurrentTab('tools')}
+          title={t('inputImage.taggerTools')}
+        >
+          {t('inputImage.taggerTools')}
+        </button>
       </div>
 
       {extractedTags.length > 0 && (
@@ -165,6 +271,22 @@ export function InputImagePanel(): JSX.Element {
                 </button>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {lastTaggerResult?.ok && (lastTaggerResult.suppressedTags?.length ?? 0) > 0 && (
+        <div className="border-t border-line pt-2" data-testid="input-image-tagger-suppressed">
+          <div className="flex items-center gap-1 text-[10px] text-ink-3 mb-1">
+            <ShieldX className="h-3 w-3 text-warn" />
+            <span>{t('taggerFilter.suppressed', { count: lastTaggerResult.suppressedTags?.length ?? 0 })}</span>
+          </div>
+          <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+            {(lastTaggerResult.suppressedTags ?? []).slice(0, 32).map((tag, index) => (
+              <span key={`${tag.name}-${index}`} className="rounded border border-line bg-bg-3 px-1.5 py-0.5 text-[10px] text-ink-3">
+                {tag.name.replace(/_/g, ' ')}
+              </span>
+            ))}
           </div>
         </div>
       )}
@@ -359,6 +481,7 @@ function EmptyState({
         'card p-4 text-center transition-colors cursor-pointer',
         dragOver ? 'border-accent bg-accent-dim/10' : 'border-dashed hover:border-ink-2'
       )}
+      data-testid="input-image-empty"
       onClick={() => fileInputRef.current?.click()}
       onDragOver={(e) => {
         e.preventDefault()

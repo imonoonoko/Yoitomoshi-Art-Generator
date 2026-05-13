@@ -17,6 +17,7 @@ interface Props {
   onEnabledChange?: (v: boolean) => void
   /** Initial expansion state. Defaults to collapsed to keep the panel quiet. */
   defaultOpen?: boolean
+  testId?: string
   children: ReactNode
 }
 
@@ -38,6 +39,7 @@ export function CollapsiblePanel({
   enabled,
   onEnabledChange,
   defaultOpen = false,
+  testId,
   children
 }: Props): JSX.Element {
   const [open, setOpen] = useState(defaultOpen)
@@ -47,7 +49,7 @@ export function CollapsiblePanel({
     <div className={cn(
       'card overflow-hidden',
       enabled === true && 'ring-1 ring-accent/40'
-    )}>
+    )} data-testid={testId}>
       <button
         type="button"
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bg-3 transition-colors text-left"

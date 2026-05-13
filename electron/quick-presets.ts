@@ -60,6 +60,30 @@ export const BUILT_IN_QUICK_PRESETS: QuickPreset[] = [
     order: 75
   },
   {
+    id: 'builtin/pos/composition-draft',
+    name: '構図探索',
+    text: 'dynamic composition, rule of thirds, depth of field, looking at viewer',
+    target: 'positive',
+    builtIn: true,
+    order: 74
+  },
+  {
+    id: 'builtin/pos/full-body',
+    name: '全身構図',
+    text: 'full body, standing pose, balanced composition, detailed face',
+    target: 'positive',
+    builtIn: true,
+    order: 73
+  },
+  {
+    id: 'builtin/pos/camera-angle',
+    name: 'カメラ角度',
+    text: 'cinematic composition, low angle, wide shot, perspective',
+    target: 'positive',
+    builtIn: true,
+    order: 72
+  },
+  {
     id: 'builtin/pos/lighting',
     name: '美しい光',
     text: 'beautiful detailed lighting, soft lighting, volumetric lighting, rim light',

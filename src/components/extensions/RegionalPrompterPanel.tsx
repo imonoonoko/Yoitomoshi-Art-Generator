@@ -58,6 +58,7 @@ export function RegionalPrompterPanel(): JSX.Element {
       hint={t('regional.hint')}
       enabled={regional.enabled}
       onEnabledChange={(enabled) => patch({ enabled })}
+      testId="regional-prompter-panel"
     >
       <div className="space-y-2">
         <div className="grid grid-cols-2 gap-1">

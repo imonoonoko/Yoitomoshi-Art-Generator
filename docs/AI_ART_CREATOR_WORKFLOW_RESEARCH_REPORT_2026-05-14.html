@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIアート制作ナレッジ総合レポート 2026-05-14</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1115;
+      --panel: #171b22;
+      --panel2: #202630;
+      --line: #323946;
+      --ink: #f2f5f8;
+      --muted: #aab2bf;
+      --subtle: #7e8898;
+      --accent: #8fb3ff;
+      --accent2: #62c7b8;
+      --ok: #79d891;
+      --warn: #f2c86d;
+      --bad: #f08383;
+      --code: #101319;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.72 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    }
+    a { color: #9fbdff; }
+    code {
+      padding: 1px 5px;
+      border-radius: 5px;
+      border: 1px solid #2d3542;
+      background: var(--code);
+      color: #e6ebff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #151a23 0%, #0f1115 100%);
+    }
+    .wrap { max-width: 1220px; margin: 0 auto; padding: 30px; }
+    .eyebrow {
+      margin: 0;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.25; letter-spacing: 0; }
+    h1 { margin-top: 8px; font-size: clamp(28px, 4vw, 42px); }
+    h2 { margin: 34px 0 12px; font-size: 21px; }
+    h3 { font-size: 16px; }
+    p { margin: 8px 0 0; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 5px 0; }
+    .lead { max-width: 980px; color: var(--muted); font-size: 16px; }
+    .meta, .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill, .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.02);
+      white-space: nowrap;
+      font-weight: 700;
+    }
+    .pill { padding: 4px 10px; color: var(--muted); font-size: 12px; }
+    .tag { padding: 2px 8px; font-size: 11px; }
+    .ok { color: var(--ok); border-color: rgba(121,216,145,.45); }
+    .warn { color: var(--warn); border-color: rgba(242,200,109,.45); }
+    .bad { color: var(--bad); border-color: rgba(240,131,131,.45); }
+    .info { color: var(--accent2); border-color: rgba(98,199,184,.45); }
+    .grid { display: grid; gap: 14px; }
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 22px;
+    }
+    .card, .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 15px;
+    }
+    .card.flat { background: var(--panel2); }
+    .card h3 { margin-bottom: 8px; }
+    .metric strong { display: block; font-size: 24px; line-height: 1.2; }
+    .metric span { color: var(--muted); font-size: 12px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 8px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      color: #dce3ee;
+      background: #1d2330;
+      font-size: 12px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    tr:last-child td { border-bottom: 0; }
+    td.small { color: var(--muted); font-size: 12px; }
+    .note {
+      border-left: 3px solid var(--accent2);
+      background: rgba(98,199,184,.08);
+      padding: 12px 14px;
+      border-radius: 0 8px 8px 0;
+      color: #cfe7e3;
+    }
+    .warnbox {
+      border-left: 3px solid var(--warn);
+      background: rgba(242,200,109,.08);
+      padding: 12px 14px;
+      border-radius: 0 8px 8px 0;
+      color: #eadfbd;
+    }
+    .muted { color: var(--muted); }
+    footer { color: var(--subtle); border-top: 1px solid var(--line); margin-top: 34px; }
+    @media (max-width: 920px) {
+      .wrap { padding: 22px; }
+      .summary, .cols-2, .cols-3 { grid-template-columns: 1fr; }
+      table { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">research report / prompt / workflow / extensions</p>
+      <h1>AIアート制作ナレッジ総合レポート</h1>
+      <p class="lead">
+        クリエイターのプロンプト作法、設定の考え方、制作ワークフロー、必須級拡張機能を、
+        公式ドキュメント、モデルカード、拡張リポジトリを中心に整理した。
+        目的は外部サービスをそのまま真似ることではなく、Yoitomoshi Art Generator の
+        ローカル制作支援へ安全に落とし込むこと。
+      </p>
+      <div class="meta">
+        <span class="pill">作成: 2026-05-14</span>
+        <span class="pill">対象: Stable Diffusion WebUI Forge / SDXL / anime workflow</span>
+        <span class="pill">前提: 8GB VRAM 安定優先</span>
+      </div>
+      <div class="summary">
+        <div class="metric"><strong>12+</strong><span>一次情報・公式系ソース</span></div>
+        <div class="metric"><strong>6</strong><span>優先してUI化したい制作パターン</span></div>
+        <div class="metric"><strong>10</strong><span>プリセット候補</span></div>
+        <div class="metric"><strong>P0/P1</strong><span>実装優先度へ分解</span></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <h2>結論</h2>
+      <div class="grid cols-3">
+        <article class="card">
+          <h3>1. プロンプトは「文章」より「制作指示書」</h3>
+          <p>
+            Stable Diffusion系では、主題、構図、視線、動作、衣装、背景、光、品質タグ、除外タグを分けて扱う方が再利用しやすい。
+            Midjourneyの公式ドキュメントも、短く明確な言葉と、最後に置くパラメータの分離を重視している。
+          </p>
+        </article>
+        <article class="card">
+          <h3>2. 設定はモデル別に固定し、seedで比較</h3>
+          <p>
+            CFG、steps、sampler、size、denoiseは「神設定」として単独で効くものではなく、モデル、LoRA、ControlNet、Hires/Upscaleと結びついて効く。
+            アプリ側は固定seedのA/B比較を最短操作にするべき。
+          </p>
+        </article>
+        <article class="card">
+          <h3>3. 拡張は制作工程に割り当てる</h3>
+          <p>
+            ControlNetは構図、ADetailerは顔や手の補修、Regional Prompterは領域分離、IP-Adapterは参照保持、Ultimate/Tiledは高解像度化。
+            名前で並べるより「何を直すか」でUIに出す方が初心者向け。
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>プロンプト作法</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>作法</th>
+            <th>実務での意味</th>
+            <th>Yoitomoshiへの落とし込み</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag info">短く明確</span></td>
+            <td>
+              Midjourneyは短く単純なプロンプトを推奨し、主題、媒体、環境、照明、色、ムード、構図を意識するよう案内している。
+              SDでも長いタグ列をただ足すより、重要度の高い要素を残す方が安定する。
+            </td>
+            <td>
+              Prompt Helperに「主題 / 行動 / 場所 / 光 / 構図 / 仕上げ」のスロットを作り、
+              未入力スロットだけを提案する。全文置換ではなく既存プロンプトへ追加する。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag info">重みは少数だけ</span></td>
+            <td>
+              A1111は `(word:1.5)` などの明示重みを持つ。便利だが、全部を強調すると優先順位が消える。
+              強調するのは顔、衣装のキー要素、光、避けたい崩れのような少数に絞る。
+            </td>
+            <td>
+              タグチップに 0.8 / 1.0 / 1.2 / 1.4 の軽い重みボタンを追加する。
+              1.6以上は「強すぎる可能性」表示にする。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag info">ネガティブは目的別</span></td>
+            <td>
+              Diffusersの公式説明では、negative promptは望まない内容や低品質特徴から離すためのもの。
+              汎用ネガティブを巨大化させるより、手、顔、文字、透かし、余計な物など目的別に分ける。
+            </td>
+            <td>
+              Negative Promptを「品質」「人体」「文字/透かし」「不要物」「スタイル抑制」のプリセットに分け、
+              生成目的に応じてON/OFFできるようにする。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag info">モデルカード優先</span></td>
+            <td>
+              Animagine XL 4.0のモデルカードは、タグ順、品質タグ、推奨negative、CFG 4-7、steps 25-28、Euler aを明記している。
+              NoobAI、Pony、Illustrious系もモデルごとの作法が強いので、一般設定で上書きしない。
+            </td>
+            <td>
+              Model Libraryへ「prompt contract」を追加する。
+              checkpointごとに開始タグ、末尾品質タグ、推奨CFG/steps/size、避けるタグを持たせる。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag info">LoRAは効果量を管理</span></td>
+            <td>
+              A1111のLoRA記法は `<lora:filename:multiplier>` で、基本的に0から1の強さを使う。
+              衣装LoRA、画風LoRA、detail LoRAを積むほど競合しやすい。
+            </td>
+            <td>
+              LoRAカードに「用途: キャラ / 衣装 / 画風 / detail」と推奨weightを保存し、
+              1.0超や複数detail LoRAの同時使用を警告する。
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>神設定の実体</h2>
+      <p class="note">
+        固定の万能値は作らない。アプリの既定値は「まず破綻しにくい値」にし、神設定は
+        モデル別プリセットとA/B比較のセットとして扱う。
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>設定</th>
+            <th>推奨初期値</th>
+            <th>調整ルール</th>
+            <th>UI化</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CFG / guidance</td>
+            <td>SDXL anime: 5前後</td>
+            <td>
+              Diffusersは高すぎるguidanceでartifactが出る可能性を説明している。
+              効かない時はCFGを上げる前に、競合タグ削除、LoRA weight調整、ControlNet追加を試す。
+            </td>
+            <td>4 / 5 / 6 / 7 の比較ボタン。7超は警告。</td>
+          </tr>
+          <tr>
+            <td>Steps</td>
+            <td>20-30</td>
+            <td>
+              単純な顔/立ち絵は20前後、背景やアクションは25-30。
+              stepsを増やすより、構図をControlNetで固定した方が効くケースが多い。
+            </td>
+            <td>「軽量」「標準」「精密」の3択。</td>
+          </tr>
+          <tr>
+            <td>Resolution</td>
+            <td>SDXL: 1024基準、8の倍数</td>
+            <td>
+              DiffusersはSD1.5の標準512、SDXLの標準1024を明記している。
+              8GB VRAMでは長辺1536以上は直接生成よりUpscaleへ回す。
+            </td>
+            <td>縦長/横長/正方形の安全サイズプリセット。</td>
+          </tr>
+          <tr>
+            <td>Hires / Upscale denoise</td>
+            <td>0.25-0.35</td>
+            <td>
+              Ultimate SD Upscaleの例はdenoise 0.35-0.4付近を示すが、
+              本アプリではtile drift対策として人物素材は0.25を基準にする。
+            </td>
+            <td>「保持」「標準」「再描画」の3段階。人物は保持を既定。</td>
+          </tr>
+          <tr>
+            <td>Seed</td>
+            <td>比較時のみ固定</td>
+            <td>
+              Diffusersはgenerator/seedで再現性を確保できる。
+              設定比較、LoRA weight比較、ControlNet ON/OFF比較では必ず固定する。
+            </td>
+            <td>比較生成に入る時だけ自動固定し、終了時に解除確認。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>制作ワークフロー</h2>
+      <div class="grid cols-2">
+        <article class="card">
+          <h3>キャラクター立ち絵</h3>
+          <ul>
+            <li>Checkpointのprompt contractを適用。</li>
+            <li>キャラ/髪/表情/服/ポーズ/背景の順でタグを組む。</li>
+            <li>LoRAはキャラ1、衣装1、画風1までを初期上限にする。</li>
+            <li>ADetailerで顔、必要なら手を補修。</li>
+            <li>採用候補をHistory labelへ保存。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>一枚絵・背景込み</h3>
+          <ul>
+            <li>最初に構図タグとカメラ距離を決める。</li>
+            <li>OpenPose/Depth/Lineartのどれで固定するか選ぶ。</li>
+            <li>Regional Prompterは前景/背景/小物の分離に使う。</li>
+            <li>UpscaleはTile ON / denoise 0.25を基準に比較。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>既存絵から再構成</h3>
+          <ul>
+            <li>Taggerで画像タグを抽出し、Prompt Helperへ渡す。</li>
+            <li>IP-Adapterまたはreference系ControlNetで雰囲気を保持。</li>
+            <li>強く寄せたい時はControlNet、緩く寄せたい時はimg2img denoiseを下げる。</li>
+            <li>著作権/キャラ名タグは用途に応じて明示的に除外できるようにする。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>素材化・ゲーム向け出力</h3>
+          <ul>
+            <li>LayerDiffuseや背景除去系は「素材化済み」ラベルとつなげる。</li>
+            <li>透過素材、背景差分、表情差分をWorkspaceへ参照保存。</li>
+            <li>同じseedとprompt contractで表情/ポーズだけ差分生成する。</li>
+            <li>最終出力はHistoryからUpscaleへ送って保存。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>必須級拡張と採用判断</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>優先</th>
+            <th>拡張 / 技術</th>
+            <th>何に効くか</th>
+            <th>採用メモ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag ok">P0</span></td>
+            <td>ControlNet</td>
+            <td>ポーズ、線画、奥行き、構図、参照画像の制御。</td>
+            <td>
+              既にControlNet Builderがあるので、次は用途別カードを
+              「ポーズ固定」「線画化」「奥行き」「参照雰囲気」に整理する。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag ok">P0</span></td>
+            <td>ADetailer</td>
+            <td>顔、手、目、小物などの自動検出とinpaint補修。</td>
+            <td>
+              本アプリではdicts-only payloadを維持する。
+              UIは「顔を整える」「手を整える」の簡単な目的名で出す。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag ok">P0</span></td>
+            <td>Tagger</td>
+            <td>入力画像からタグを抽出し、Prompt Helperへ戻す。</td>
+            <td>
+              WD系を安定既定にし、PixAI/Camieなど新規taggerはライセンスと実行形式を分けて評価する。
+              商用配布に注意が必要なものは同梱しない。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag ok">P0</span></td>
+            <td>Ultimate SD Upscale / Tile ControlNet</td>
+            <td>高解像度化、細部追加、VRAM制限下の分割処理。</td>
+            <td>
+              現在のUpscale比較と相性が良い。
+              既定は人物保持寄り、detail追加は明示的な比較候補にする。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag warn">P1</span></td>
+            <td>IP-Adapter</td>
+            <td>参照画像の雰囲気、顔、服、構図をプロンプト以外で保持。</td>
+            <td>
+              ControlNet Unit 2やCharacter Compositeに接続する価値が高い。
+              非正方形画像は情報欠落が起き得るので、参照クロップUIが必要。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag warn">P1</span></td>
+            <td>Regional Prompter</td>
+            <td>領域ごとに髪色、服、背景、小物などを分ける。</td>
+            <td>
+              `BREAK`、`ADDROW`、`ADDCOL`を直接書かせるより、
+              画面分割テンプレートからpromptを生成する方が扱いやすい。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag warn">P1</span></td>
+            <td>LayerDiffuse / IC-Light</td>
+            <td>透過素材、背景合成、照明合わせ。</td>
+            <td>
+              ゲーム素材化に直結するが、まずは導入診断と不足モデル表示を優先する。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag warn">P1</span></td>
+            <td>Dynamic Thresholding / FreeU</td>
+            <td>高CFG時の色破綻抑制、U-Net出力の質感改善。</td>
+            <td>
+              初心者向け既定にはせず、上級設定またはプリセット内でON/OFF比較する。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag bad">保留</span></td>
+            <td>ComfyUI巨大workflow移植</td>
+            <td>ノードベースの柔軟な制作。</td>
+            <td>
+              ComfyUIはノード型で強力だが、このアプリはForge API専用起動が前提。
+              workflow思想だけを取り込み、ComfyUI依存は増やさない。
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>プリセット候補</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>名前</th>
+            <th>狙い</th>
+            <th>初期値</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Anime Character Safe</td>
+            <td>立ち絵・顔中心の安定生成</td>
+            <td>CFG 5、steps 24-28、縦長SDXL、ADetailer face ON、denoise低め。</td>
+          </tr>
+          <tr>
+            <td>Character Sheet</td>
+            <td>表情/衣装差分の素材化</td>
+            <td>seed固定、背景簡素化、LoRA weight控えめ、History labelへ採用候補保存。</td>
+          </tr>
+          <tr>
+            <td>Pose Lock</td>
+            <td>ポーズを崩さず生成</td>
+            <td>OpenPose ControlNet、weight 0.8前後、promptは服と雰囲気へ集中。</td>
+          </tr>
+          <tr>
+            <td>Lineart Finish</td>
+            <td>ラフ/線画から清書</td>
+            <td>Lineart ControlNet、低denoise img2img、色と光のタグを追加。</td>
+          </tr>
+          <tr>
+            <td>Depth Scene</td>
+            <td>背景込み一枚絵</td>
+            <td>Depth ControlNet、横長または縦長SDXL、steps 28、CFG 5-6。</td>
+          </tr>
+          <tr>
+            <td>Reference Mood</td>
+            <td>参照画像の雰囲気を活かす</td>
+            <td>IP-Adapter/reference、scale低めから開始、参照クロップ確認。</td>
+          </tr>
+          <tr>
+            <td>Region Outfit</td>
+            <td>髪/上着/スカートなど部位指定</td>
+            <td>Regional Prompterテンプレート、3分割、base/common prompt使用。</td>
+          </tr>
+          <tr>
+            <td>Tile Preserve Upscale</td>
+            <td>人物を保った高解像度化</td>
+            <td>Tile ON、denoise 0.25、padding/overlap大きめ、seed固定。</td>
+          </tr>
+          <tr>
+            <td>Tile Detail Upscale</td>
+            <td>背景や装飾の細部追加</td>
+            <td>Tile ON、denoise 0.35、細部タグ追加、人物素材では比較候補止まり。</td>
+          </tr>
+          <tr>
+            <td>Transparent Asset</td>
+            <td>ゲーム素材の透過化</td>
+            <td>LayerDiffuse/背景除去診断、素材化済みラベル、Workspace参照保存。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Yoitomoshiへの実装提案</h2>
+      <div class="grid cols-2">
+        <article class="card flat">
+          <h3>P0: Prompt Contract</h3>
+          <p>
+            Model Libraryにモデル別の推奨タグ順、品質タグ、negative、CFG、steps、size、samplerを保存する。
+            既存のHugging Face検索、Civitai metadata、safetensors inspectと自然に接続できる。
+          </p>
+        </article>
+        <article class="card flat">
+          <h3>P0: Compare Studio</h3>
+          <p>
+            seed固定でCFG、steps、LoRA weight、denoise、ControlNet ON/OFFを少数候補で横並び生成する。
+            既存のUpscale比較保存をtxt2img/img2imgにも広げる。
+          </p>
+        </article>
+        <article class="card flat">
+          <h3>P0: Prompt Helper 2</h3>
+          <p>
+            自然文補助ではなく、主題、動作、構図、照明、質感、negative、LoRA、ControlNetのチェックリストにする。
+            入力済みプロンプトを壊さず、足りない要素だけ提案する。
+          </p>
+        </article>
+        <article class="card flat">
+          <h3>P1: Extension Recipe Cards</h3>
+          <p>
+            「顔を直す」「手を直す」「ポーズ固定」「線画化」「背景と前景を分ける」「高解像度化」のように、
+            拡張名ではなく制作目的カードから設定を作る。
+          </p>
+        </article>
+        <article class="card flat">
+          <h3>P1: Regional Template Builder</h3>
+          <p>
+            1x2、1x3、2x2、前景/背景、人物/小物/背景のテンプレートを作り、
+            `BREAK`や`ADDROW`をUIが自動生成する。
+          </p>
+        </article>
+        <article class="card flat">
+          <h3>P1: Source Reliability Badge</h3>
+          <p>
+            プリセットの出典を「モデルカード」「公式拡張README」「ユーザー検証」「コミュニティ記事」に分ける。
+            コミュニティ由来の神設定は必ず固定seed比較を要求する。
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>注意点</h2>
+      <div class="warnbox">
+        <ul>
+          <li>コミュニティの神設定は、checkpoint、VAE、LoRA、sampler、scheduler、clip skip、解像度が揃わないと再現しない。</li>
+          <li>AGPL/GPL/CC BY-NC-SA系の拡張やモデルは、同梱、再配布、商用利用の扱いを分ける。</li>
+          <li>Forge API専用運用では、Gradio UI前提の拡張をそのまま使えないことがある。alwayson_scriptsの引数順を固定し、変更検知を入れる。</li>
+          <li>画像参照、tagger、IP-Adapterは便利だが、著作権キャラ名やartist tagの混入を避けるフィルタが必要。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>確認した一次情報・公式系ソース</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>分類</th>
+            <th>ソース</th>
+            <th>このレポートで使った要点</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Prompt / A1111</td>
+            <td><a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/Features">AUTOMATIC1111 stable-diffusion-webui Wiki: Features</a></td>
+            <td>LoRA記法、prompt emphasis、prompt matrix、Hires fix、clip skip。</td>
+          </tr>
+          <tr>
+            <td>Pipeline</td>
+            <td><a href="https://huggingface.co/docs/diffusers/using-diffusers/conditional_image_generation">Hugging Face Diffusers: Text-to-image</a></td>
+            <td>guidance scale、negative prompt、seed/generator、ControlNetの考え方。</td>
+          </tr>
+          <tr>
+            <td>Forge</td>
+            <td><a href="https://github.com/lllyasviel/stable-diffusion-webui-forge">Stable Diffusion WebUI Forge</a></td>
+            <td>ForgeをA1111上位互換のローカル基盤として扱う前提。</td>
+          </tr>
+          <tr>
+            <td>Control</td>
+            <td><a href="https://github.com/Mikubill/sd-webui-controlnet">Mikubill/sd-webui-controlnet</a></td>
+            <td>ControlNetの導入、モデル配置、API/外部制御。</td>
+          </tr>
+          <tr>
+            <td>Detail</td>
+            <td><a href="https://github.com/Bing-su/adetailer">Bing-su/adetailer</a></td>
+            <td>自動検出、マスク、inpaint補修、モデル/クラス指定。</td>
+          </tr>
+          <tr>
+            <td>Region</td>
+            <td><a href="https://github.com/hako-mikan/sd-webui-regional-prompter">hako-mikan/sd-webui-regional-prompter</a></td>
+            <td>`BREAK`、`ADDROW`、`ADDCOL`、base/common prompt、API args。</td>
+          </tr>
+          <tr>
+            <td>Upscale</td>
+            <td><a href="https://github.com/Coyote-A/ultimate-upscale-for-automatic1111">Ultimate SD Upscale</a></td>
+            <td>tile size、padding、mask blur、denoise例、低VRAMでの分割upscale。</td>
+          </tr>
+          <tr>
+            <td>Upscale</td>
+            <td><a href="https://github.com/pkuliyi2015/multidiffusion-upscaler-for-automatic1111/wiki">Tiled Diffusion &amp; VAE extension</a></td>
+            <td>2K以上、低VRAM、Tiled VAE、Tiled Diffusion、ControlNet support。</td>
+          </tr>
+          <tr>
+            <td>Reference</td>
+            <td><a href="https://github.com/tencent-ailab/IP-Adapter">tencent-ailab/IP-Adapter</a></td>
+            <td>画像プロンプト、SDXL対応、scale調整、非正方形参照の注意。</td>
+          </tr>
+          <tr>
+            <td>Layer</td>
+            <td><a href="https://github.com/lllyasviel/sd-forge-layerdiffuse">lllyasviel/sd-forge-layerdiffuse</a></td>
+            <td>前景/背景/合成画像、素材化や透明画像編集への応用。</td>
+          </tr>
+          <tr>
+            <td>Relight</td>
+            <td><a href="https://github.com/lllyasviel/IC-Light">lllyasviel/IC-Light</a></td>
+            <td>foregroundやtextを条件にしたrelightingモデル。</td>
+          </tr>
+          <tr>
+            <td>CFG</td>
+            <td><a href="https://github.com/mcmonkeyprojects/sd-dynamic-thresholding">Dynamic Thresholding CFG Scale Fix</a></td>
+            <td>高CFG時の色破綻を抑える上級設定候補。</td>
+          </tr>
+          <tr>
+            <td>Model card</td>
+            <td><a href="https://huggingface.co/cagliostrolab/animagine-xl-4.0/blob/main/README.md">Animagine XL 4.0 model card</a></td>
+            <td>タグ順、品質タグ、negative、CFG、steps、sampler、推奨解像度。</td>
+          </tr>
+          <tr>
+            <td>Cross-platform</td>
+            <td><a href="https://docs.midjourney.com/hc/en-us/articles/32023408776205-Prompt-Basics">Midjourney Prompt Basics</a> / <a href="https://docs.midjourney.com/hc/en-us/articles/32859204029709-Parameter-List">Parameter List</a> / <a href="https://docs.midjourney.com/hc/en-us/articles/32180011136653-Style-Reference">Style Reference</a></td>
+            <td>短く明確なprompt、parameterの末尾配置、style referenceの扱い。</td>
+          </tr>
+          <tr>
+            <td>Workflow</td>
+            <td><a href="https://docs.comfy.org/">ComfyUI Official Documentation</a></td>
+            <td>ノード型workflowの考え方は参考にするが、Forge依存の本アプリへは思想だけ移植。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer>
+      <p>作成日: 2026-05-14 / 対象: Yoitomoshi Art Generator / 目的: ローカル制作支援へ落とし込むための調査整理</p>
+    </footer>
+  </main>
+</body>
+</html>

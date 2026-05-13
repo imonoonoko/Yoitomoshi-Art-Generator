@@ -1,11 +1,12 @@
 import { AlertTriangle, Languages, Plus, Sparkles, Wand2, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '@/lib/store'
+import { api } from '@/lib/ipc'
 import { promptAppend } from '@/lib/prompt-utils'
 import { translatePromptToEnglishTags } from '@/lib/prompt-translate'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import type { PromptCategory, PromptGroupTag } from '@shared/types'
+import type { HistoryItem, PromptCategory, PromptGroupTag } from '@shared/types'
 
 interface HelperResult {
   translated: string[]
@@ -55,15 +56,33 @@ export function PromptHelperPanel(): JSX.Element {
   const negative = useStore((s) => s.negativePrompt)
   const setPrompt = useStore((s) => s.setPrompt)
   const setNegative = useStore((s) => s.setNegativePrompt)
+  const history = useStore((s) => s.history)
   const library = useStore((s) => s.library)
   const customLibrary = useStore((s) => s.customLibrary)
+  const [reviewHistory, setReviewHistory] = useState<HistoryItem[]>([])
   const t = useT()
 
   const result = useMemo(
     () => analyzeDescription(description, [...library, ...customLibrary], t),
     [description, library, customLibrary, t]
   )
+  const historySource = useMemo(() => mergeHistorySources(history, reviewHistory), [history, reviewHistory])
+  const reviewedTags = useMemo(() => collectReviewedHistoryTags(historySource), [historySource])
   const hasResult = result.positive.length > 0 || result.negative.length > 0 || result.warnings.length > 0
+  const hasReviewedTags = reviewedTags.accepted.length > 0 || reviewedTags.rejected.length > 0
+
+  useEffect(() => {
+    if (!open) return
+    let disposed = false
+    void api.storage.listHistory()
+      .then((items) => {
+        if (!disposed) setReviewHistory(items)
+      })
+      .catch(() => undefined)
+    return () => {
+      disposed = true
+    }
+  }, [open])
 
   function applyPositive(tags: string[]): void {
     let next = prompt
@@ -83,11 +102,12 @@ export function PromptHelperPanel(): JSX.Element {
   }
 
   return (
-    <section className="border border-line rounded-md bg-bg-0/60">
+    <section className="border border-line rounded-md bg-bg-0/60" data-testid="prompt-helper-panel">
       <button
         type="button"
         className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-bg-2 transition-colors"
         onClick={() => setOpen((v) => !v)}
+        data-testid="prompt-helper-toggle"
       >
         <Sparkles className="h-4 w-4 text-accent" />
         <span className="text-xs font-medium text-ink-1">{t('promptHelper.title')}</span>
@@ -161,6 +181,47 @@ export function PromptHelperPanel(): JSX.Element {
             </div>
           ) : (
             <div className="text-[11px] text-ink-3">{t('promptHelper.empty')}</div>
+          )}
+          {hasReviewedTags && (
+            <div className="border-t border-line pt-2 space-y-2" data-testid="prompt-helper-reviewed-tags">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] uppercase tracking-wide text-ink-3">{t('promptHelper.reviewedHistory')}</span>
+                <span className="ml-auto text-[10px] text-ink-3">{reviewedTags.reviewedCount}</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  className="btn text-xs py-1 gap-1"
+                  disabled={!reviewedTags.accepted.length}
+                  onClick={() => applyPositive(reviewedTags.accepted)}
+                  data-testid="prompt-helper-apply-review-accepted"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {t('promptHelper.applyReviewAccepted')}
+                </button>
+                <button
+                  type="button"
+                  className="btn text-xs py-1 gap-1"
+                  disabled={!reviewedTags.rejected.length}
+                  onClick={() => applyNegative(reviewedTags.rejected)}
+                  data-testid="prompt-helper-apply-review-rejected"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  {t('promptHelper.applyReviewRejected')}
+                </button>
+              </div>
+              <TagRow
+                label={t('promptHelper.reviewAccepted')}
+                tags={reviewedTags.accepted}
+                onClick={(tag) => applyPositive([tag])}
+              />
+              <TagRow
+                label={t('promptHelper.reviewRejected')}
+                tags={reviewedTags.rejected}
+                tone="negative"
+                onClick={(tag) => applyNegative([tag])}
+              />
+            </div>
           )}
         </div>
       )}
@@ -262,4 +323,57 @@ function findLibraryTags(text: string, library: PromptCategory[]): PromptGroupTa
     }
   }
   return out
+}
+
+function collectReviewedHistoryTags(history: HistoryItem[]): { accepted: string[]; rejected: string[]; reviewedCount: number } {
+  const acceptedCounts = new Map<string, { label: string; count: number }>()
+  const rejectedCounts = new Map<string, { label: string; count: number }>()
+  let reviewedCount = 0
+  for (const item of history) {
+    const review = item.tagReview
+    if (!review) continue
+    if (review.acceptedTags.length > 0 || review.rejectedTags.length > 0) reviewedCount += 1
+    for (const tag of review.acceptedTags) incrementTagCount(acceptedCounts, tag)
+    for (const tag of review.rejectedTags) incrementTagCount(rejectedCounts, tag)
+  }
+  return {
+    accepted: topReviewedTags(acceptedCounts, 18),
+    rejected: topReviewedTags(rejectedCounts, 14),
+    reviewedCount
+  }
+}
+
+function mergeHistorySources(storeHistory: HistoryItem[], storageHistory: HistoryItem[]): HistoryItem[] {
+  const byId = new Map<string, HistoryItem>()
+  for (const item of storeHistory) byId.set(item.id, item)
+  for (const item of storageHistory) {
+    const current = byId.get(item.id)
+    byId.set(item.id, pickFresherReviewItem(current, item))
+  }
+  return Array.from(byId.values())
+}
+
+function pickFresherReviewItem(a: HistoryItem | undefined, b: HistoryItem): HistoryItem {
+  if (!a) return b
+  const aTime = a.tagReview?.updatedAt ?? 0
+  const bTime = b.tagReview?.updatedAt ?? 0
+  if (bTime > aTime) return b
+  if (!a.tagReview && b.tagReview) return b
+  return a
+}
+
+function incrementTagCount(map: Map<string, { label: string; count: number }>, raw: string): void {
+  const label = raw.trim().replace(/\s+/g, ' ')
+  const key = label.toLowerCase()
+  if (!label) return
+  const current = map.get(key)
+  if (current) current.count += 1
+  else map.set(key, { label, count: 1 })
+}
+
+function topReviewedTags(map: Map<string, { label: string; count: number }>, limit: number): string[] {
+  return Array.from(map.values())
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .map((item) => item.label)
+    .slice(0, limit)
 }

@@ -73,6 +73,7 @@ export function FabricFeedbackPanel(): JSX.Element {
       hint={t('fabric.hint')}
       enabled={fabric.enabled}
       onEnabledChange={(enabled) => patch({ enabled })}
+      testId="fabric-panel"
     >
       <div className="space-y-2">
         <div className="grid grid-cols-2 gap-2">

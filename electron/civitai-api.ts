@@ -520,6 +520,8 @@ export function destDirForAssetType(
       return join(forgePath, 'webui', 'embeddings')
     case 'Controlnet':
       return join(forgePath, 'webui', 'models', 'ControlNet')
+    case 'Tagger':
+      return join(forgePath, 'webui', 'models', 'Tagger')
     case 'Hypernetwork':
       return join(forgePath, 'webui', 'models', 'hypernetworks')
     case 'Other':

@@ -5,6 +5,7 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { IPC } from '../src/shared/ipc-channels.js'
+import { DEFAULT_TAGGER_BLACKLIST, DEFAULT_TAGGER_MIN_SCORE, normalizeTaggerFilterToken } from '../src/shared/tagger-filter.js'
 import type { ForgeManager } from './forge-manager.js'
 import type { ForgeApi } from './forge-api.js'
 import type { Storage } from './storage.js'
@@ -35,6 +36,7 @@ import type {
   DownloadJob,
   HuggingFaceSearchOptions,
   HistoryItem,
+  HistoryTagReview,
   Img2ImgRequest,
   Img2ImgResponse,
   LibraryIntegrityReport,
@@ -51,9 +53,14 @@ import type {
   ModelLibraryRecoveryResult,
   ModelLibrarySummary,
   ModelImportResult,
+  PartialFileDeleteResult,
   SdLora,
   SdModel,
   StartupMetrics,
+  TaggerRunRequest,
+  TaggerRunResult,
+  TaggerRunSuppressedTag,
+  TaggerRunTag,
   Txt2ImgRequest,
   Txt2ImgResponse,
   WorkspaceSnapshot,
@@ -81,7 +88,7 @@ interface ModelHealthFolder {
   totalBytes: number
 }
 
-const MODEL_FILE_EXTS = new Set(['.safetensors', '.ckpt', '.pt', '.pth', '.vae'])
+const MODEL_FILE_EXTS = new Set(['.safetensors', '.ckpt', '.pt', '.pth', '.vae', '.onnx', '.bin'])
 const INSPECTABLE_MODEL_FILE_EXTS = new Set(['.safetensors', '.ckpt', '.pt', '.pth', '.vae'])
 const CONVERTIBLE_MODEL_FILE_EXTS = new Set(['.ckpt', '.pt', '.pth'])
 const CHARACTER_REFERENCE_MODEL_EXTS = new Set(['.safetensors', '.ckpt', '.pt', '.pth', '.bin'])
@@ -95,6 +102,7 @@ const CIVITAI_ASSET_TYPES = new Set<CivitaiAssetType>([
   'Hypernetwork',
   'VAE',
   'Controlnet',
+  'Tagger',
   'Other'
 ])
 const EXTERNAL_LINK_DOMAINS = [
@@ -132,11 +140,13 @@ const MODEL_HEALTH_FOLDERS: Array<{
   label: string
   expected: ModelKind
   parts: string[]
+  optional?: boolean
 }> = [
   { id: 'checkpoints', label: 'Checkpoints', expected: 'checkpoint', parts: ['webui', 'models', 'Stable-diffusion'] },
   { id: 'loras', label: 'LoRA', expected: 'lora', parts: ['webui', 'models', 'Lora'] },
   { id: 'vae', label: 'VAE', expected: 'vae', parts: ['webui', 'models', 'VAE'] },
-  { id: 'controlnet', label: 'ControlNet', expected: 'controlnet', parts: ['webui', 'models', 'ControlNet'] }
+  { id: 'controlnet', label: 'ControlNet', expected: 'controlnet', parts: ['webui', 'models', 'ControlNet'] },
+  { id: 'tagger', label: 'Tagger', expected: 'tagger', parts: ['webui', 'models', 'Tagger'], optional: true }
 ]
 
 const MODEL_LIBRARY_FOLDERS: Array<{
@@ -147,6 +157,7 @@ const MODEL_LIBRARY_FOLDERS: Array<{
   { type: 'LORA', parts: ['webui', 'models', 'Lora'] },
   { type: 'VAE', parts: ['webui', 'models', 'VAE'] },
   { type: 'Controlnet', parts: ['webui', 'models', 'ControlNet'] },
+  { type: 'Tagger', parts: ['webui', 'models', 'Tagger'] },
   { type: 'Embedding', parts: ['webui', 'embeddings'] },
   { type: 'Hypernetwork', parts: ['webui', 'models', 'hypernetworks'] },
   { type: 'Upscaler', parts: ['webui', 'models', 'ESRGAN'] },
@@ -231,6 +242,195 @@ print(json.dumps({
     "message": message,
     "outputPath": match.group(1) if match else None,
 }, ensure_ascii=False))
+`.trim()
+
+const PY_RUN_TAGGER = `
+import base64
+import csv
+import json
+import math
+import sys
+import time
+
+payload = json.loads(base64.b64decode(sys.argv[1]).decode("utf-8"))
+
+def emit(status, message, **extra):
+    out = {
+        "ok": status == "ok",
+        "status": status,
+        "modelDir": payload.get("modelDir"),
+        "modelPath": payload.get("modelPath"),
+        "tagsPath": payload.get("tagsPath"),
+        "provider": extra.get("provider"),
+        "elapsedMs": extra.get("elapsedMs"),
+        "tags": extra.get("tags", []),
+        "suppressedTags": extra.get("suppressedTags", []),
+        "promptTags": extra.get("promptTags", []),
+        "filter": extra.get("filter"),
+        "message": message,
+    }
+    stderr = extra.get("stderr")
+    if stderr:
+        out["stderr"] = stderr
+    print(json.dumps(out, ensure_ascii=False))
+
+try:
+    import numpy as np
+    import onnxruntime as ort
+    from PIL import Image
+except Exception as exc:
+    emit("missing-runtime", f"missing Python dependency: {exc}")
+    raise SystemExit(0)
+
+def load_tags(path):
+    rows = []
+    with open(path, "r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames:
+            for fallback_idx, row in enumerate(reader):
+                raw_id = row.get("id") or row.get("tag_id") or row.get("index") or str(fallback_idx)
+                try:
+                    idx = int(raw_id)
+                except Exception:
+                    idx = fallback_idx
+                name = row.get("name") or row.get("tag") or row.get("tag_name") or ""
+                if not name:
+                    for value in row.values():
+                        if value:
+                            name = str(value)
+                            break
+                try:
+                    category = int(row.get("category", "0") or 0)
+                except Exception:
+                    category = 0
+                if name:
+                    rows.append({"id": idx, "name": str(name), "category": category})
+        else:
+            f.seek(0)
+            for fallback_idx, row in enumerate(csv.reader(f)):
+                if row:
+                    rows.append({"id": fallback_idx, "name": row[0], "category": 0})
+    rows.sort(key=lambda item: item["id"])
+    return rows
+
+def preprocess(path, size=448):
+    image = Image.open(path)
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+    image = image.resize((size, size), Image.BICUBIC)
+    arr = np.array(image).astype(np.float32) / 255.0
+    arr = (arr - 0.5) / 0.5
+    arr = arr.transpose(2, 0, 1)
+    return np.expand_dims(arr, 0)
+
+def sigmoid(x):
+    x = np.clip(x, -50, 50)
+    return 1 / (1 + np.exp(-x))
+
+def normalize_filter_token(value):
+    out = str(value).lower()
+    out = out.replace("\\\\(", "(").replace("\\\\)", ")")
+    for ch in "()[]{}":
+        out = out.replace(ch, " ")
+    for ch in "_/-":
+        out = out.replace(ch, " ")
+    out = "".join(ch if ch.isalnum() or ch.isspace() else " " for ch in out)
+    return " ".join(out.split()).strip()
+
+def is_meta_tag(name):
+    raw = str(name).lower()
+    normalized = normalize_filter_token(name)
+    return (
+        raw.endswith("_(style)") or
+        raw.endswith("_theme") or
+        raw in {"photo_(medium)", "commentary_request", "artist_name", "tagme"} or
+        normalized in {"text focus", "highres", "absurdres", "best quality", "masterpiece"}
+    )
+
+try:
+    tags = load_tags(payload["tagsPath"])
+    expected = len(tags)
+    if expected == 0:
+        emit("failed", "selected_tags.csv did not contain any tags")
+        raise SystemExit(0)
+
+    sess_options = ort.SessionOptions()
+    sess_options.log_severity_level = 3
+    session = ort.InferenceSession(payload["modelPath"], sess_options=sess_options, providers=["CPUExecutionProvider"])
+    input_name = session.get_inputs()[0].name
+    tensor = preprocess(payload["imagePath"], int(payload.get("inputSize", 448)))
+    started = time.time()
+    outputs = session.run(None, {input_name: tensor})
+    elapsed_ms = int((time.time() - started) * 1000)
+
+    logits = None
+    for output in outputs:
+        arr = np.asarray(output)
+        if arr.ndim >= 2 and arr.shape[-1] == expected:
+            logits = arr.reshape(-1, arr.shape[-1])[0]
+            break
+        if arr.ndim >= 2 and arr.shape[1] == expected:
+            logits = arr.reshape(arr.shape[0], arr.shape[1], -1)[0, :, 0]
+            break
+    if logits is None:
+        largest = max((np.asarray(output) for output in outputs), key=lambda arr: arr.size)
+        logits = largest.reshape(-1)
+    probs = sigmoid(logits)
+
+    general_threshold = float(payload.get("generalThreshold", 0.3))
+    character_threshold = float(payload.get("characterThreshold", 0.85))
+    min_score = float(payload.get("minScore", 0.4))
+    blacklist = set(normalize_filter_token(item) for item in payload.get("blacklist", []) if str(item).strip())
+    exclude_meta = bool(payload.get("excludeMeta", True))
+    limit = int(payload.get("limit", 60))
+    found = []
+    suppressed = []
+    for idx, tag in enumerate(tags):
+        if idx >= len(probs):
+            break
+        category_id = int(tag.get("category", 0))
+        category = "character" if category_id == 4 else ("general" if category_id == 0 else "other")
+        threshold = character_threshold if category == "character" else general_threshold
+        score = float(probs[idx])
+        if math.isfinite(score) and score >= threshold:
+            item = {"name": tag["name"], "score": score, "category": category}
+            normalized_name = normalize_filter_token(tag["name"])
+            reason = None
+            if score < min_score:
+                reason = "low-confidence"
+            elif normalized_name in blacklist:
+                reason = "blacklist"
+            elif exclude_meta and is_meta_tag(tag["name"]):
+                reason = "meta"
+            if reason:
+                item["reason"] = reason
+                suppressed.append(item)
+            else:
+                found.append(item)
+    found.sort(key=lambda item: item["score"], reverse=True)
+    suppressed.sort(key=lambda item: item["score"], reverse=True)
+    found = found[:limit]
+    suppressed = suppressed[:120]
+    prompt_tags = [item["name"].replace("_", " ") for item in found]
+    provider = session.get_providers()[0] if session.get_providers() else "CPUExecutionProvider"
+    emit(
+        "ok",
+        f"extracted {len(found)} tags; suppressed {len(suppressed)}",
+        provider=provider,
+        elapsedMs=elapsed_ms,
+        tags=found,
+        suppressedTags=suppressed,
+        promptTags=prompt_tags,
+        filter={
+            "minScore": min_score,
+            "excludeMeta": exclude_meta,
+            "blacklist": sorted(blacklist),
+            "kept": len(found),
+            "suppressed": len(suppressed),
+        },
+    )
+except Exception as exc:
+    emit("failed", str(exc))
 `.trim()
 
 /**
@@ -1008,6 +1208,83 @@ function validateInterrogateArgs(input: unknown): { image: string; model?: 'clip
   return { image, model }
 }
 
+function validateTaggerRunRequest(input: unknown): TaggerRunRequest {
+  assertPlainObject(input, 'tagger request')
+  const image = validateImagePayload(input.image, 'tagger image')
+  const modelId = input.modelId == null ? 'pixai-onnx' : input.modelId
+  if (modelId !== 'pixai-onnx') {
+    throw new Error('Invalid tagger model')
+  }
+  return {
+    image,
+    modelId,
+    generalThreshold: boundedNumber(input.generalThreshold, 'general threshold', 0, 1) ?? 0.3,
+    characterThreshold: boundedNumber(input.characterThreshold, 'character threshold', 0, 1) ?? 0.85,
+    minScore: boundedNumber(input.minScore, 'minimum tag score', 0, 1) ?? DEFAULT_TAGGER_MIN_SCORE,
+    blacklist: validateTaggerBlacklist(input.blacklist),
+    excludeMeta: input.excludeMeta === false ? false : true,
+    limit: boundedInteger(input.limit, 'tag limit', 1, 200) ?? 60
+  }
+}
+
+function validateTaggerBlacklist(raw: unknown): string[] {
+  const source = Array.isArray(raw) ? raw : DEFAULT_TAGGER_BLACKLIST
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const item of source) {
+    if (typeof item !== 'string') continue
+    const normalized = normalizeTaggerFilterToken(item)
+    if (!normalized || seen.has(normalized)) continue
+    seen.add(normalized)
+    result.push(normalized)
+    if (result.length >= 200) break
+  }
+  return result
+}
+
+function validateHistoryTagReview(input: unknown): HistoryTagReview | null {
+  if (input == null) return null
+  assertPlainObject(input, 'history tag review')
+  const acceptedTags = validateHistoryReviewTags(input.acceptedTags, 'accepted tags')
+  const rejectedTags = validateHistoryReviewTags(input.rejectedTags, 'rejected tags')
+  const sourceModel = input.sourceModel === 'pixai-onnx' ? 'pixai-onnx' : 'manual'
+  const updatedAtRaw = typeof input.updatedAt === 'number' ? input.updatedAt : Date.now()
+  return {
+    acceptedTags,
+    rejectedTags,
+    sourceModel,
+    updatedAt: Number.isFinite(updatedAtRaw) ? Math.max(0, Math.floor(updatedAtRaw)) : Date.now()
+  }
+}
+
+function validateHistoryReviewTags(raw: unknown, label: string): string[] {
+  if (!Array.isArray(raw)) throw new Error(`Invalid ${label}`)
+  const seen = new Set<string>()
+  const tags: string[] = []
+  for (const item of raw) {
+    if (typeof item !== 'string') continue
+    assertNoUnsafeControlChars(item, label)
+    const tag = item.replace(/\s+/g, ' ').trim().slice(0, 80)
+    const key = tag.toLowerCase()
+    if (!tag || seen.has(key)) continue
+    seen.add(key)
+    tags.push(tag)
+    if (tags.length >= 120) break
+  }
+  return tags
+}
+
+function imagePayloadToBuffer(rawImage: string, label: string): Buffer {
+  const image = validateImagePayload(rawImage, label)
+  const match = image.match(/^data:image\/([^;]+);base64,(.+)$/s)
+  const payload = match?.[2] ?? image
+  const bytes = Buffer.from(payload.replace(/\s+/g, ''), 'base64')
+  if (bytes.length === 0 || bytes.length > MAX_WORKSPACE_IMAGE_BYTES) {
+    throw new Error(`${label} is too large`)
+  }
+  return bytes
+}
+
 async function scanModelHealth(forgePath: string): Promise<{
   root: string
   scannedAt: number
@@ -1030,6 +1307,10 @@ async function scanModelHealth(forgePath: string): Promise<{
     }
 
     if (!folder.exists) {
+      if (spec.optional) {
+        folders.push(folder)
+        continue
+      }
       issues.push({
         severity: 'warn',
         folder: spec.label,
@@ -1061,7 +1342,7 @@ async function scanModelHealth(forgePath: string): Promise<{
         continue
       }
 
-      if (/\.safetensors$/i.test(file)) {
+      if (/\.safetensors$/i.test(file) && spec.expected !== 'tagger') {
         const inspected = await inspectSafetensors(file)
         if (inspected.kind === 'unknown') {
           issues.push({
@@ -1203,6 +1484,7 @@ async function scanModelLibrary(forgePath: string, storage: Storage): Promise<Mo
 }
 
 async function checkLibraryIntegrity(storage: Storage): Promise<LibraryIntegrityReport> {
+  const settings = storage.getSettings()
   const entries = storage.listModelLibrary()
   const jobs = storage.listDownloadJobs()
   const issues: LibraryIntegrityReport['issues'] = []
@@ -1268,6 +1550,15 @@ async function checkLibraryIntegrity(storage: Storage): Promise<LibraryIntegrity
         message: `Partial download remains for ${job.filename}`
       })
     }
+    if (job.status === 'completed' && existsSync(job.partialPath)) {
+      totals.partialDownloads += 1
+      issues.push({
+        severity: 'warn',
+        jobId: job.id,
+        path: job.partialPath,
+        message: `Completed download still has a partial file: ${job.filename}`
+      })
+    }
     if (job.status === 'completed' && !existsSync(job.destPath)) {
       totals.missingFiles += 1
       issues.push({
@@ -1279,8 +1570,245 @@ async function checkLibraryIntegrity(storage: Storage): Promise<LibraryIntegrity
     }
   }
 
+  const knownPartialPaths = new Set(jobs.map((job) => resolve(job.partialPath).toLowerCase()))
+  const orphanPartials = await findModelFolderPartialFiles(settings.forgePath, knownPartialPaths)
+  for (const partialPath of orphanPartials) {
+    totals.partialDownloads += 1
+    issues.push({
+      severity: 'warn',
+      path: partialPath,
+      message: 'Orphan partial model download is not associated with a DownloadJob'
+    })
+  }
+
   totals.issues = issues.length
   return { checkedAt: Date.now(), totals, issues }
+}
+
+async function findModelFolderPartialFiles(forgePath: string, knownPartialPaths: Set<string>): Promise<string[]> {
+  const roots = Array.from(new Set(
+    MODEL_LIBRARY_FOLDERS.map((folder) => resolve(forgePath, ...folder.parts))
+  ))
+  const partials: string[] = []
+  for (const root of roots) {
+    if (!existsSync(root)) continue
+    await collectPartialFiles(root, knownPartialPaths, partials)
+  }
+  partials.sort((a, b) => a.localeCompare(b))
+  return partials
+}
+
+async function collectPartialFiles(dir: string, knownPartialPaths: Set<string>, out: string[]): Promise<void> {
+  let entries: Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>
+  try {
+    entries = await readdir(dir, { withFileTypes: true })
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    const full = resolve(dir, entry.name)
+    if (entry.isDirectory()) {
+      await collectPartialFiles(full, knownPartialPaths, out)
+      continue
+    }
+    if (!entry.isFile()) continue
+    const lowerName = entry.name.toLowerCase()
+    if (!lowerName.includes('.partial')) continue
+    const normalized = full.toLowerCase()
+    if (knownPartialPaths.has(normalized)) continue
+    out.push(full)
+  }
+}
+
+async function deleteLibraryPartialFile(storage: Storage, rawPath: string): Promise<PartialFileDeleteResult> {
+  const target = assertAbsolutePath(rawPath, 'partial file')
+  const settings = storage.getSettings()
+  const roots = MODEL_LIBRARY_FOLDERS.map((folder) => resolve(settings.forgePath, ...folder.parts))
+  if (!roots.some((root) => isSubpath(root, target))) {
+    throw new Error('Partial file must be under a Forge model folder')
+  }
+  if (!basename(target).toLowerCase().includes('.partial')) {
+    throw new Error('Only partial download files can be deleted here')
+  }
+  const st = await stat(target).catch(() => null)
+  if (!st?.isFile()) {
+    throw new Error('Partial file was not found')
+  }
+  await unlink(target)
+  return { path: target, sizeBytes: st.size, deleted: true }
+}
+
+interface LocalTaggerFiles {
+  modelDir: string
+  modelPath: string | null
+  tagsPath: string | null
+}
+
+async function findLocalTaggerFiles(forgePath: string): Promise<LocalTaggerFiles> {
+  const modelDir = resolve(forgePath, 'webui', 'models', 'Tagger')
+  if (!existsSync(modelDir)) {
+    return { modelDir, modelPath: null, tagsPath: null }
+  }
+  const [onnxFiles, csvFiles] = await Promise.all([
+    walkFilesByExt(modelDir, new Set(['.onnx']), 80),
+    walkFilesByExt(modelDir, new Set(['.csv']), 80)
+  ])
+  const modelPath = onnxFiles
+    .sort((a, b) => taggerFilePriority(a) - taggerFilePriority(b) || a.localeCompare(b))[0] ?? null
+  const tagsPath = modelPath
+    ? (
+        csvFiles.find((file) => dirname(file) === dirname(modelPath) && basename(file).toLowerCase() === 'selected_tags.csv') ??
+        csvFiles.find((file) => basename(file).toLowerCase() === 'selected_tags.csv') ??
+        null
+      )
+    : null
+  return { modelDir, modelPath, tagsPath }
+}
+
+function taggerFilePriority(path: string): number {
+  const name = basename(path).toLowerCase()
+  if (name === 'model.onnx') return 0
+  if (name.includes('pixai')) return 1
+  return 10
+}
+
+async function runLocalTagger(storage: Storage, input: unknown): Promise<TaggerRunResult> {
+  const req = validateTaggerRunRequest(input)
+  const settings = storage.getSettings()
+  const files = await findLocalTaggerFiles(settings.forgePath)
+  if (!files.modelPath || !files.tagsPath) {
+    return {
+      ok: false,
+      status: 'missing-model',
+      modelDir: files.modelDir,
+      modelPath: files.modelPath,
+      tagsPath: files.tagsPath,
+      provider: null,
+      elapsedMs: null,
+      tags: [],
+      promptTags: [],
+      message: 'Tagger model.onnx and selected_tags.csv were not found under Forge models/Tagger'
+    }
+  }
+
+  const pythonExe = join(settings.forgePath, 'system', 'python', 'python.exe')
+  if (!existsSync(pythonExe)) {
+    return {
+      ok: false,
+      status: 'missing-runtime',
+      modelDir: files.modelDir,
+      modelPath: files.modelPath,
+      tagsPath: files.tagsPath,
+      provider: null,
+      elapsedMs: null,
+      tags: [],
+      promptTags: [],
+      message: 'Forge Python was not found'
+    }
+  }
+
+  const webuiDir = resolve(settings.forgePath, 'webui')
+  const tempDir = resolve(webuiDir, 'tmp', 'yoitomoshi-tagger')
+  if (!isSubpath(webuiDir, tempDir)) {
+    throw new Error('Invalid tagger temporary folder')
+  }
+  await mkdir(tempDir, { recursive: true })
+  const bytes = imagePayloadToBuffer(req.image, 'tagger image')
+  const imagePath = resolve(tempDir, `${Date.now()}-${createHash('sha256').update(bytes).digest('hex').slice(0, 12)}.png`)
+  if (!isSubpath(tempDir, imagePath)) {
+    throw new Error('Invalid tagger temporary image path')
+  }
+  writeFileSync(imagePath, bytes)
+
+  try {
+    const payload = Buffer.from(JSON.stringify({
+      modelDir: files.modelDir,
+      modelPath: files.modelPath,
+      tagsPath: files.tagsPath,
+      imagePath,
+      generalThreshold: req.generalThreshold,
+      characterThreshold: req.characterThreshold,
+      minScore: req.minScore,
+      blacklist: req.blacklist,
+      excludeMeta: req.excludeMeta,
+      limit: req.limit,
+      inputSize: 448
+    })).toString('base64')
+    const result = await runProcess(pythonExe, ['-c', PY_RUN_TAGGER, payload], { cwd: webuiDir })
+    return normalizeTaggerRunResult(parseLastJsonLine(result.stdout), files, result.stderr)
+  } finally {
+    await unlink(imagePath).catch(() => undefined)
+  }
+}
+
+function normalizeTaggerRunResult(
+  raw: unknown,
+  files: LocalTaggerFiles,
+  stderr: string
+): TaggerRunResult {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('Tagger runner returned no JSON result')
+  }
+  const value = raw as Partial<TaggerRunResult>
+  const status = value.status === 'ok' || value.status === 'missing-model' || value.status === 'missing-runtime' || value.status === 'failed'
+    ? value.status
+    : 'failed'
+  const tags = Array.isArray(value.tags)
+    ? value.tags
+        .map((tag): TaggerRunTag | null => {
+          if (!tag || typeof tag !== 'object') return null
+          const candidate = tag as Partial<TaggerRunTag>
+          if (typeof candidate.name !== 'string' || typeof candidate.score !== 'number') return null
+          const category = candidate.category === 'character' || candidate.category === 'other' ? candidate.category : 'general'
+          return { name: candidate.name, score: candidate.score, category }
+        })
+        .filter((tag): tag is TaggerRunTag => tag !== null)
+    : []
+  const suppressedTags: TaggerRunSuppressedTag[] = Array.isArray(value.suppressedTags)
+    ? value.suppressedTags
+        .map((tag): TaggerRunSuppressedTag | null => {
+          if (!tag || typeof tag !== 'object') return null
+          const candidate = tag as Partial<TaggerRunTag> & { reason?: unknown }
+          if (typeof candidate.name !== 'string' || typeof candidate.score !== 'number') return null
+          const category = candidate.category === 'character' || candidate.category === 'other' ? candidate.category : 'general'
+          const reason: TaggerRunSuppressedTag['reason'] = candidate.reason === 'blacklist' || candidate.reason === 'low-confidence' || candidate.reason === 'meta'
+            ? candidate.reason
+            : 'blacklist'
+          return { name: candidate.name, score: candidate.score, category, reason }
+        })
+        .filter((tag): tag is TaggerRunSuppressedTag => tag !== null)
+    : []
+  const promptTags = Array.isArray(value.promptTags)
+    ? value.promptTags.filter((tag): tag is string => typeof tag === 'string')
+    : tags.map((tag) => tag.name.replace(/_/g, ' '))
+  const filterValue = value.filter && typeof value.filter === 'object' && !Array.isArray(value.filter)
+    ? value.filter as Partial<TaggerRunResult['filter']>
+    : null
+  return {
+    ok: status === 'ok',
+    status,
+    modelDir: typeof value.modelDir === 'string' ? value.modelDir : files.modelDir,
+    modelPath: typeof value.modelPath === 'string' ? value.modelPath : files.modelPath,
+    tagsPath: typeof value.tagsPath === 'string' ? value.tagsPath : files.tagsPath,
+    provider: typeof value.provider === 'string' ? value.provider : null,
+    elapsedMs: typeof value.elapsedMs === 'number' ? value.elapsedMs : null,
+    tags,
+    suppressedTags,
+    promptTags,
+    filter: filterValue
+      ? {
+          minScore: typeof filterValue.minScore === 'number' ? filterValue.minScore : 0.4,
+          excludeMeta: filterValue.excludeMeta !== false,
+          blacklist: Array.isArray(filterValue.blacklist)
+            ? filterValue.blacklist.filter((item): item is string => typeof item === 'string')
+            : [],
+          kept: typeof filterValue.kept === 'number' ? filterValue.kept : tags.length,
+          suppressed: typeof filterValue.suppressed === 'number' ? filterValue.suppressed : suppressedTags.length
+        }
+      : undefined,
+    message: typeof value.message === 'string' ? value.message : 'Tagger runner failed',
+    ...(stderr ? { stderr } : {})
+  }
 }
 
 async function hashModelLibraryEntry(storage: Storage, rawId: string): Promise<ModelHashResult> {
@@ -2050,7 +2578,9 @@ export function registerIpcHandlers(deps: {
   )
   ipcMain.handle(IPC.toolsListDownloadJobs, (): DownloadJob[] => storage.listDownloadJobs())
   ipcMain.handle(IPC.toolsCheckLibraryIntegrity, () => checkLibraryIntegrity(storage))
+  ipcMain.handle(IPC.toolsDeletePartialFile, (_e, path: string) => deleteLibraryPartialFile(storage, path))
   ipcMain.handle(IPC.toolsHashModelLibraryEntry, (_e, id: string) => hashModelLibraryEntry(storage, id))
+  ipcMain.handle(IPC.toolsRunTagger, (_e, req) => runLocalTagger(storage, req))
   ipcMain.handle(IPC.toolsRecoverModelLibrary, () => recoverModelLibrary(storage))
   ipcMain.handle(IPC.toolsConvertModelFormat, () => convertModelFormat(storage, win))
   ipcMain.handle(IPC.toolsInspectMergerSupport, () =>
@@ -2710,6 +3240,9 @@ export function registerIpcHandlers(deps: {
   ipcMain.handle(IPC.storageDeleteHistory, (_e, id) => storage.deleteHistory(id))
   ipcMain.handle(IPC.storageSetHistoryLabel, (_e, id: string, label: HistoryItem['label']) =>
     storage.setHistoryLabel(id, label ?? null)
+  )
+  ipcMain.handle(IPC.storageSetHistoryTagReview, (_e, id: string, review: HistoryTagReview | null) =>
+    storage.setHistoryTagReview(id, validateHistoryTagReview(review))
   )
   ipcMain.handle(IPC.storageListPresets, () => storage.listPresets())
   ipcMain.handle(IPC.storageSavePreset, (_e, input) => storage.savePreset(input))

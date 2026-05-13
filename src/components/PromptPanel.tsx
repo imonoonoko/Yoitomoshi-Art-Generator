@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Languages, Wand2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore } from '@/lib/store'
@@ -9,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { PromptEditor } from './PromptEditor'
 import { PromptTagChips } from './PromptTagChips'
 import { PromptHelperPanel } from './PromptHelperPanel'
+import { ResearchWorkflowPanel } from './ResearchWorkflowPanel'
 import { ParametersPanel } from './ParametersPanel'
 import { RecommendationCard } from './RecommendationCard'
 import { QuickPresetBar } from './QuickPresetBar'
@@ -21,7 +23,7 @@ import { FabricFeedbackPanel } from './extensions/FabricFeedbackPanel'
 import { ADetailerPanel } from './extensions/ADetailerPanel'
 import { ControlNetBuilderPanel } from './extensions/ControlNetBuilderPanel'
 import { ControlNetPanel } from './extensions/ControlNetPanel'
-import { GenerationPreflightPanel } from './GenerationPreflightPanel'
+import { buildPreflightItems, GenerationPreflightPanel } from './GenerationPreflightPanel'
 import { CharacterComposePanel } from './CharacterComposePanel'
 
 interface Props {
@@ -33,15 +35,17 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
   const negative = useStore((s) => s.negativePrompt)
   const setPrompt = useStore((s) => s.setPrompt)
   const setNeg = useStore((s) => s.setNegativePrompt)
-  const status = useStore((s) => s.forgeStatus)
   const isGenerating = useStore((s) => s.isGenerating)
-  const selected = useStore((s) => s.selectedModelTitle)
   const currentTab = useStore((s) => s.currentTab)
   const library = useStore((s) => s.library)
   const customLibrary = useStore((s) => s.customLibrary)
+  const state = useStore((s) => s)
   const t = useT()
 
-  const canGenerate = status.kind === 'ready' && !!selected && !isGenerating
+  const preflightItems = useMemo(() => buildPreflightItems(state), [state])
+  const generateBlocker = preflightItems.find((item) => item.severity === 'block') ?? null
+  const canGenerate = !isGenerating && generateBlocker === null
+  const disabledReason = generateBlocker ? t(generateBlocker.messageKey, generateBlocker.params) : undefined
 
   async function interrupt(): Promise<void> {
     try {
@@ -77,8 +81,9 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
       {currentTab === 'img2img' && <CharacterComposePanel onGenerate={onGenerate} />}
       <LoraSuggestionStrip />
       <PromptHelperPanel />
+      <ResearchWorkflowPanel />
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5" data-testid="prompt-positive-section">
         <div className="flex items-baseline justify-between">
           <div className="flex items-center gap-1.5">
             <span className="label">{t('prompt.label')}</span>
@@ -111,7 +116,7 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
         />
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5" data-testid="prompt-negative-section">
         <div className="flex items-baseline justify-between">
           <span className="label">{t('prompt.negativeLabel')}</span>
           <TokenMeter text={negative} />
@@ -159,7 +164,7 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
             {t('generate.interrupt')}
           </button>
         ) : (
-          <GenerateButton onClick={onGenerate} disabled={!canGenerate} />
+          <GenerateButton onClick={onGenerate} disabled={!canGenerate} disabledReason={disabledReason} />
         )}
         <div className="text-[10px] text-ink-3 text-center">
           {t('generate.shortcuts')}
@@ -169,7 +174,15 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
   )
 }
 
-function GenerateButton({ onClick, disabled }: { onClick(): void; disabled: boolean }): JSX.Element {
+function GenerateButton({
+  onClick,
+  disabled,
+  disabledReason
+}: {
+  onClick(): void
+  disabled: boolean
+  disabledReason?: string
+}): JSX.Element {
   const tab = useStore((s) => s.currentTab)
   const t = useT()
   // The mode chip surfaces which workspace tab is active so the user always knows
@@ -180,6 +193,10 @@ function GenerateButton({ onClick, disabled }: { onClick(): void; disabled: bool
       className="btn btn-primary w-full justify-center text-base font-semibold py-2.5 gap-2"
       disabled={disabled}
       onClick={onClick}
+      title={disabledReason}
+      aria-label={disabledReason ? `${t('generate.button')}: ${disabledReason}` : t('generate.button')}
+      data-testid="generate-button"
+      data-disabled-reason={disabledReason}
     >
       <Wand2 className="h-5 w-5" />
       <span>{t('generate.button')}</span>

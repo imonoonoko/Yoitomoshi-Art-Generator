@@ -19,6 +19,10 @@
 - [必要モデル・実素材リサーチ 2026-05-13](docs/MODEL_AND_ASSET_RESEARCH_REPORT_2026-05-13.html)
 - [ControlNet追加モデル導入レポート 2026-05-13](docs/CONTROLNET_MODEL_INSTALLATION_REPORT_2026-05-13.html)
 - [Goal 1-5 実行レポート 2026-05-13](docs/GOAL_1_5_EXECUTION_REPORT_2026-05-13.html)
+- [AIアート制作ナレッジ総合レポート 2026-05-14](docs/AI_ART_CREATOR_WORKFLOW_RESEARCH_REPORT_2026-05-14.html)
+- [AIアート制作 二次情報リサーチ補足レポート 2026-05-14](docs/AI_ART_SECONDARY_SOURCE_RESEARCH_REPORT_2026-05-14.html)
+- [AIアート調査 実装ステータス 2026-05-14](docs/AI_ART_RESEARCH_IMPLEMENTATION_STATUS_2026-05-14.md)
+- [未検証項目 徹底検証・修正レポート 2026-05-14](docs/UNVERIFIED_DEEP_VALIDATION_REPORT_2026-05-14.html)
 - [ロードマップ](docs/ROADMAP.md)
 - [ファイル / フォルダ構造](docs/PROJECT_STRUCTURE.md)
 - QA証跡:
@@ -26,7 +30,10 @@
   [ControlNet UI](docs/QA_CONTROLNET_UI_2026-05-12.md) /
   [Workspace復元](docs/QA_WORKSPACE_RESTORE_2026-05-12.md) /
   [Model Library復旧](docs/QA_MODEL_LIBRARY_RECOVERY_2026-05-12.md) /
-  [Upscale比較](docs/QA_UPSCALE_COMPARISON_2026-05-12.md)
+  [Upscale比較](docs/QA_UPSCALE_COMPARISON_2026-05-12.md) /
+  [制作ナレッジP2](docs/QA_CREATOR_WORKFLOW_P2_2026-05-14.md) /
+  [未検証徹底検証](docs/QA_UNVERIFIED_DEEP_VALIDATION_2026-05-14.md) /
+  [DOM自動QA](docs/QA_DOM_GUIDE_2026-05-14.md)
 
 ## 起動 — 3 ステップ
 
@@ -136,6 +143,10 @@ npm run typecheck
 
 # プロダクションビルド
 npm run build
+
+# Electron DOM QA(別途remote debugging付きElectron起動が必要)
+npm run qa:dom -- selectors --port=9338
+npm run qa:dom:preflight -- --port=9338
 
 # パッケージング (Electron 実行ファイル生成)
 npm run dist

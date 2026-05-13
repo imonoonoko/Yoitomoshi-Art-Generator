@@ -41,7 +41,8 @@ const TYPE_FILTERS: Array<{ id: CivitaiAssetType | 'all'; labelKey: string }> = 
   { id: 'LORA', labelKey: 'cs.typeLora' },
   { id: 'VAE', labelKey: 'cs.typeVae' },
   { id: 'TextualInversion', labelKey: 'cs.typeEmbedding' },
-  { id: 'Controlnet', labelKey: 'cs.typeControlnet' }
+  { id: 'Controlnet', labelKey: 'cs.typeControlnet' },
+  { id: 'Tagger', labelKey: 'cs.typeTagger' }
 ]
 
 const SORT_OPTIONS = [
@@ -127,7 +128,7 @@ export function CivitaiSearchModal({
       ? api.civitai
           .search({
             query: submittedQuery || undefined,
-            types: type === 'all' ? undefined : [type],
+            types: type === 'all' || type === 'Tagger' ? undefined : [type],
             sort,
             nsfw,
             limit: 20,
@@ -804,6 +805,7 @@ function labelOfType(t: CivitaiAssetType): string {
     case 'Hypernetwork': return 'Hyper'
     case 'VAE': return 'VAE'
     case 'Controlnet': return 'ControlNet'
+    case 'Tagger': return tStatic('cs.typeTagger')
     case 'Other': return tStatic('cs.typeOther')
   }
 }

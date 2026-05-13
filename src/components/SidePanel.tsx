@@ -32,10 +32,10 @@ export function SidePanel(): JSX.Element {
       className="w-[400px] shrink-0 flex flex-col bg-bg-1 border-l border-line min-h-0"
     >
       <Tabs.List className="flex shrink-0 border-b border-line bg-bg-1">
-        <Tabs.Trigger value="library" className={cn(TAB_BTN)}>
+        <Tabs.Trigger value="library" className={cn(TAB_BTN)} data-testid="side-tab-library">
           <Library className="h-3.5 w-3.5" /> {t('side.library')}
         </Tabs.Trigger>
-        <Tabs.Trigger value="lora" className={cn(TAB_BTN, 'relative')}>
+        <Tabs.Trigger value="lora" className={cn(TAB_BTN, 'relative')} data-testid="side-tab-lora">
           <Layers className="h-3.5 w-3.5" /> LoRA
           {activeCount > 0 && (
             <span className="absolute -top-0.5 right-1 bg-accent text-bg-0 text-[9px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center">
@@ -43,29 +43,29 @@ export function SidePanel(): JSX.Element {
             </span>
           )}
         </Tabs.Trigger>
-        <Tabs.Trigger value="history" className={cn(TAB_BTN)}>
+        <Tabs.Trigger value="history" className={cn(TAB_BTN)} data-testid="side-tab-history">
           <History className="h-3.5 w-3.5" /> {t('side.history')}
         </Tabs.Trigger>
-        <Tabs.Trigger value="presets" className={cn(TAB_BTN)}>
+        <Tabs.Trigger value="presets" className={cn(TAB_BTN)} data-testid="side-tab-presets">
           <Star className="h-3.5 w-3.5" /> {t('side.presets')}
         </Tabs.Trigger>
       </Tabs.List>
-      <Tabs.Content value="library" className="flex-1 min-h-0 outline-none">
+      <Tabs.Content value="library" className="flex-1 min-h-0 outline-none" data-testid="side-content-library">
         <Suspense fallback={<SidePanelLoading />}>
           <PromptLibrary />
         </Suspense>
       </Tabs.Content>
-      <Tabs.Content value="lora" className="flex-1 min-h-0 outline-none">
+      <Tabs.Content value="lora" className="flex-1 min-h-0 outline-none" data-testid="side-content-lora">
         <Suspense fallback={<SidePanelLoading />}>
           <LoraPanel />
         </Suspense>
       </Tabs.Content>
-      <Tabs.Content value="history" className="flex-1 min-h-0 overflow-hidden outline-none">
+      <Tabs.Content value="history" className="flex-1 min-h-0 overflow-hidden outline-none" data-testid="side-content-history">
         <Suspense fallback={<SidePanelLoading />}>
           <HistoryGallery />
         </Suspense>
       </Tabs.Content>
-      <Tabs.Content value="presets" className="flex-1 min-h-0 outline-none">
+      <Tabs.Content value="presets" className="flex-1 min-h-0 outline-none" data-testid="side-content-presets">
         <Suspense fallback={<SidePanelLoading />}>
           <PresetList />
         </Suspense>

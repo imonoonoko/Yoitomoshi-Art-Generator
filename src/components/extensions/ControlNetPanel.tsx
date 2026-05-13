@@ -93,6 +93,7 @@ export function ControlNetPanel(): JSX.Element {
       hint={t('cn.hint')}
       enabled={c.enabled}
       onEnabledChange={(v) => patchC({ enabled: v })}
+      testId="controlnet-panel"
     >
       <div className="space-y-3">
         {c.units.map((u, i) => (

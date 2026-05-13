@@ -84,7 +84,7 @@ export function ParametersPanel(): JSX.Element {
   )
 
   return (
-    <div className="grid grid-cols-2 gap-2.5">
+    <div className="grid grid-cols-2 gap-2.5" data-testid="parameters-panel">
       <div className="col-span-2 rounded-md border border-line bg-bg-2/60 p-2">
         <div className="mb-1.5 flex items-center gap-1.5">
           <Sparkles className="h-3.5 w-3.5 text-accent" />

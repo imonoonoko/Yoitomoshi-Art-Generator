@@ -51,6 +51,7 @@ export function ADetailerPanel(): JSX.Element {
       hint={t('ad.hint')}
       enabled={a.enabled}
       onEnabledChange={(v) => patchA({ enabled: v })}
+      testId="adetailer-panel"
     >
       <div className="space-y-3">
         {a.units.map((u, i) => (

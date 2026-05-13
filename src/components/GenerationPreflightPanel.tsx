@@ -1,13 +1,16 @@
 import { AlertTriangle, CheckCircle2, Info } from 'lucide-react'
 import { useMemo } from 'react'
+import toast from 'react-hot-toast'
 import { useStore, type AppState } from '@/lib/store'
-import { useT } from '@/lib/i18n'
+import { useT, t as tStatic } from '@/lib/i18n'
 import { getExtensionGuardIssues } from '@/lib/extension-guards'
+import { baseModelsCompatible } from '@/lib/lora-suggest'
+import { approxTokenCount, promptAppend } from '@/lib/prompt-utils'
 import { cn } from '@/lib/utils'
 
-type PreflightSeverity = 'block' | 'warn' | 'ok'
+export type PreflightSeverity = 'block' | 'warn' | 'ok'
 
-interface PreflightItem {
+export interface PreflightItem {
   severity: PreflightSeverity
   key: string
   messageKey: string
@@ -21,9 +24,15 @@ export function GenerationPreflightPanel(): JSX.Element {
   const blockers = items.filter((item) => item.severity === 'block').length
   const warnings = items.filter((item) => item.severity === 'warn').length
   const ok = blockers === 0 && warnings === 0
+  const visibleItems = items.filter((item) => item.severity !== 'ok').slice(0, 6)
 
   return (
-    <section className="rounded-md border border-line bg-bg-0/50 p-2 text-[11px]">
+    <section
+      className="rounded-md border border-line bg-bg-0/50 p-2 text-[11px]"
+      data-testid="preflight-panel"
+      data-preflight-blockers={blockers}
+      data-preflight-warnings={warnings}
+    >
       <div className="flex items-center gap-1.5 text-ink-2">
         {ok ? (
           <CheckCircle2 className="h-3.5 w-3.5 text-ok" />
@@ -40,7 +49,7 @@ export function GenerationPreflightPanel(): JSX.Element {
             : blockers > 0
               ? 'border-warn/45 text-warn'
               : 'border-accent/45 text-accent'
-        )}>
+        )} data-testid="preflight-summary">
           {ok
             ? t('preflight.ready')
             : t('preflight.summary', { blocks: blockers, warnings })}
@@ -49,25 +58,58 @@ export function GenerationPreflightPanel(): JSX.Element {
 
       {!ok && (
         <div className="mt-2 space-y-1">
-          {items.filter((item) => item.severity !== 'ok').slice(0, 6).map((item) => (
-            <div key={item.key} className="flex items-start gap-1.5 leading-relaxed">
+          {visibleItems.map((item) => {
+            const target = preflightTargetForKey(item.key)
+            const canQuickFix = canQuickFixPreflightItem(item.key)
+            return (
+            <div
+              key={item.key}
+              className="flex items-start gap-1.5 leading-relaxed"
+              data-testid={`preflight-item-${item.key}`}
+              data-preflight-severity={item.severity}
+              data-preflight-target={target?.testIds.join(',') ?? ''}
+              data-preflight-can-fix={canQuickFix ? 'true' : 'false'}
+            >
               {item.severity === 'block' ? (
                 <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-warn" />
               ) : (
                 <Info className="mt-0.5 h-3 w-3 shrink-0 text-accent" />
               )}
-              <span className={item.severity === 'block' ? 'text-warn' : 'text-ink-3'}>
+              <span className={cn(
+                'min-w-0 flex-1',
+                item.severity === 'block' ? 'text-warn' : 'text-ink-3'
+              )}>
                 {t(item.messageKey, item.params)}
               </span>
+              {target && (
+                <button
+                  type="button"
+                  className="btn btn-ghost shrink-0 px-1.5 py-0.5 text-[10px]"
+                  onClick={() => focusPreflightItem(item.key)}
+                  data-testid={`preflight-open-${item.key}`}
+                >
+                  {t('preflight.open')}
+                </button>
+              )}
+              {canQuickFix && (
+                <button
+                  type="button"
+                  className="btn btn-ghost shrink-0 px-1.5 py-0.5 text-[10px]"
+                  onClick={() => quickFixPreflightItem(item.key)}
+                  data-testid={`preflight-fix-${item.key}`}
+                >
+                  {t('preflight.quickFix')}
+                </button>
+              )}
             </div>
-          ))}
+          )})}
         </div>
       )}
     </section>
   )
 }
 
-function buildPreflightItems(state: AppState): PreflightItem[] {
+export function buildPreflightItems(state: AppState): PreflightItem[] {
   const items: PreflightItem[] = []
 
   if (state.forgeStatus.kind !== 'ready') {
@@ -114,6 +156,16 @@ function buildPreflightItems(state: AppState): PreflightItem[] {
     }
   }
 
+  const promptTokens = approxTokenCount(state.prompt)
+  if (promptTokens > 150) {
+    items.push({
+      severity: 'warn',
+      key: 'prompt-tokens',
+      messageKey: 'preflight.promptTooLong',
+      params: { tokens: promptTokens }
+    })
+  }
+
   const knownLoras = new Set(state.loras.map((lora) => lora.name))
   const missingLoras = state.activeLoras.filter((lora) => !knownLoras.has(lora.name))
   if (missingLoras.length > 0) {
@@ -122,6 +174,41 @@ function buildPreflightItems(state: AppState): PreflightItem[] {
       key: 'lora',
       messageKey: 'preflight.loraMissing',
       params: { count: missingLoras.length }
+    })
+  }
+  const checkpointBase = state.recommendation?.baseModel ?? inferBaseModelFromTitle(state.selectedModelTitle)
+  const incompatibleLoras = state.activeLoras.filter((active) => {
+    const meta = state.loraMeta.get(active.name)
+    return Boolean(checkpointBase && meta?.baseModel && !baseModelsCompatible(checkpointBase, meta.baseModel))
+  })
+  if (incompatibleLoras.length > 0) {
+    items.push({
+      severity: 'warn',
+      key: 'lora-base',
+      messageKey: 'preflight.loraBaseMismatch',
+      params: { count: incompatibleLoras.length }
+    })
+  }
+  const promptLower = state.prompt.toLowerCase()
+  const missingTriggers = state.activeLoras.filter((active) =>
+    active.triggerWords.length > 0 &&
+    active.triggerWords.every((word) => !promptLower.includes(word.toLowerCase()))
+  )
+  if (missingTriggers.length > 0) {
+    items.push({
+      severity: 'warn',
+      key: 'lora-trigger',
+      messageKey: 'preflight.loraTriggerMissing',
+      params: { count: missingTriggers.length }
+    })
+  }
+
+  if (checkpointBase && isSdxlFamily(checkpointBase) && Math.max(state.params.width, state.params.height) < 900) {
+    items.push({
+      severity: 'warn',
+      key: 'sdxl-size',
+      messageKey: 'preflight.sdxlSmallSize',
+      params: { width: state.params.width, height: state.params.height }
     })
   }
 
@@ -147,6 +234,17 @@ function buildPreflightItems(state: AppState): PreflightItem[] {
           params: { unit: index + 1 }
         })
       }
+      if (checkpointBase && unit.model !== 'None') {
+        const mismatch = controlNetBaseMismatch(checkpointBase, unit.model)
+        if (mismatch) {
+          items.push({
+            severity: 'warn',
+            key: `cn-base-${index}`,
+            messageKey: 'preflight.controlnetBaseMismatch',
+            params: { unit: index + 1, expected: mismatch.expected, actual: mismatch.actual }
+          })
+        }
+      }
     })
   }
 
@@ -161,4 +259,152 @@ function buildPreflightItems(state: AppState): PreflightItem[] {
     items.push({ severity: 'ok', key: 'ok', messageKey: 'preflight.ok' })
   }
   return items
+}
+
+function canQuickFixPreflightItem(key: string): boolean {
+  return key === 'lora-trigger' || key === 'sdxl-size'
+}
+
+function quickFixPreflightItem(key: string): void {
+  const state = useStore.getState()
+  if (key === 'lora-trigger') {
+    const promptLower = state.prompt.toLowerCase()
+    const missingWords = uniqueNonEmpty(
+      state.activeLoras.flatMap((active) =>
+        active.triggerWords.filter((word) => !promptLower.includes(word.toLowerCase()))
+      )
+    )
+    if (missingWords.length === 0) {
+      focusPreflightItem(key)
+      return
+    }
+    const nextPrompt = missingWords.reduce((next, word) => promptAppend(next, word), state.prompt)
+    state.setPrompt(nextPrompt)
+    toast.success(tStatic('preflight.fixedTriggerWords', { count: missingWords.length }))
+    focusPreflightItem('prompt-tokens')
+    return
+  }
+
+  if (key === 'sdxl-size') {
+    const current = state.params
+    const next = current.width > current.height
+      ? { width: 1216, height: 832 }
+      : current.height > current.width
+        ? { width: 832, height: 1216 }
+        : { width: 1024, height: 1024 }
+    state.patchParams(next)
+    toast.success(tStatic('preflight.fixedSdxlSize', next))
+    focusPreflightItem(key)
+  }
+}
+
+function uniqueNonEmpty(words: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of words) {
+    const word = raw.trim()
+    if (!word) continue
+    const key = word.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(word)
+  }
+  return out
+}
+
+interface PreflightTarget {
+  tab?: AppState['currentTab']
+  sideTab?: 'library' | 'lora' | 'history' | 'presets'
+  testIds: string[]
+}
+
+function preflightTargetForKey(key: string): PreflightTarget | null {
+  if (key === 'tab') return { tab: 'txt2img', testIds: ['main-tab-txt2img'] }
+  if (key === 'model' || key === 'vae' || key === 'forge') {
+    return { sideTab: 'library', testIds: ['side-tab-library', 'side-content-library'] }
+  }
+  if (key === 'img2img-image') {
+    return { tab: 'img2img', testIds: ['input-image-panel', 'input-image-empty'] }
+  }
+  if (key === 'prompt-tokens' || key === 'lora-trigger') {
+    return { tab: 'txt2img', testIds: ['prompt-positive-section'] }
+  }
+  if (key === 'lora' || key === 'lora-base') {
+    return { tab: 'txt2img', sideTab: 'lora', testIds: ['side-tab-lora', 'side-content-lora'] }
+  }
+  if (key === 'sdxl-size') {
+    return { tab: 'txt2img', testIds: ['parameters-panel'] }
+  }
+  if (key === 'fabric-empty' || key === 'fabric-controlnet-reference') {
+    return { tab: 'txt2img', testIds: ['fabric-panel', 'controlnet-panel'] }
+  }
+  if (key === 'adetailer-empty') {
+    return { tab: 'txt2img', testIds: ['adetailer-panel'] }
+  }
+  if (key.startsWith('cn-')) {
+    return { tab: 'txt2img', testIds: ['controlnet-builder-panel', 'controlnet-panel'] }
+  }
+  if (key.startsWith('regional-')) {
+    return { tab: 'txt2img', testIds: ['regional-prompter-panel', 'prompt-positive-section'] }
+  }
+  return null
+}
+
+function focusPreflightItem(key: string): void {
+  const target = preflightTargetForKey(key)
+  if (!target) return
+  const store = useStore.getState()
+  if (target.tab) store.setCurrentTab(target.tab)
+  window.setTimeout(() => {
+    if (target.sideTab) {
+      clickByTestId(`side-tab-${target.sideTab}`)
+    }
+    const node = target.testIds
+      .map((id) => document.querySelector(`[data-testid="${id}"]`))
+      .find((candidate): candidate is HTMLElement => candidate instanceof HTMLElement)
+    if (!node) return
+    node.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
+    node.focus({ preventScroll: true })
+  }, 0)
+}
+
+function clickByTestId(id: string): void {
+  const node = document.querySelector(`[data-testid="${id}"]`)
+  if (node instanceof HTMLElement) node.click()
+}
+
+function inferBaseModelFromTitle(title: string | null): string | null {
+  if (!title) return null
+  if (/sdxl|pony|illustrious|animagine|noobai/i.test(title)) return 'SDXL'
+  if (/sd\s*1\.5|sd1\.5|sd15|v1-?5/i.test(title)) return 'SD 1.5'
+  if (/flux/i.test(title)) return 'FLUX'
+  return null
+}
+
+function isSdxlFamily(baseModel: string): boolean {
+  return /sdxl|pony|illustrious|animagine|noobai/i.test(baseModel)
+}
+
+function controlNetBaseMismatch(checkpointBase: string, controlNetModel: string): {
+  expected: string
+  actual: string
+} | null {
+  const expected = controlNetExpectedFamily(checkpointBase)
+  const actual = controlNetModelFamily(controlNetModel)
+  if (!expected || !actual || expected === actual) return null
+  return { expected, actual }
+}
+
+function controlNetExpectedFamily(baseModel: string): string | null {
+  if (/sdxl|pony|illustrious|animagine|noobai/i.test(baseModel)) return 'SDXL'
+  if (/sd\s*1\.5|sd1\.5|sd15/i.test(baseModel)) return 'SD1.5'
+  if (/flux/i.test(baseModel)) return 'FLUX'
+  return null
+}
+
+function controlNetModelFamily(model: string): string | null {
+  if (/flux/i.test(model)) return 'FLUX'
+  if (/sdxl|\bxl\b|pony|illustrious|animagine/i.test(model)) return 'SDXL'
+  if (/sd15|sd1\.5|control_v11|controlnet11|v11p|v11f/i.test(model)) return 'SD1.5'
+  return null
 }

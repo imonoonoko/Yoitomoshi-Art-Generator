@@ -10,6 +10,7 @@ import type {
   DownloadJob,
   DownloadJobStatus,
   HistoryItem,
+  HistoryTagReview,
   HistoryLabel,
   LoraCivitaiMetadata,
   LoraUsageRecord,
@@ -37,6 +38,8 @@ const DOWNLOAD_JOB_STATUSES = new Set<DownloadJobStatus>([
   'canceled'
 ])
 const HISTORY_LABELS = new Set<HistoryLabel>(['favorite', 'candidate', 'rejected', 'asset'])
+const MAX_HISTORY_REVIEW_TAGS = 120
+const MAX_HISTORY_REVIEW_TAG_LENGTH = 80
 
 /**
  * Filesystem-backed JSON storage. Phase 1 stays JSON-only — when history grows past
@@ -599,6 +602,16 @@ export class Storage {
     return all[index]
   }
 
+  setHistoryTagReview(id: string, review: HistoryTagReview | null): HistoryItem | null {
+    const all = this.listHistory()
+    const index = all.findIndex((h) => h.id === id)
+    if (index < 0) return null
+    const nextReview = review ? sanitizeHistoryTagReview(review) : null
+    all[index] = { ...all[index], tagReview: nextReview }
+    writeFileSync(this.historyIndexPath(), JSON.stringify(all, null, 2))
+    return all[index]
+  }
+
   readHistoryImageDataUrl(id: string): string | null {
     const item = this.listHistory().find((h) => h.id === id)
     if (!item || !existsSync(item.imagePath)) return null
@@ -938,6 +951,31 @@ export class Storage {
       JSON.stringify({ cachedAt: Date.now(), tags }, null, 2)
     )
   }
+}
+
+function sanitizeHistoryTagReview(review: HistoryTagReview): HistoryTagReview {
+  return {
+    acceptedTags: sanitizeHistoryReviewTags(review.acceptedTags),
+    rejectedTags: sanitizeHistoryReviewTags(review.rejectedTags),
+    sourceModel: review.sourceModel === 'pixai-onnx' ? 'pixai-onnx' : 'manual',
+    updatedAt: Number.isFinite(review.updatedAt) ? Math.max(0, Math.floor(review.updatedAt)) : Date.now()
+  }
+}
+
+function sanitizeHistoryReviewTags(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const tags: string[] = []
+  for (const item of raw) {
+    if (typeof item !== 'string') continue
+    const tag = item.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, MAX_HISTORY_REVIEW_TAG_LENGTH)
+    const key = tag.toLowerCase()
+    if (!tag || seen.has(key)) continue
+    seen.add(key)
+    tags.push(tag)
+    if (tags.length >= MAX_HISTORY_REVIEW_TAGS) break
+  }
+  return tags
 }
 
 function normalizeSourceMetadata(raw: unknown): ModelSourceMetadata | undefined {

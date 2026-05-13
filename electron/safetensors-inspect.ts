@@ -6,6 +6,7 @@ export type ModelKind =
   | 'vae'
   | 'embedding'
   | 'controlnet'
+  | 'tagger'
   | 'text_encoder'
   | 'unknown'
 
@@ -152,6 +153,7 @@ export function describeKind(kind: ModelKind): string {
     case 'checkpoint': return 'チェックポイント (本体モデル)'
     case 'vae': return 'VAE'
     case 'controlnet': return 'ControlNet'
+    case 'tagger': return 'Tagger'
     case 'embedding': return 'Textual Inversion (Embedding)'
     case 'text_encoder': return 'テキストエンコーダ'
     case 'unknown': return '不明な形式'

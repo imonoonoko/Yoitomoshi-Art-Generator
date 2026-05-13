@@ -7,7 +7,7 @@ import type {
 } from '../src/shared/types.js'
 
 const HF_BASE = 'https://huggingface.co'
-const HF_MODEL_EXTS = new Set(['.safetensors', '.ckpt', '.pt', '.pth', '.vae'])
+const HF_MODEL_EXTS = new Set(['.safetensors', '.ckpt', '.pt', '.pth', '.vae', '.onnx', '.bin'])
 
 interface RawModel {
   id?: string
@@ -93,6 +93,7 @@ function normalizeFile(
 
 function inferAssetType(path: string, tags: string[]): CivitaiAssetType {
   const haystack = `${path} ${tags.join(' ')}`.toLowerCase()
+  if (/\b(image-classification|anime-tagger|tagger|wd-tagger|danbooru|multi-label)\b/.test(haystack)) return 'Tagger'
   if (/\b(controlnet|control-net|control_net)\b/.test(haystack)) return 'Controlnet'
   if (/\b(lora|locon|lycoris)\b/.test(haystack)) return 'LORA'
   if (/\bvae\b/.test(haystack) || /\.vae$/i.test(path)) return 'VAE'

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Trash2, RotateCcw, Search, Filter, ImageUpscale, GitCompare, Star, CheckCircle2, XCircle, PackageCheck, ThumbsUp, ThumbsDown, Loader2 } from 'lucide-react'
+import { Trash2, RotateCcw, Search, Filter, ImageUpscale, GitCompare, Star, CheckCircle2, XCircle, PackageCheck, ThumbsUp, ThumbsDown, Loader2, Tag, ScanLine, Save, ShieldX } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore, type FabricFeedbackItem } from '@/lib/store'
 import { api } from '@/lib/ipc'
 import { cn } from '@/lib/utils'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { stripLoraTokens } from '@/lib/lora-suggest'
-import type { HistoryItem, HistoryLabel } from '@shared/types'
+import { promptAppend } from '@/lib/prompt-utils'
+import { DEFAULT_TAGGER_BLACKLIST, DEFAULT_TAGGER_MIN_SCORE, parseTaggerBlacklist } from '@shared/tagger-filter'
+import type { HistoryItem, HistoryLabel, HistoryTagReview, TaggerRunResult } from '@shared/types'
 
 const RANGE_OPTIONS = [
   { id: 'all', labelKey: 'history.range.all', ms: Infinity },
@@ -50,6 +52,16 @@ export function HistoryGallery(): JSX.Element {
   const [loading, setLoading] = useState(false)
   const [fabricBusy, setFabricBusy] = useState<'positive' | 'negative' | null>(null)
   const [visibleCount, setVisibleCount] = useState(HISTORY_PAGE_SIZE)
+  const [reviewingId, setReviewingId] = useState<string | null>(null)
+  const [reviewImage, setReviewImage] = useState<string | null>(null)
+  const [reviewBusy, setReviewBusy] = useState(false)
+  const [reviewResult, setReviewResult] = useState<TaggerRunResult | null>(null)
+  const [acceptedText, setAcceptedText] = useState('')
+  const [rejectedText, setRejectedText] = useState('')
+  const [reviewCandidateQuery, setReviewCandidateQuery] = useState('')
+  const [reviewMinScore, setReviewMinScore] = useState(DEFAULT_TAGGER_MIN_SCORE)
+  const [reviewExcludeMeta, setReviewExcludeMeta] = useState(true)
+  const [reviewBlacklistText, setReviewBlacklistText] = useState(DEFAULT_TAGGER_BLACKLIST.join(', '))
 
   useEffect(() => {
     if (history.length > 0 || loading) return
@@ -119,6 +131,14 @@ export function HistoryGallery(): JSX.Element {
   const visibleItems = filtered.slice(0, visibleCount)
   const fabricPositiveCount = history.filter((h) => h.label && FABRIC_POSITIVE_LABELS.has(h.label)).length
   const fabricNegativeCount = history.filter((h) => h.label === 'rejected').length
+  const reviewingItem = reviewingId ? history.find((item) => item.id === reviewingId) ?? null : null
+  const visibleReviewCandidates = useMemo(() => {
+    if (!reviewResult?.ok) return []
+    const q = reviewCandidateQuery.trim().toLowerCase()
+    const tags = reviewResult.tags.map((tag) => tag.name.replace(/_/g, ' '))
+    if (!q) return tags.slice(0, 80)
+    return tags.filter((tag) => tag.toLowerCase().includes(q)).slice(0, 80)
+  }, [reviewCandidateQuery, reviewResult])
 
   async function restore(id: string): Promise<void> {
     const h = history.find((x) => x.id === id)
@@ -190,6 +210,100 @@ export function HistoryGallery(): JSX.Element {
     const updated = await api.storage.setHistoryLabel(id, nextLabel)
     if (!updated) return
     setHistory(history.map((item) => item.id === id ? updated : item))
+  }
+
+  async function openTagReview(id: string): Promise<void> {
+    const item = history.find((x) => x.id === id)
+    if (!item) return
+    setReviewingId(id)
+    setReviewResult(null)
+    setReviewCandidateQuery('')
+    setAcceptedText((item.tagReview?.acceptedTags ?? []).join(', '))
+    setRejectedText((item.tagReview?.rejectedTags ?? []).join(', '))
+    const image = await api.storage.readHistoryImage(id).catch(() => null)
+    setReviewImage(image ?? item.thumbDataUrl)
+  }
+
+  async function runReviewTagger(): Promise<void> {
+    if (!reviewingItem || !reviewImage || reviewBusy) return
+    setReviewBusy(true)
+    try {
+      const result = await api.tools.runTagger({
+        image: reviewImage,
+        modelId: 'pixai-onnx',
+        generalThreshold: 0.3,
+        characterThreshold: 0.85,
+        minScore: reviewMinScore,
+        excludeMeta: reviewExcludeMeta,
+        blacklist: parseTaggerBlacklist(reviewBlacklistText),
+        limit: 80
+      })
+      setReviewResult(result)
+      if (!result.ok) {
+        toast.error(tStatic('history.reviewRunFailed', { message: result.message }))
+        return
+      }
+      const current = parseReviewTags(acceptedText)
+      const next = mergeReviewTags(current, result.promptTags)
+      setAcceptedText(next.join(', '))
+      toast.success(tStatic('history.reviewRunDone', { count: result.promptTags.length }))
+    } catch (e) {
+      toast.error(tStatic('history.reviewRunFailed', { message: (e as Error).message }))
+    } finally {
+      setReviewBusy(false)
+    }
+  }
+
+  async function saveTagReview(): Promise<void> {
+    if (!reviewingItem) return
+    const review: HistoryTagReview = {
+      acceptedTags: parseReviewTags(acceptedText),
+      rejectedTags: parseReviewTags(rejectedText),
+      sourceModel: reviewResult?.ok ? 'pixai-onnx' : 'manual',
+      updatedAt: Date.now()
+    }
+    const updated = await api.storage.setHistoryTagReview(reviewingItem.id, review)
+    if (!updated) return
+    setHistory(history.map((item) => item.id === updated.id ? updated : item))
+    toast.success(tStatic('history.reviewSaved', { count: review.acceptedTags.length }))
+  }
+
+  function acceptReviewTag(tag: string): void {
+    setAcceptedText(mergeReviewTags(parseReviewTags(acceptedText), [tag]).join(', '))
+    setRejectedText(parseReviewTags(rejectedText).filter((item) => item.toLowerCase() !== tag.toLowerCase()).join(', '))
+  }
+
+  function rejectReviewTag(tag: string): void {
+    setRejectedText(mergeReviewTags(parseReviewTags(rejectedText), [tag]).join(', '))
+    setAcceptedText(parseReviewTags(acceptedText).filter((item) => item.toLowerCase() !== tag.toLowerCase()).join(', '))
+  }
+
+  function acceptAllReviewTags(tags = visibleReviewCandidates): void {
+    if (!tags.length) return
+    setAcceptedText(mergeReviewTags(parseReviewTags(acceptedText), tags).join(', '))
+    const incoming = new Set(tags.map((tag) => tag.toLowerCase()))
+    setRejectedText(parseReviewTags(rejectedText).filter((item) => !incoming.has(item.toLowerCase())).join(', '))
+  }
+
+  function rejectAllReviewTags(tags = visibleReviewCandidates): void {
+    if (!tags.length) return
+    setRejectedText(mergeReviewTags(parseReviewTags(rejectedText), tags).join(', '))
+    const incoming = new Set(tags.map((tag) => tag.toLowerCase()))
+    setAcceptedText(parseReviewTags(acceptedText).filter((item) => !incoming.has(item.toLowerCase())).join(', '))
+  }
+
+  function appendReviewAcceptedToPrompt(): void {
+    const tags = parseReviewTags(acceptedText)
+    if (!tags.length) return
+    setPrompt(tags.reduce((next, tag) => promptAppend(next, tag), useStore.getState().prompt))
+    toast.success(tStatic('history.reviewPromptAdded', { count: tags.length }))
+  }
+
+  function appendReviewRejectedToNegative(): void {
+    const tags = parseReviewTags(rejectedText)
+    if (!tags.length) return
+    setNeg(tags.reduce((next, tag) => promptAppend(next, tag), useStore.getState().negativePrompt))
+    toast.success(tStatic('history.reviewNegativeAdded', { count: tags.length }))
   }
 
   async function addLabeledToFabric(kind: 'positive' | 'negative'): Promise<void> {
@@ -322,6 +436,182 @@ export function HistoryGallery(): JSX.Element {
         {compareItems.length === 2 && (
           <PromptDiffPanel left={compareItems[0]} right={compareItems[1]} onClear={() => setCompareIds([])} />
         )}
+        {reviewingItem && (
+          <div className="rounded-md border border-line bg-bg-2/60 p-2 text-[10px] space-y-2" data-testid="history-tag-review-panel">
+            <div className="flex items-center gap-1.5">
+              <Tag className="h-3.5 w-3.5 text-accent" />
+              <span className="font-semibold text-ink-1">{t('history.reviewTitle')}</span>
+              <span className="font-mono text-ink-3 truncate">{new Date(reviewingItem.createdAt).toLocaleDateString()}</span>
+              <button
+                className="ml-auto text-ink-3 hover:text-ink-1"
+                onClick={() => {
+                setReviewingId(null)
+                setReviewImage(null)
+                setReviewResult(null)
+                setReviewCandidateQuery('')
+              }}
+            >
+                {t('common.close')}
+              </button>
+            </div>
+            <div className="grid grid-cols-[56px_1fr] gap-2">
+              {reviewImage && <img src={reviewImage} alt="" className="h-14 w-14 rounded object-cover bg-bg-3" />}
+              <div className="space-y-2 min-w-0">
+                <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                  <label className="min-w-0">
+                    <div className="flex items-baseline justify-between text-ink-3">
+                      <span>{t('taggerFilter.minScore')}</span>
+                      <span className="font-mono text-ink-1">{reviewMinScore.toFixed(2)}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.3}
+                      max={0.8}
+                      step={0.01}
+                      value={reviewMinScore}
+                      onChange={(e) => setReviewMinScore(parseFloat(e.target.value))}
+                      className="w-full accent-accent"
+                    />
+                  </label>
+                  <label className="flex items-center gap-1.5 text-ink-2">
+                    <input
+                      type="checkbox"
+                      checked={reviewExcludeMeta}
+                      onChange={(e) => setReviewExcludeMeta(e.target.checked)}
+                      className="accent-accent"
+                    />
+                    {t('taggerFilter.excludeMeta')}
+                  </label>
+                </div>
+                <textarea
+                  className="input min-h-10 text-[10px] font-mono"
+                  value={reviewBlacklistText}
+                  onChange={(e) => setReviewBlacklistText(e.target.value)}
+                  placeholder={t('taggerFilter.blacklist')}
+                />
+              </div>
+            </div>
+            {reviewingItem.tagReview && (
+              <div className="rounded border border-line bg-bg-1/70 p-2 space-y-1" data-testid="history-review-saved-summary">
+                <div className="flex items-center justify-between text-ink-3">
+                  <span>{t('history.reviewSavedSummary')}</span>
+                  <span className="font-mono">{new Date(reviewingItem.tagReview.updatedAt).toLocaleDateString()}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
+                  <div className="min-w-0">
+                    <div className="text-ok">{t('history.reviewAccepted')} ({reviewingItem.tagReview.acceptedTags.length})</div>
+                    <div className="truncate text-ink-3">{reviewingItem.tagReview.acceptedTags.slice(0, 16).join(', ') || '-'}</div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-warn">{t('history.reviewRejected')} ({reviewingItem.tagReview.rejectedTags.length})</div>
+                    <div className="truncate text-ink-3">{reviewingItem.tagReview.rejectedTags.slice(0, 16).join(', ') || '-'}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <label>
+                <span className="text-ink-3">{t('history.reviewAccepted')}</span>
+                <textarea
+                  className="input mt-1 min-h-16 text-[10px] font-mono"
+                  value={acceptedText}
+                  onChange={(e) => setAcceptedText(e.target.value)}
+                  data-testid="history-review-accepted"
+                />
+              </label>
+              <label>
+                <span className="text-ink-3">{t('history.reviewRejected')}</span>
+                <textarea
+                  className="input mt-1 min-h-16 text-[10px] font-mono"
+                  value={rejectedText}
+                  onChange={(e) => setRejectedText(e.target.value)}
+                  data-testid="history-review-rejected"
+                />
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                className="btn justify-center gap-1 text-[10px]"
+                onClick={appendReviewAcceptedToPrompt}
+                disabled={parseReviewTags(acceptedText).length === 0}
+                data-testid="history-review-append-prompt"
+              >
+                <Tag className="h-3 w-3" />
+                {t('history.reviewAppendPrompt')}
+              </button>
+              <button
+                className="btn justify-center gap-1 text-[10px]"
+                onClick={appendReviewRejectedToNegative}
+                disabled={parseReviewTags(rejectedText).length === 0}
+                data-testid="history-review-append-negative"
+              >
+                <ShieldX className="h-3 w-3" />
+                {t('history.reviewAppendNegative')}
+              </button>
+            </div>
+            <div className="flex gap-1.5">
+              <button
+                className="btn btn-primary flex-1 justify-center gap-1"
+                disabled={reviewBusy || !reviewImage}
+                onClick={() => { void runReviewTagger() }}
+                data-testid="history-review-run-tagger"
+              >
+                {reviewBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <ScanLine className="h-3 w-3" />}
+                {reviewBusy ? t('tools.tagger.running') : t('history.reviewRun')}
+              </button>
+              <button
+                className="btn justify-center gap-1"
+                onClick={() => { void saveTagReview() }}
+                data-testid="history-review-save"
+              >
+                <Save className="h-3 w-3" />
+                {t('common.save')}
+              </button>
+            </div>
+            {reviewResult?.ok && (
+              <div className="space-y-1" data-testid="history-review-result">
+                <div className="flex items-center gap-1.5 text-ink-3">
+                  <span>
+                    {t('taggerFilter.keptSuppressed', {
+                      kept: reviewResult.filter?.kept ?? reviewResult.promptTags.length,
+                      suppressed: reviewResult.filter?.suppressed ?? reviewResult.suppressedTags?.length ?? 0
+                    })}
+                  </span>
+                  <button className="ml-auto btn px-1.5 py-0.5 text-[10px]" onClick={() => acceptAllReviewTags()} data-testid="history-review-accept-all">
+                    {t('history.reviewAcceptAll')}
+                  </button>
+                  <button className="btn px-1.5 py-0.5 text-[10px]" onClick={() => rejectAllReviewTags()} data-testid="history-review-reject-all">
+                    {t('history.reviewRejectAll')}
+                  </button>
+                </div>
+                <input
+                  className="input py-1 text-[10px]"
+                  value={reviewCandidateQuery}
+                  onChange={(e) => setReviewCandidateQuery(e.target.value)}
+                  placeholder={t('history.reviewSearch')}
+                  data-testid="history-review-search"
+                />
+                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                  {visibleReviewCandidates.slice(0, 40).map((tag) => (
+                    <span key={tag} className="inline-flex items-center gap-1 rounded border border-line bg-bg-3 px-1.5 py-0.5 text-ink-1">
+                      {tag}
+                      <button className="text-ok hover:text-ink-0" onClick={() => acceptReviewTag(tag)} title={t('history.reviewAcceptTag')}>+</button>
+                      <button className="text-err hover:text-ink-0" onClick={() => rejectReviewTag(tag)} title={t('history.reviewRejectTag')}>×</button>
+                    </span>
+                  ))}
+                </div>
+                {(reviewResult.suppressedTags?.length ?? 0) > 0 && (
+                  <div className="flex items-start gap-1 text-ink-3">
+                    <ShieldX className="h-3 w-3 text-warn mt-0.5 shrink-0" />
+                    <div className="min-w-0 truncate">
+                      {reviewResult.suppressedTags?.slice(0, 12).map((tag) => tag.name.replace(/_/g, ' ')).join(', ')}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -349,6 +639,12 @@ export function HistoryGallery(): JSX.Element {
                   {h.label && (
                     <HistoryLabelBadge label={h.label} className="absolute top-1 left-8 z-10" />
                   )}
+                  {h.tagReview?.acceptedTags?.length ? (
+                    <span className="absolute top-8 left-1 z-10 inline-flex items-center gap-1 rounded bg-bg-2/90 px-1.5 py-1 text-[10px] text-ok backdrop-blur">
+                      <Tag className="h-3 w-3" />
+                      {h.tagReview.acceptedTags.length}
+                    </span>
+                  ) : null}
                   <img
                     src={h.thumbDataUrl}
                     alt={h.prompt.slice(0, 80)}
@@ -358,6 +654,14 @@ export function HistoryGallery(): JSX.Element {
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors pointer-events-none" />
                   <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      className="btn btn-icon bg-bg-2/90 backdrop-blur"
+                      onClick={() => { void openTagReview(h.id) }}
+                      title={t('history.reviewOpen')}
+                      data-testid="history-review-open"
+                    >
+                      <Tag className="h-3 w-3" />
+                    </button>
                     <button
                       className="btn btn-icon bg-bg-2/90 backdrop-blur"
                       onClick={() => { void restore(h.id) }}
@@ -506,4 +810,31 @@ function tokenizePrompt(prompt: string): string[] {
     .split(/[,;\n]+/)
     .map((token) => token.trim().replace(/\s+/g, ' '))
     .filter(Boolean)
+}
+
+function parseReviewTags(value: string): string[] {
+  const seen = new Set<string>()
+  const tags: string[] = []
+  for (const raw of value.split(/[,;\n]+/)) {
+    const tag = raw.trim().replace(/\s+/g, ' ')
+    const key = tag.toLowerCase()
+    if (!tag || seen.has(key)) continue
+    seen.add(key)
+    tags.push(tag)
+  }
+  return tags.slice(0, 120)
+}
+
+function mergeReviewTags(current: string[], incoming: string[]): string[] {
+  const seen = new Set(current.map((tag) => tag.toLowerCase()))
+  const merged = [...current]
+  for (const raw of incoming) {
+    const tag = raw.trim().replace(/\s+/g, ' ')
+    const key = tag.toLowerCase()
+    if (!tag || seen.has(key)) continue
+    seen.add(key)
+    merged.push(tag)
+    if (merged.length >= 120) break
+  }
+  return merged
 }

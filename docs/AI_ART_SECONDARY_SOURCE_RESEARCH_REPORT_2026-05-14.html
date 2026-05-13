@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIアート制作 二次情報リサーチ補足レポート 2026-05-14</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1115;
+      --panel: #171b22;
+      --panel2: #202630;
+      --line: #323946;
+      --ink: #f2f5f8;
+      --muted: #aab2bf;
+      --subtle: #7e8898;
+      --accent: #8fb3ff;
+      --accent2: #62c7b8;
+      --ok: #79d891;
+      --warn: #f2c86d;
+      --bad: #f08383;
+      --code: #101319;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.72 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    }
+    a { color: #9fbdff; }
+    code {
+      padding: 1px 5px;
+      border-radius: 5px;
+      border: 1px solid #2d3542;
+      background: var(--code);
+      color: #e6ebff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #151a23 0%, #0f1115 100%);
+    }
+    .wrap { max-width: 1220px; margin: 0 auto; padding: 30px; }
+    .eyebrow {
+      margin: 0;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.25; letter-spacing: 0; }
+    h1 { margin-top: 8px; font-size: clamp(28px, 4vw, 42px); }
+    h2 { margin: 34px 0 12px; font-size: 21px; }
+    h3 { font-size: 16px; }
+    p { margin: 8px 0 0; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 5px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+    th, td { border: 1px solid var(--line); padding: 10px; vertical-align: top; }
+    th { background: #1c222c; text-align: left; color: #dbe5ff; }
+    td { background: rgba(255,255,255,.015); }
+    footer { margin-top: 42px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--subtle); }
+    .lead { max-width: 980px; color: var(--muted); font-size: 16px; }
+    .meta, .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill, .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.02);
+      white-space: nowrap;
+      font-weight: 700;
+    }
+    .pill { padding: 4px 10px; color: var(--muted); font-size: 12px; }
+    .tag { padding: 2px 8px; font-size: 11px; }
+    .ok { color: var(--ok); border-color: rgba(121,216,145,.45); }
+    .warn { color: var(--warn); border-color: rgba(242,200,109,.45); }
+    .bad { color: var(--bad); border-color: rgba(240,131,131,.45); }
+    .info { color: var(--accent2); border-color: rgba(98,199,184,.45); }
+    .grid { display: grid; gap: 14px; }
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+    .callout {
+      border: 1px solid rgba(143,179,255,.35);
+      border-left: 4px solid var(--accent);
+      background: rgba(143,179,255,.06);
+      padding: 14px;
+      border-radius: 8px;
+    }
+    .note { color: var(--muted); }
+    .small { color: var(--subtle); font-size: 12px; }
+    @media (max-width: 860px) {
+      .wrap { padding: 20px; }
+      .cols-2, .cols-3 { grid-template-columns: 1fr; }
+      table { table-layout: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">Secondary Source Research</p>
+      <h1>AIアート制作 二次情報リサーチ補足レポート</h1>
+      <p class="lead">前回の一次情報中心レポートを補うため、チュートリアル、Creator記事、Civitai系ワークフロー共有、日本語講座、Redditの失敗談を横断して、実際の制作現場で繰り返し出てくる作法・神設定・拡張機能・詰まりどころを整理した。</p>
+      <div class="meta">
+        <span class="pill">作成日: 2026-05-14</span>
+        <span class="pill">対象: Yoitomoshi Art Generator</span>
+        <span class="pill">前提: 二次情報は補助証拠</span>
+        <span class="pill">用途: UX / プリセット / レシピ設計</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="callout">
+      <h2>結論</h2>
+      <p>二次情報で強く見えたのは、「万能の神設定」ではなく、<strong>固定seedで比較する習慣、モデルごとの推奨値、ControlNet/IPAdapter/ADetailerの役割分担、古いチュートリアルを壊れやすいものとして扱う安全策</strong>だった。Yoitomoshiに入れるべき価値は、数値を一発で当てることより、制作工程を再現可能なレシピに変換し、互換性と出典の鮮度をUIで見せることにある。</p>
+    </section>
+
+    <section>
+      <h2>1. 調査方針と信頼度</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>分類</th>
+            <th>扱い</th>
+            <th>採用基準</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag ok">信頼度A</span> 複数講座で一致</td>
+            <td>設計に反映してよい。</td>
+            <td>Promptの順序、seed固定比較、ControlNetのpreprocessor/model一致、ADetailerの顔補修、ComfyUIは最小workflowから学ぶ、など。</td>
+          </tr>
+          <tr>
+            <td><span class="tag warn">信頼度B</span> Creator実例</td>
+            <td>プリセット候補にする。既定値化は実機検証後。</td>
+            <td>Civitaiワークフロー共有、個人ブログの数値、動画向け複合workflow、最新モデル対応の体感報告。</td>
+          </tr>
+          <tr>
+            <td><span class="tag bad">信頼度C</span> 単発コメント</td>
+            <td>摩擦点やリスクの発見に使う。</td>
+            <td>Redditの詰まり報告、古いworkflowのnode名変更、モデル互換性の感想。実装判断は一次情報で裏取りする。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>2. 二次情報から見えた制作作法</h2>
+      <div class="grid cols-2">
+        <article class="card">
+          <h3>Promptは文章より「強い要素の順序」</h3>
+          <p>Civitai系のPrompting記事、ReplicateのStable Diffusionガイド、Stable Diffusion Artのprompt guideはいずれも、重要語を前に置く、カンマ区切りで整理する、weightを使って影響を調整する、という考え方を共有している。</p>
+          <p class="note">Yoitomoshiへの落とし込み: Prompt Helperは自然文をそのまま長文化するのではなく、<code>content type / subject / composition / style / lighting / color / extra / negative</code> に分解する。</p>
+        </article>
+        <article class="card">
+          <h3>色・画角・構図タグは専用カテゴリに分ける</h3>
+          <p>日本語の構図プロンプト集は、<code>full body</code>、<code>upper body</code>、<code>from above</code>、<code>dutch angle</code>、<code>perspective</code> のような画角・向き・遠近表現を画像例付きで整理している。これは初心者が最初に詰まる「何を英語で書くか」を直接助ける。</p>
+          <p class="note">Yoitomoshiへの落とし込み: Prompt Libraryに「構図」「カメラ」「遠近」「視線」「色調」タブを追加し、タグをクリックでappendする。</p>
+        </article>
+        <article class="card">
+          <h3>Negative promptは万能修正ではなく除外条件</h3>
+          <p>Stable Diffusion Artは、否定語をpositive promptに入れるより、不要物をnegative promptへ分離する例を示している。Replicateも、写真を狙うなら<code>painting</code>や<code>illustration</code>をnegative側へ置くよう説明している。</p>
+          <p class="note">Yoitomoshiへの落とし込み: Negative欄に「品質」「手指」「文字/透かし」「写真化したい時の絵柄除外」などの用途別セットを用意する。</p>
+        </article>
+        <article class="card">
+          <h3>1枚で判断せず、固定seedと少数batchで比較する</h3>
+          <p>Stable Diffusion Artのworkflow記事は、base prompt、モデル選択、構図選び、inpaint、upscale、最終調整の段階化を示している。Replicateもseed固定でsteps、prompt、guidance scaleを変える比較を説明している。</p>
+          <p class="note">Yoitomoshiへの落とし込み: Compare Studioを作り、seed固定のままPrompt差分、CFG、steps、LoRA weight、ADetailer有無を並べて比較する。</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. 「神設定」の実体</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>よく語られる設定</th>
+            <th>二次情報での傾向</th>
+            <th>Yoitomoshiでの扱い</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CFG / guidance scale</td>
+            <td>Replicateは開始値として7から7.5付近を示し、promptへの追従を上げたい時は増やし、創造性を残したい時は下げると説明している。ただしTurbo系では扱いが異なる。</td>
+            <td>「固定値」ではなく、モデル種別ごとの初期値と警告にする。SDXL Turbo系ではCFG欄を通常モデルと同じ意味で見せない。</td>
+          </tr>
+          <tr>
+            <td>Steps</td>
+            <td>20前後から始め、増やしすぎても効果が逓減するという説明が複数の講座で一致する。古いSD1.5/SDXLとTurbo/LCMでは意味が変わる。</td>
+            <td>基本presetは20/28/35のような比較候補にし、速度重視と品質重視を切り替える。</td>
+          </tr>
+          <tr>
+            <td>Sampler / scheduler</td>
+            <td>Euler/Euler aは入門値、DPM++ 2M KarrasはA1111系で人気という扱いが多い。万能ではなくモデルcardの推奨が優先。</td>
+            <td>Model Libraryに「推奨sampler/steps/CFG」を保存し、モデルを選ぶと候補に反映する。</td>
+          </tr>
+          <tr>
+            <td>Resolution</td>
+            <td>SD1.5は512/768系、SDXLは1024系が基準。大きすぎる直接生成よりupscale工程へ分ける説明が多い。</td>
+            <td>base modelから推奨サイズを提示し、無理なサイズはVRAM/破綻リスクを表示する。</td>
+          </tr>
+          <tr>
+            <td>Seed</td>
+            <td>制作ではseed固定が「比較と再現」の中心になる。幅・高さを変えると同じseedでも結果が大きく変わる点も注意されている。</td>
+            <td>Historyから「同seed再試行」「seed固定でPromptだけ変更」「seedランダムで構図探索」を明確に分ける。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>4. 拡張機能と実務workflow</h2>
+      <div class="grid cols-3">
+        <article class="card">
+          <h3>ControlNet</h3>
+          <p>ControlNet講座では、OpenPoseは人物の姿勢、Cannyは輪郭・構図、Depthは奥行き、Lineartは線画、Tileはupscale時のdetail補助、という役割分担が繰り返し説明される。preprocessorとmodelの対応、preview、control weight調整が重要。</p>
+          <p class="note">UI案: 「OpenPose」「線画」「Depth」「Tile」「Reference」を技術名ではなく用途カードにする。</p>
+        </article>
+        <article class="card">
+          <h3>IPAdapter / Reference</h3>
+          <p>IPAdapterは画像プロンプトとして扱われ、style/content/face referenceの実務利用が多い。Civitai系の動画workflowでは、複数IPAdapter、ControlNet、latent upscale、bypass用グループを組み合わせている。</p>
+          <p class="note">UI案: 参照画像に「styleだけ」「顔寄せ」「構図寄せ」「弱く混ぜる」を選ばせ、weight/scaleを内部設定へ写す。</p>
+        </article>
+        <article class="card">
+          <h3>ADetailer</h3>
+          <p>日本語・英語講座とも、ADetailerは全身絵や小さい顔の補修、表情差分に有効とされる。一方で、手の修正は安定しにくく、検出数が多いと時間が増えるという注意も一致する。</p>
+          <p class="note">UI案: 「顔を整える」は既定ON候補、「手も直す」は時間増の警告付きオプションにする。</p>
+        </article>
+        <article class="card">
+          <h3>Upscale</h3>
+          <p>講座では、AI upscaler、SD upscale、ControlNet tile upscaleを使い分ける説明が多い。いきなり大解像度で生成するより、構図確定後に拡大し、必要に応じて顔補修や最終調整を加える方が安定する。</p>
+          <p class="note">UI案: 生成結果カードに「構図確定」「顔補修」「2x」「4x」「印刷向け」の次アクションを並べる。</p>
+        </article>
+        <article class="card">
+          <h3>ComfyUI workflow</h3>
+          <p>ComfyUI系の二次情報は、強力だが初心者にはnode依存とcustom node更新が壁になる、という傾向が強い。Redditでは、まず最小のtext-to-image workflowから始め、nodeを1つずつ足すべきという助言が繰り返される。</p>
+          <p class="note">UI案: YoitomoshiはComfyUI風の自由配線を直接入れず、Forge向けの安全なrole-based recipeへ落とす。</p>
+        </article>
+        <article class="card">
+          <h3>大型workflow共有</h3>
+          <p>CivitaiやRedditのall-in-one workflowは、ControlNet、IPAdapter、inpaint、outpaint、upscale、face detailer、VRAM管理を1つにまとめる例がある。一方で、作者自身が中級者向け、node多数、依存downloadが必要と注記するケースも多い。</p>
+          <p class="note">UI案: 「万能workflowを丸ごと再現」ではなく、構成要素をYoitomoshiの小さなレシピカードへ分解する。</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>5. 二次情報から見える失敗パターン</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>失敗パターン</th>
+            <th>観測された原因</th>
+            <th>Yoitomoshiでの予防策</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>古いチュートリアル通りにやるとnodeが赤くなる</td>
+            <td>RedditではIPAdapter node名変更、リンク切れ、古いworkflow、custom node依存が初心者の大きな詰まりとして報告されている。</td>
+            <td>外部workflowや講座を取り込む時は、掲載日、更新日、対象UI、base model、必要拡張、検証済みバージョンを保存する。</td>
+          </tr>
+          <tr>
+            <td>最新モデルに移行したらControlNet/IPAdapterが使えない</td>
+            <td>コミュニティでは、新しい編集系モデルはControlNet/IPAdapter前提ではない、非編集モデルはControlNet対応が遅れる、という実務感が共有されている。</td>
+            <td>Model Libraryに「ControlNet実績あり」「IPAdapter実績あり」「inpaint実績あり」「不明」を表示する。</td>
+          </tr>
+          <tr>
+            <td>全身画像の顔が崩れる</td>
+            <td>ADetailer講座は、小さい顔や全身構図で顔が崩れやすく、face detectorで補修する流れを説明している。</td>
+            <td>全身/遠景/集合絵のpromptを検知したら、ADetailer face presetを提案する。</td>
+          </tr>
+          <tr>
+            <td>「神設定」を入れても再現しない</td>
+            <td>同じCFG/stepsでも、モデル、VAE、LoRA、解像度、seed、拡張の有無で結果が変わる。</td>
+            <td>設定だけでなく、モデルhash、LoRA weight、negative、extension payload、seed、サイズを1つのRecipeとして保存する。</td>
+          </tr>
+          <tr>
+            <td>プロンプトが長くなりすぎて効かない</td>
+            <td>二次情報では、重要語の位置、tokenの強弱、色語の強さ、余計な接続詞の影響が繰り返し語られる。</td>
+            <td>Prompt Helperに「前に出すべき語」「重複語」「色に支配されやすい語」「negativeへ移す語」の軽い診断を入れる。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>6. Yoitomoshiへの実装提案</h2>
+      <div class="grid cols-2">
+        <article class="card">
+          <h3>Recipe Card 2.0</h3>
+          <p>生成設定を単なるpresetではなく、目的、対象base model、推奨prompt構造、negative、LoRA、ControlNet、ADetailer、Upscale、出典URL、検証日を持つレシピにする。</p>
+          <div class="tags">
+            <span class="tag ok">優先度高</span>
+            <span class="tag info">既存Preset/Historyと親和性高</span>
+          </div>
+        </article>
+        <article class="card">
+          <h3>Source Reliability Badge</h3>
+          <p>各レシピやPrompt Library項目に、一次情報、複数講座一致、Creator実例、単発コメント、未検証を表示する。二次情報を使うほど、根拠の重みをUIで見える化する。</p>
+          <div class="tags">
+            <span class="tag ok">優先度高</span>
+            <span class="tag info">調査資産を直接活用</span>
+          </div>
+        </article>
+        <article class="card">
+          <h3>Compare Studio</h3>
+          <p>固定seedで、prompt差分、negative差分、CFG/steps/sampler、LoRA weight、ADetailer有無、ControlNet weightを並べる。二次情報の「試して比較する」作法を機能化する。</p>
+          <div class="tags">
+            <span class="tag warn">中期</span>
+            <span class="tag info">History比較と連携</span>
+          </div>
+        </article>
+        <article class="card">
+          <h3>Compatibility Guard</h3>
+          <p>base model、SD1.5/SDXL/Flux系、ControlNet model、LoRA、VAE、拡張payloadの互換性を、生成前に警告する。古いチュートリアル由来の事故を減らす。</p>
+          <div class="tags">
+            <span class="tag ok">優先度高</span>
+            <span class="tag info">Model Library強化</span>
+          </div>
+        </article>
+        <article class="card">
+          <h3>Role-based Control Cards</h3>
+          <p>ControlNetやIPAdapterを技術名で並べるのではなく、「ポーズを保つ」「線画から作る」「奥行きを保つ」「絵柄を寄せる」「顔を寄せる」「高解像度化で崩さない」の目的カードにする。</p>
+          <div class="tags">
+            <span class="tag warn">中期</span>
+            <span class="tag info">初心者導線</span>
+          </div>
+        </article>
+        <article class="card">
+          <h3>Prompt Structure Assistant</h3>
+          <p>自然文からpromptを作るだけでなく、既存promptを分解し、重要語の位置、色語、重複、negative候補、構図語不足を診断する。Civitai/Replicate/日本語講座の実務作法を軽量ローカル処理で再現する。</p>
+          <div class="tags">
+            <span class="tag ok">優先度高</span>
+            <span class="tag info">Prompt Helper拡張</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>7. すぐ使えるレシピ候補</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>目的</th>
+            <th>レシピ骨子</th>
+            <th>注意</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>構図探索</td>
+            <td>seed random / batch 4 / promptはsubjectとcompositionを短め / ADetailer OFF / upscale OFF</td>
+            <td>この段階で顔や細部を追いすぎない。</td>
+          </tr>
+          <tr>
+            <td>全身キャラの顔補修</td>
+            <td>seed固定 / ADetailer face_yolo系 / ADetailer promptに顔・表情だけ / inpaint only masked相当</td>
+            <td>手は別検出にすると時間が増え、成功率も顔ほど高くない。</td>
+          </tr>
+          <tr>
+            <td>ポーズ固定</td>
+            <td>OpenPose or DWPose / preprocessor preview / model対応確認 / control weightを弱めから調整</td>
+            <td>足先や指はpreprocessorによって情報が欠けるため、過信しない。</td>
+          </tr>
+          <tr>
+            <td>線画から仕上げ</td>
+            <td>Lineart or Canny / promptは彩色・材質・光を補う / 必要ならADetailer後処理</td>
+            <td>線を忠実に守りすぎると表情や衣装が硬くなる。</td>
+          </tr>
+          <tr>
+            <td>参照画像から雰囲気寄せ</td>
+            <td>IPAdapter / reference image / text promptで主題を指定 / scaleやweightを比較</td>
+            <td>参照が強すぎると構図や色を支配する。弱め候補を先に試す。</td>
+          </tr>
+          <tr>
+            <td>仕上げupscale</td>
+            <td>構図確定後 / 2xから / denoise低め / Tile系はpreviewと境界チェック</td>
+            <td>直接大解像度生成より、構図確定後の段階処理が安定。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>8. 確認した二次情報・補助ソース</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>分類</th>
+            <th>ソース</th>
+            <th>使った要点</th>
+            <th>信頼度</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Prompt</td>
+            <td><a href="https://civitai.red/articles/67/prompting-in-stable-diffusion">Civitai: Prompting in Stable Diffusion</a></td>
+            <td>token順序、weight、Prompt構造、色語の置き場所、Civitai画像から作法を学ぶ流れ。</td>
+            <td>B</td>
+          </tr>
+          <tr>
+            <td>Parameters</td>
+            <td><a href="https://replicate.com/docs/guides/run/make-art-with-stable-diffusion">Replicate: Make art with Stable Diffusion</a></td>
+            <td>prompt/negative/size/steps/seed/guidance/samplerの実務説明、SD1.5とSDXLのサイズ目安。</td>
+            <td>A</td>
+          </tr>
+          <tr>
+            <td>Workflow</td>
+            <td><a href="https://stable-diffusion-art.com/workflow/">Stable Diffusion Art: Workflow</a></td>
+            <td>base prompt、モデル選択、構図選び、inpaint、upscale、最終調整の段階化。</td>
+            <td>A</td>
+          </tr>
+          <tr>
+            <td>Negative</td>
+            <td><a href="https://stable-diffusion-art.com/how-negative-prompt-work/">Stable Diffusion Art: Negative prompt</a></td>
+            <td>positive側に否定語を入れるより、negative promptへ除外したい要素を分ける考え方。</td>
+            <td>A</td>
+          </tr>
+          <tr>
+            <td>ControlNet</td>
+            <td><a href="https://stable-diffusion-art.com/controlNet/">Stable Diffusion Art: ControlNet Guide</a></td>
+            <td>OpenPose/Canny/Depth/Lineart/Tile/IPAdapter、preprocessor/model対応、weight調整。</td>
+            <td>A</td>
+          </tr>
+          <tr>
+            <td>ADetailer</td>
+            <td><a href="https://stable-diffusion-art.com/adetailer/">Stable Diffusion Art: ADetailer</a> / <a href="https://romptn.com/article/6752">romptn Magazine</a> / <a href="https://www.kageori.com/2023/09/stable-diffusionadetailer.html">影織文庫</a></td>
+            <td>顔補修、表情差分、手修正の限界、検出数による時間増、全身絵での実用性。</td>
+            <td>A</td>
+          </tr>
+          <tr>
+            <td>Upscale</td>
+            <td><a href="https://stable-diffusion-art.com/controlnet-upscale/">Stable Diffusion Art: ControlNet tile upscale</a></td>
+            <td>AI upscaler、SD upscale、ControlNet tile upscaleの使い分け。</td>
+            <td>A</td>
+          </tr>
+          <tr>
+            <td>ComfyUI</td>
+            <td><a href="https://aituts.com/comfyui/">Aituts: Beginner's Guide to ComfyUI</a> / <a href="https://comfyui-wiki.com/ja/workflows">ComfyUI Wiki workflow examples</a></td>
+            <td>node型workflowの学習負荷、workflow画像/JSONの共有、用途別workflow例。</td>
+            <td>B</td>
+          </tr>
+          <tr>
+            <td>Prompt JP</td>
+            <td><a href="https://ai.joho.info/stable-diffusion/composition-prompt/">AI超入門部: 構図・カメラアングル</a> / <a href="https://rin87.com/sd-composition-prompt/">開発室RIN: 構図プロンプト集</a></td>
+            <td>画角、向き、遠近、構図タグを初心者が選びやすい形に整理する発想。</td>
+            <td>B</td>
+          </tr>
+          <tr>
+            <td>Civitai workflow</td>
+            <td><a href="https://civitai.green/models/208005/jboogx-and-machine-learner-animatediff-workflow-vid2vid-controlnet-latent-upscale-upscale-controlnet-pass-multi-image-ipadapter-reactor-face-swap?modelVersionId=254315">Civitai workflow example</a></td>
+            <td>ControlNet群のbypass、IPAdapter、latent upscale、複合workflowの中級者向け注意。</td>
+            <td>B</td>
+          </tr>
+          <tr>
+            <td>Community pain</td>
+            <td><a href="https://www.reddit.com/r/StableDiffusion/comments/1dkfwyl/how_come_every_tutorial_is_broken/">Reddit: broken tutorials</a> / <a href="https://www.reddit.com/r/comfyui/comments/1e76yuw/ive_tried_but_not_succeeded_how_to_go_from/">Reddit: A1111 to ComfyUI</a> / <a href="https://www.reddit.com/r/StableDiffusion/comments/1sulw1o/upgrading_from_sdxl_comfyui_workflow_which_newer/">Reddit: newer model compatibility</a></td>
+            <td>古いnode名、リンク切れ、ComfyUI学習負荷、最新モデルのControlNet/IPAdapter互換不安。</td>
+            <td>C</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer>
+      <p>作成日: 2026-05-14 / 対象: Yoitomoshi Art Generator / 目的: 一次情報レポートを補完し、実制作者の講座・共有workflow・失敗談からUX実装候補を抽出する</p>
+    </footer>
+  </main>
+</body>
+</html>

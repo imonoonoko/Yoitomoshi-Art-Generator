@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import yaml from 'js-yaml'
 import type { PromptCategory, PromptGroup } from '../src/shared/types.js'
@@ -31,17 +31,36 @@ export interface PromptLibrary {
 }
 
 export function loadPromptLibrary(resourcesDir: string): PromptLibrary {
-  const path = join(resourcesDir, 'prompt-library.ja.yaml')
-  const raw = readFileSync(path, 'utf8')
-  const parsed = yaml.load(raw) as RawCategory[] | null
+  const paths = [
+    join(resourcesDir, 'prompt-library.ja.yaml'),
+    join(resourcesDir, 'prompt-library.yoitomoshi.ja.yaml')
+  ]
 
-  const categories: PromptCategory[] = []
+  let categories: PromptCategory[] = []
   const autocomplete = new Map<string, string>()
 
-  if (!parsed || !Array.isArray(parsed)) {
-    return { categories, autocompleteIndex: autocomplete }
+  for (const path of paths) {
+    if (!existsSync(path)) continue
+    const raw = readFileSync(path, 'utf8')
+    const parsed = yaml.load(raw) as RawCategory[] | null
+    categories = mergeCategories(categories, normalizeCategories(parsed))
   }
 
+  for (const cat of categories) {
+    for (const group of cat.groups) {
+      for (const tag of group.tags) {
+        if (!autocomplete.has(tag.en)) autocomplete.set(tag.en, tag.ja)
+      }
+    }
+  }
+
+  return { categories, autocompleteIndex: autocomplete }
+}
+
+function normalizeCategories(parsed: RawCategory[] | null): PromptCategory[] {
+  if (!parsed || !Array.isArray(parsed)) return []
+
+  const categories: PromptCategory[] = []
   for (const cat of parsed) {
     if (!cat?.name || !Array.isArray(cat.groups)) continue
     const groups: PromptGroup[] = []
@@ -51,9 +70,6 @@ export function loadPromptLibrary(resourcesDir: string): PromptLibrary {
         en,
         ja: (ja ?? '').toString()
       }))
-      for (const t of entries) {
-        if (!autocomplete.has(t.en)) autocomplete.set(t.en, t.ja)
-      }
       groups.push({
         name: g.name,
         color: g.color || 'rgba(120, 120, 130, .35)',
@@ -64,6 +80,46 @@ export function loadPromptLibrary(resourcesDir: string): PromptLibrary {
       categories.push({ name: cat.name, groups })
     }
   }
+  return categories
+}
 
-  return { categories, autocompleteIndex: autocomplete }
+function mergeCategories(base: PromptCategory[], additions: PromptCategory[]): PromptCategory[] {
+  const merged = base.map((cat) => ({
+    ...cat,
+    groups: cat.groups.map((group) => ({ ...group, tags: [...group.tags] }))
+  }))
+  const categoryByName = new Map(merged.map((cat) => [cat.name, cat]))
+
+  for (const addCat of additions) {
+    const targetCat = categoryByName.get(addCat.name)
+    if (!targetCat) {
+      const nextCat = {
+        ...addCat,
+        groups: addCat.groups.map((group) => ({ ...group, tags: [...group.tags] }))
+      }
+      merged.push(nextCat)
+      categoryByName.set(nextCat.name, nextCat)
+      continue
+    }
+
+    const groupByName = new Map(targetCat.groups.map((group) => [group.name, group]))
+    for (const addGroup of addCat.groups) {
+      const targetGroup = groupByName.get(addGroup.name)
+      if (!targetGroup) {
+        const nextGroup = { ...addGroup, tags: [...addGroup.tags] }
+        targetCat.groups.push(nextGroup)
+        groupByName.set(nextGroup.name, nextGroup)
+        continue
+      }
+
+      const tagEns = new Set(targetGroup.tags.map((tag) => tag.en))
+      for (const tag of addGroup.tags) {
+        if (tagEns.has(tag.en)) continue
+        targetGroup.tags.push(tag)
+        tagEns.add(tag.en)
+      }
+    }
+  }
+
+  return merged
 }

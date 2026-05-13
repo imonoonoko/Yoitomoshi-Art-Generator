@@ -17,6 +17,7 @@ import type {
   ForgeStatus,
   GenerationProgress,
   HistoryItem,
+  HistoryTagReview,
   HuggingFaceSearchOptions,
   HuggingFaceSearchResult,
   Img2ImgRequest,
@@ -45,6 +46,9 @@ import type {
   SdVae,
   StartupMetrics,
   StartupMetricsSample,
+  PartialFileDeleteResult,
+  TaggerRunRequest,
+  TaggerRunResult,
   Txt2ImgRequest,
   Txt2ImgResponse,
   WorkspaceFile,
@@ -162,8 +166,12 @@ const api = {
       ipcRenderer.invoke(IPC.toolsOpenDownloadJobFolder, id),
     checkLibraryIntegrity: (): Promise<LibraryIntegrityReport> =>
       ipcRenderer.invoke(IPC.toolsCheckLibraryIntegrity),
+    deletePartialFile: (path: string): Promise<PartialFileDeleteResult> =>
+      ipcRenderer.invoke(IPC.toolsDeletePartialFile, path),
     hashModelLibraryEntry: (id: string): Promise<ModelHashResult> =>
       ipcRenderer.invoke(IPC.toolsHashModelLibraryEntry, id),
+    runTagger: (req: TaggerRunRequest): Promise<TaggerRunResult> =>
+      ipcRenderer.invoke(IPC.toolsRunTagger, req),
     recoverModelLibrary: (): Promise<ModelLibraryRecoveryResult> =>
       ipcRenderer.invoke(IPC.toolsRecoverModelLibrary),
     convertModelFormat: (): Promise<ModelFormatConversionResult | null> =>
@@ -245,6 +253,8 @@ const api = {
       ipcRenderer.invoke(IPC.storageDeleteHistory, id),
     setHistoryLabel: (id: string, label: HistoryItem['label']): Promise<HistoryItem | null> =>
       ipcRenderer.invoke(IPC.storageSetHistoryLabel, id, label ?? null),
+    setHistoryTagReview: (id: string, review: HistoryTagReview | null): Promise<HistoryItem | null> =>
+      ipcRenderer.invoke(IPC.storageSetHistoryTagReview, id, review),
     listPresets: (): Promise<PromptPreset[]> => ipcRenderer.invoke(IPC.storageListPresets),
     savePreset: (input: {
       id?: string

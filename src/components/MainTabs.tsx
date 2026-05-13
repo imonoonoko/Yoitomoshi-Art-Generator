@@ -48,6 +48,7 @@ export function MainTabs(): JSX.Element {
             key={tab.id}
             role="tab"
             aria-selected={active}
+            data-testid={`main-tab-${tab.id}`}
             className={cn(
               'flex items-center gap-1.5 px-3 text-xs transition-colors border-b-2',
               active
