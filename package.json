@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "author": "Yoitomoshi Atelier",
+  "license": "MIT",
   "description": "Yoitomoshi Art Generator — personal Electron UI for Stable Diffusion WebUI Forge with Civitai integration, prompt library, LoRA / VAE recommendation, and in-app Civitai download",
   "main": "out/main/index.js",
   "scripts": {

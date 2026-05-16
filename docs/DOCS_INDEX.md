@@ -11,6 +11,7 @@
 | 5分で起動したい | [`../はじめに.txt`](../はじめに.txt) |
 | セットアップを丁寧に進めたい | [`SETUP_GUIDE.md`](SETUP_GUIDE.md) |
 | フォルダ構造とGit管理範囲を知りたい | [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md) |
+| public化前の確認をしたい | [`OPEN_SOURCE_RELEASE_CHECKLIST.md`](OPEN_SOURCE_RELEASE_CHECKLIST.md) |
 | 現在の優先順位を知りたい | [`ROADMAP.md`](ROADMAP.md) |
 | アプリ全体の構造を俯瞰したい | [`APP_MAP_2026-05-15.html`](APP_MAP_2026-05-15.html) / [`APP_MAP_2026-05-15.json`](APP_MAP_2026-05-15.json) |
 

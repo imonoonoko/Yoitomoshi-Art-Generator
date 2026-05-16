@@ -15,6 +15,13 @@ output/
 *.log
 .DS_Store
 
+# local secrets and agent scratch data
+.env
+.env.*
+!.env.example
+*.local
+.codex-rollback/
+
 # Electron / Chromium profile artifacts.
 # The app now stores these under userdata/electron-profile, but keep the root
 # entries ignored so old launches cannot accidentally pollute a future repo.

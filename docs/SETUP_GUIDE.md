@@ -154,6 +154,8 @@ npm.cmd run qa:dom:generation-sections -- --port=9338
 
 ## 10. GitHubへ載せる前の確認
 
+公開リポジトリへ切り替える前は、[`OPEN_SOURCE_RELEASE_CHECKLIST.md`](OPEN_SOURCE_RELEASE_CHECKLIST.md) も確認してください。
+
 ```powershell
 git status --short
 npm.cmd run typecheck
