@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>生成画面モード切替UI 調査・改善提案 - 2026-05-16</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101218;
+      --panel: #171c24;
+      --panel2: #202733;
+      --line: #333c4c;
+      --ink: #f2f5f8;
+      --muted: #aab3c1;
+      --subtle: #7f8998;
+      --accent: #86a7ff;
+      --accent2: #61c8b6;
+      --ok: #76d48d;
+      --warn: #edc461;
+      --bad: #e77c7c;
+      --code: #0d1017;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.76 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    }
+    a { color: #a6b8ff; }
+    code {
+      padding: 1px 5px;
+      border-radius: 5px;
+      border: 1px solid #2d3542;
+      background: var(--code);
+      color: #e5eaff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #151b26 0%, #101218 100%);
+    }
+    .wrap { max-width: 1260px; margin: 0 auto; padding: 30px; }
+    .eyebrow {
+      margin: 0;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.25; letter-spacing: 0; }
+    h1 { margin-top: 8px; font-size: clamp(28px, 4vw, 43px); }
+    h2 { margin: 34px 0 12px; font-size: 21px; }
+    h3 { margin-bottom: 8px; font-size: 16px; }
+    p { margin: 8px 0 0; }
+    ul, ol { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 5px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+    th, td { border: 1px solid var(--line); padding: 10px; vertical-align: top; }
+    th { background: #1c2430; text-align: left; color: #dce6ff; font-size: 12px; }
+    td { background: rgba(255,255,255,.015); }
+    footer { margin-top: 42px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--subtle); }
+    .lead { max-width: 1000px; color: var(--muted); font-size: 16px; }
+    .meta, .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill, .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.02);
+      white-space: nowrap;
+      font-weight: 700;
+    }
+    .pill { padding: 4px 10px; color: var(--muted); font-size: 12px; }
+    .tag { padding: 2px 8px; font-size: 11px; }
+    .ok { color: var(--ok); border-color: rgba(118,212,141,.45); }
+    .warn { color: var(--warn); border-color: rgba(237,196,97,.45); }
+    .bad { color: var(--bad); border-color: rgba(231,124,124,.45); }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+    .card.soft { background: rgba(255,255,255,.025); }
+    .callout {
+      margin-top: 14px;
+      border: 1px solid rgba(134,167,255,.42);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      background: rgba(134,167,255,.08);
+      padding: 14px;
+    }
+    .risk {
+      border-color: rgba(237,196,97,.45);
+      border-left-color: var(--warn);
+      background: rgba(237,196,97,.07);
+    }
+    .badbox {
+      border-color: rgba(231,124,124,.45);
+      border-left-color: var(--bad);
+      background: rgba(231,124,124,.07);
+    }
+    .source {
+      color: var(--subtle);
+      font-size: 12px;
+    }
+    .score {
+      display: inline-flex;
+      min-width: 26px;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 1px 7px;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: #111722;
+      font-weight: 800;
+      font-size: 12px;
+    }
+    .mock {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #111722;
+      padding: 12px;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+      color: #d6ddf0;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .mini {
+      color: var(--subtle);
+      font-size: 12px;
+    }
+    .priority {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 800;
+    }
+    @media (max-width: 900px) {
+      .wrap { padding: 22px; }
+      .grid, .grid2 { grid-template-columns: 1fr; }
+      table { table-layout: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">UI research report / generation workspace</p>
+      <h1>生成画面モード切替UI 調査・改善提案</h1>
+      <p class="lead">
+        対象は Yoitomoshi Art Generator の生成画面左カラムにある <code>作る / 整える / 高度</code> の切替導線。
+        タブの押しやすさだけではなく、プロ向けUI設計資料から「そもそもタブで扱うべき情報か」を検証し、
+        実装へ落とせる改善案に整理した。
+      </p>
+      <div class="meta">
+        <span class="pill">作成日: 2026-05-16</span>
+        <span class="pill">対象: src/components/PromptPanel.tsx</span>
+        <span class="pill">目的: タブ切替の扱いづらさ解消</span>
+        <span class="pill">方針: payload仕様は変えない</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <h2>結論</h2>
+      <div class="callout">
+        <h3>推奨案: タブ式から「セクションナビ + 折りたたみパネル」へ変更する</h3>
+        <p>
+          <code>作る / 整える / 高度</code> は排他的なページではなく、1つの生成payloadに同時に効く設定群である。
+          調査した複数のデザインシステムは、タブを「同じ文脈内で1つのパネルだけを見る」用途に限定し、
+          比較や同時確認が必要な情報、送信対象が分かりにくいフォームには注意を促している。
+          そのため、現状の「タブで隠す」構造をさらに磨くより、各モードを同一スクロール面のセクションとして扱い、
+          上部の小さなナビで該当セクションへジャンプ・展開する形が最も筋が良い。
+        </p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>今すぐ直すべき違和感</h3>
+          <p>モード切替が「表示カテゴリ」なのか「生成に効く設定のON/OFF」なのか直感的に分かりにくい。</p>
+          <span class="tag bad">根本課題</span>
+        </div>
+        <div class="card">
+          <h3>最小の勝ち筋</h3>
+          <p>タブではなく、全セクションの見出しを常に存在させる。クリック時は表示切替ではなくスクロールと展開にする。</p>
+          <span class="tag ok">推奨</span>
+        </div>
+        <div class="card">
+          <h3>残すべき現設計</h3>
+          <p>プロンプト欄、タグ並び替え、Generate、Preflight、ActiveFeatureSummary は常時表示のまま維持する。</p>
+          <span class="tag ok">維持</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>現在のUI監査</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>観点</th>
+            <th>現状</th>
+            <th>問題</th>
+            <th>改善方向</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>構造</td>
+            <td><code>PromptPanel</code> の左カラム内で <code>GenerationModeTabs</code> が <code>PromptFields</code> の上にある。</td>
+            <td>タブを押すと下の大きな領域が丸ごと入れ替わる。ユーザーは「隠れた設定も生成に効くのか」を確認しづらい。</td>
+            <td>タブ表示ではなく、セクション見出しと折りたたみで「存在しているが省略中」に変える。</td>
+          </tr>
+          <tr>
+            <td>情報の関係</td>
+            <td><code>作る</code> は Parameters、LoRA、入力画像。<code>整える</code> は Prompt Helper、Dynamic Prompt、Research。<code>高度</code> は ControlNet 等。</td>
+            <td>互いに排他的ではない。むしろ生成前に複数カテゴリを横断して調整する。</td>
+            <td>「モード」より「作業セクション」として扱う。アクティブ設定は折りたたみ中でも要約する。</td>
+          </tr>
+          <tr>
+            <td>押しやすさ</td>
+            <td>直近で sticky 化、44px 以上の高さ、キーボード移動を追加済み。</td>
+            <td>押しやすさの最低ラインは上がったが、左カラム内の長いフォームで、切替自体が認知負荷になる。</td>
+            <td>セクションを同一面に並べ、クリックは「切替」ではなく「移動」にする。ショートカットも追加する。</td>
+          </tr>
+          <tr>
+            <td>状態把握</td>
+            <td><code>ActiveFeatureSummary</code> に有効チップはある。</td>
+            <td>チップは役立つが、対象パネルがタブの裏に隠れるため「どこで直すか」の負担が残る。</td>
+            <td>チップクリックで対象セクションを展開し、対象コントロールへスクロールする。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>調査ソースと得られた原則</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ソース</th>
+            <th>要点</th>
+            <th>この画面への示唆</th>
+            <th>信頼度</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><a href="https://www.w3.org/WAI/ARIA/apg/patterns/tabs/">WAI-ARIA APG Tabs Pattern</a></td>
+            <td>タブは1つのパネルを表示し、他パネルを隠すウィジェット。<code>tablist</code>、<code>tab</code>、<code>tabpanel</code>、<code>aria-selected</code>、キーボード操作の関係が定義されている。</td>
+            <td>タブとして続けるなら <code>aria-controls</code> と <code>tabpanel</code> まで揃えるべき。ただし、ナビだけなら <code>role=tab</code> を外し、普通のボタン/リンクにする方が正確。</td>
+            <td><span class="score">高</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://w3c.github.io/wcag/understanding/target-size-minimum.html">W3C WCAG 2.2 Target Size</a></td>
+            <td>ポインター操作では最低24x24 CSS px、隣接ターゲットとの間隔も重要。小さいターゲットは誤操作を増やす。</td>
+            <td>現状の44pxは最低ラインを超えるが、頻繁に使う切替は48-52px程度、十分な余白、隣接ボタンとの明確な分離を持たせたい。</td>
+            <td><span class="score">高</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://m1.material.io/components/tabs.html">Material Design Tabs</a></td>
+            <td>タブは単一行、表示中コンテンツと隣接、階層的に接続、短く意味のあるラベル、固定タブは素早いピボットに向く。タブ間比較が必要なら別構成を検討する。</td>
+            <td>左カラム内で離れた状態を切り替えるより、セクション見出しと内容を近づける。<code>作る</code> など抽象ラベルには補助説明が必要。</td>
+            <td><span class="score">高</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://design-system.service.gov.uk/components/tabs/">GOV.UK Design System Tabs</a></td>
+            <td>タブは定常利用者の高速切替には有効。ただし内容を隠すため、ラベル明確化、最重要タブを先頭、比較や順読みが必要な場合は不向き。</td>
+            <td>このアプリは日常生成者向けなので高速導線は必要。一方で複数設定が同時に効くため、完全なタブ隠蔽は不向き。</td>
+            <td><span class="score">高</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://carbondesignsystem.com/components/tabs/usage/">IBM Carbon Tabs</a></td>
+            <td>タブとContent switcher、Progress indicatorの使い分けを明確化。タブは進行手順ではなく、同じ文脈の内容グループを切り替えるためのもの。</td>
+            <td><code>作る → 整える → 高度</code> を手順のように見せすぎない。作業段階ではなく、設定カテゴリとして扱う。</td>
+            <td><span class="score">高</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://design.learn.microsoft.com/components/segmented-controls.html">Microsoft Atlas Segmented Controls</a></td>
+            <td>セグメントはタブに似たビュー切替。クリック、左右キー、必要なら前後ボタンで移動できる。</td>
+            <td>もし3項目の切替UIを残すなら、タブより「セグメントコントロール」として実装し、左右キーとAlt+1/2/3を提供するのが自然。</td>
+            <td><span class="score">中</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://leopard-adc.pepas.com/documentation/UserExperience/Conceptual/AppleHIGuidelines/XHIGControls/XHIGControls.html">Apple HIG Controls</a></td>
+            <td>タブビューは少数のビューを1箇所に収める用途。セグメントは密接に関連した選択やビュー変更に使い、各セグメント幅を揃える。</td>
+            <td>3分類だけならセグメントは妥当。ただし中身が同時に生成へ影響するため、セグメントで非表示化するより、見出しナビ化が合う。</td>
+            <td><span class="score">中</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://baymard.com/blog/accordion-and-tab-design">Baymard: Inline Accordion and Tab Designs</a></td>
+            <td>フォームをタブ/アコーディオンで隠すと、どのフィールドが保存・送信されるのか不安を生むことがある。</td>
+            <td>生成設定はフォームに近い。隠れた高度設定もpayloadに入るため、折りたたみ中でも「ON」「要確認」を表示し、送信範囲を明示する。</td>
+            <td><span class="score">高</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://help.figma.com/hc/en-us/articles/30925881896727-FD4B-Navigate-Figma-Design-files">Figma Learn: editor structure</a></td>
+            <td>Figmaはツールバー、左右サイドバー、キャンバスという明確な役割分担を持つ。右サイドバーは選択中オブジェクトのプロパティを扱う。</td>
+            <td>生成画面も「常時作業対象=プロンプト」「補助設定=セクション」「結果=中央/右」の役割分担を明確にする。</td>
+            <td><span class="score">中</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://www.figma.com/blog/our-approach-to-designing-ui3/">Figma UI3 redesign notes</a></td>
+            <td>浮遊パネルは小画面で作業領域を圧迫し、ユーザーを遅くしたため固定/リサイズ可能なパネルへ戻した。アイコン化でツールチップ待ちが発生した操作も戻している。</td>
+            <td>視覚的にすっきりさせるために隠しすぎると、毎日使う人ほど遅くなる。重要操作はテキストと状態を残す。</td>
+            <td><span class="score">中</span></td>
+          </tr>
+          <tr>
+            <td><a href="https://developer.adobe.com/photoshop/uxp/design/ux-patterns/Designingforphotoshop/">Adobe Photoshop UXP Design</a></td>
+            <td>キャンバスへアクセスしながら使う機能は非ブロッキングのパネルが適切。固定幅が大きすぎるとワークスペース問題を起こす。テーマ/コントラストも重視。</td>
+            <td>生成UIは作業を止めないパネル設計が合う。左カラムは広げすぎず、表示密度を管理し、折りたたみと要約で圧迫を抑える。</td>
+            <td><span class="score">中</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>改善方針</h2>
+      <div class="grid2">
+        <div class="card">
+          <h3>1. タブを「排他的ビュー」から「セクション移動」に変える</h3>
+          <p>
+            <code>GenerationModeTabs</code> は <code>GenerationSectionNavigator</code> に置き換える。
+            クリック時は <code>generationMode</code> だけを切り替えてパネルを差し替えるのではなく、
+            対象セクションを展開してスクロールする。これにより全カテゴリの存在が常に見える。
+          </p>
+        </div>
+        <div class="card">
+          <h3>2. セクションヘッダーに状態を出す</h3>
+          <p>
+            <code>高度</code> が閉じていても <code>ControlNet 1</code>、<code>FreeU ON</code>、<code>ADetailer OFF</code> のように主要状態を出す。
+            「隠れているが効いている」問題を要約で潰す。
+          </p>
+        </div>
+        <div class="card">
+          <h3>3. 頻繁な操作はプロンプト欄周辺へ固定する</h3>
+          <p>
+            タグ並び替え、Format、翻訳、Generate、Preflight要約は常時表示のまま維持する。
+            <code>作る/整える/高度</code> はプロンプト作業を遮らない補助導線に下げる。
+          </p>
+        </div>
+        <div class="card">
+          <h3>4. 上級機能は「ONのもの優先」</h3>
+          <p>
+            高度セクションは全パネルを常に展開しない。まず有効中/警告中のパネルを上に出し、
+            未使用の拡張は「追加する」リストへ寄せる。プロ向けツールほど状態の見通しが重要。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>推奨レイアウト案</h2>
+      <p>
+        トップレベルの <code>txt2img / img2img / Upscale / Tools</code> と3カラム構造は維持する。
+        変更対象は左カラムのみ。下記のように、タブではなく「生成設定の目次」として見せる。
+      </p>
+      <div class="mock">左カラム
+┌────────────────────────────────────┐
+│ Recommendation / Active chips       │
+│ Prompt editor                       │
+│   Format / Translate / Tag reorder  │
+│ Negative editor                     │
+│ Generate / Preflight summary        │
+├────────────────────────────────────┤
+│ 生成設定ナビ                         │  sticky
+│ [1 作る 基本] [2 整える Prompt] [3 高度 拡張] │
+│  LoRA 2   Dynamic ON   注意 1        │
+├────────────────────────────────────┤
+│ ▼ 作る 基本設定                      │
+│   Input image / LoRA suggestion / Parameters
+│ ▼ 整える Prompt・タグ                 │
+│   Prompt Helper / Dynamic Prompt / Research
+│ ▶ 高度 拡張設定   ControlNet 1 ON     │
+│   collapsed summary + open button
+└────────────────────────────────────┘</div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>部品</th>
+            <th>仕様</th>
+            <th>理由</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>生成設定ナビ</td>
+            <td>高さ52px前後、3等分、テキスト主体、ショートラベル + サブラベル。<code>Alt+1/2/3</code>、左右キー対応。</td>
+            <td>Material/WCAG/Microsoftのターゲット・キー操作原則に合わせる。抽象ラベルを補助する。</td>
+          </tr>
+          <tr>
+            <td>セクション</td>
+            <td><code>CollapsiblePanel</code> を流用。初期は <code>作る</code> 展開、<code>整える</code> と <code>高度</code> は折りたたみ。ただし有効機能や警告があるセクションは自動展開または強いバッジ表示。</td>
+            <td>タブの「消える」感覚を避ける。ユーザーは全体の地図を見ながら必要な場所だけ開ける。</td>
+          </tr>
+          <tr>
+            <td>ActiveFeatureSummary</td>
+            <td>チップクリックで該当セクションを展開し、対象コントロールへスクロール。チップは単なるタブ移動ではなく「修正先へのショートカット」にする。</td>
+            <td>隠れた設定を迷わず発見できる。Preflightと同じ導線になる。</td>
+          </tr>
+          <tr>
+            <td>高度セクション</td>
+            <td>上部に「有効中」「警告あり」「未使用」の3分類。未使用パネルは小さな追加ボタン群または折りたたみリスト。</td>
+            <td>ControlNetなどは頻繁に使う人と使わない人の差が大きい。未使用時の圧迫を減らす。</td>
+          </tr>
+          <tr>
+            <td>Preflight</td>
+            <td><code>target.generationMode</code> は <code>target.sectionId</code> へ拡張。開くボタンは対象セクションを展開してフォーカスする。</td>
+            <td>タブ廃止後も隠れた問題へ正しく誘導できる。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>代替案比較</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>案</th>
+            <th>概要</th>
+            <th>利点</th>
+            <th>欠点</th>
+            <th>判断</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>A. 現タブをさらに強化</td>
+            <td>タブ高さを52pxへ、説明文追加、active状態強化、ショートカット追加。</td>
+            <td>実装が最小。既存DOM QAの調整が少ない。</td>
+            <td>隠れた設定が生成に効く根本問題は残る。</td>
+            <td><span class="tag warn">短期のみ</span></td>
+          </tr>
+          <tr>
+            <td>B. セクションナビ + 折りたたみ</td>
+            <td>3カテゴリを同一スクロール面に置き、ナビはジャンプ/展開にする。</td>
+            <td>タブの扱いづらさと隠れ設定の不安を同時に解消。既存3分類も残せる。</td>
+            <td>DOM QAを作り直す必要がある。左カラムの高さ管理が必要。</td>
+            <td><span class="tag ok">推奨</span></td>
+          </tr>
+          <tr>
+            <td>C. 左カラムを全面再設計</td>
+            <td>生成・Prompt・拡張・履歴を含めたワークスペース再設計。</td>
+            <td>最も大きく改善できる可能性。</td>
+            <td>Tools/History/Upscaleまで波及し、今回のスコープを超える。</td>
+            <td><span class="tag bad">後回し</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>実装計画</h2>
+      <ol>
+        <li>
+          <span class="priority">Phase 1: タブをナビ化</span>
+          <p><code>GenerationModeTabs</code> を <code>GenerationSectionNavigator</code> に置換。<code>role=tablist</code> は使わず、通常の <code>button</code> と <code>aria-controls</code> で対象セクションへ移動する。</p>
+        </li>
+        <li>
+          <span class="priority">Phase 2: 3セクションを常時DOMに存在させる</span>
+          <p><code>CreateModePanel</code>、<code>RefineModePanel</code>、<code>AdvancedModePanel</code> を <code>CollapsiblePanel</code> 化し、表示切替ではなく展開状態で制御する。payload/state処理は変更しない。</p>
+        </li>
+        <li>
+          <span class="priority">Phase 3: 要約と警告をセクションヘッダーへ統合</span>
+          <p>LoRA数、Dynamic Prompt、ControlNet、ADetailer、FABRIC、Preflight警告数をヘッダーに表示。閉じていても効いている設定が分かるようにする。</p>
+        </li>
+        <li>
+          <span class="priority">Phase 4: PreflightとActive chipsの誘導を更新</span>
+          <p>チップや「開く」ボタンは、対象セクションを展開してから対象要素へスクロールする。現在の <code>generationMode</code> 依存を <code>sectionId</code> に寄せる。</p>
+        </li>
+        <li>
+          <span class="priority">Phase 5: DOM QA更新</span>
+          <p><code>qa:dom:generation-modes</code> を <code>qa:dom:generation-sections</code> 相当に更新。全セクションの見出し存在、展開/折りたたみ、チップ誘導、Preflight誘導、Alt+1/2/3を検証する。</p>
+        </li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>受け入れ基準</h2>
+      <div class="grid2">
+        <div class="card soft">
+          <h3>UX</h3>
+          <ul>
+            <li>ユーザーが現在の設定カテゴリを見失わない。</li>
+            <li>閉じたセクションに有効設定がある場合、ヘッダーだけで分かる。</li>
+            <li>Prompt編集、タグ並び替え、Generateは常にすぐ触れる。</li>
+            <li>モード移動はクリック、キーボード、チップ、Preflightから同じ挙動になる。</li>
+          </ul>
+        </div>
+        <div class="card soft">
+          <h3>技術</h3>
+          <ul>
+            <li>生成payload、History metadata、Dynamic Prompt解決ロジックは変更しない。</li>
+            <li>既存の <code>CollapsiblePanel</code> を利用し、独自の複雑な状態管理を増やしすぎない。</li>
+            <li>DOM QAは文言ではなく <code>data-testid</code> と状態属性で検証する。</li>
+            <li><code>npm.cmd run typecheck</code>、<code>npm.cmd run build</code>、対象DOM QAを通す。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>実装時の注意</h2>
+      <div class="callout risk">
+        <h3>タブをやめる場合、ARIAの意味も変える</h3>
+        <p>
+          内容を隠すタブパネルではなく、ページ内セクション移動にするなら <code>role="tablist"</code> は使わない。
+          <code>button aria-controls="generation-section-advanced"</code> のような通常ナビにして、
+          展開後の見出しへフォーカスまたはスクロールする方が支援技術にも実態に合う。
+        </p>
+      </div>
+      <div class="callout badbox">
+        <h3>見た目だけの縮小は逆効果</h3>
+        <p>
+          Figma UI3の事例でも、すっきり見せるために操作をアイコンや浮遊パネルへ隠すと、日常利用者の速度が落ちることがある。
+          このアプリでも「高度を隠す」こと自体は良いが、ONになっているもの、警告があるもの、次に直すべきものは隠さない。
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>参考リンク</h2>
+      <ul class="source">
+        <li><a href="https://www.w3.org/WAI/ARIA/apg/patterns/tabs/">WAI-ARIA Authoring Practices Guide: Tabs Pattern</a></li>
+        <li><a href="https://w3c.github.io/wcag/understanding/target-size-minimum.html">W3C WCAG Understanding SC 2.5.8 Target Size Minimum</a></li>
+        <li><a href="https://m1.material.io/components/tabs.html">Material Design: Tabs</a></li>
+        <li><a href="https://design-system.service.gov.uk/components/tabs/">GOV.UK Design System: Tabs</a></li>
+        <li><a href="https://carbondesignsystem.com/components/tabs/usage/">IBM Carbon Design System: Tabs usage</a></li>
+        <li><a href="https://design.learn.microsoft.com/components/segmented-controls.html">Microsoft Atlas Design: Segmented Controls</a></li>
+        <li><a href="https://leopard-adc.pepas.com/documentation/UserExperience/Conceptual/AppleHIGuidelines/XHIGControls/XHIGControls.html">Apple Human Interface Guidelines archive: Controls</a></li>
+        <li><a href="https://baymard.com/blog/accordion-and-tab-design">Baymard Institute: Accordion UX and Tab Designs</a></li>
+        <li><a href="https://help.figma.com/hc/en-us/articles/30925881896727-FD4B-Navigate-Figma-Design-files">Figma Learn: Navigate Figma Design files</a></li>
+        <li><a href="https://www.figma.com/blog/our-approach-to-designing-ui3/">Figma Blog: Our approach to designing UI3</a></li>
+        <li><a href="https://developer.adobe.com/photoshop/uxp/design/ux-patterns/Designingforphotoshop/">Adobe Photoshop UXP: Designing for Photoshop</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <p>
+      このレポートは現時点の <code>PromptPanel.tsx</code> 構造と公開されているUI設計資料をもとに作成。
+      次の実装では、まず左カラム内のモード切替をタブからセクションナビへ置き換えるのが最小で効果の大きい変更になる。
+    </p>
+  </footer>
+</body>
+</html>

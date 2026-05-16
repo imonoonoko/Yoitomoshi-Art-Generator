@@ -23,7 +23,9 @@ import type {
   StartupMetrics,
   StartupMetricsSample,
   TaggerRunResult,
+  WorkspaceFile,
   WorkspaceImageReference,
+  WorkspaceImageReferences,
   WorkspaceImageSaveMode,
   WorkspaceSummary
 } from '@shared/types'
@@ -113,12 +115,24 @@ function ToolSection({
   )
 }
 
+interface WorkspacePreflightIssue {
+  key: string
+  messageKey: string
+  params: Record<string, string | number>
+}
+
+interface WorkspacePreflightResult {
+  checkedAt: number
+  issues: WorkspacePreflightIssue[]
+}
+
 function WorkspaceCard(): JSX.Element {
   const t = useT()
   const [name, setName] = useState('')
   const [imageSaveMode, setImageSaveMode] = useState<WorkspaceImageSaveMode>('embed')
   const [busy, setBusy] = useState(false)
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
+  const [workspacePreflights, setWorkspacePreflights] = useState<Record<string, WorkspacePreflightResult>>({})
 
   async function load(): Promise<void> {
     setWorkspaces(await api.storage.listWorkspaces())
@@ -148,6 +162,28 @@ function WorkspaceCard(): JSX.Element {
     }
   }
 
+  async function runPreflight(id: string): Promise<WorkspacePreflightResult | null> {
+    if (busy) return null
+    setBusy(true)
+    try {
+      const workspace = await api.storage.loadWorkspace(id)
+      if (!workspace) throw new Error('Workspace not found')
+      const result = await inspectWorkspaceImport(workspace, useStore.getState(), true)
+      setWorkspacePreflights((current) => ({ ...current, [id]: result }))
+      if (result.issues.length > 0) {
+        toast(tStatic('tools.workspace.preflightIssues', { count: result.issues.length }), { icon: '!' })
+      } else {
+        toast.success(tStatic('tools.workspace.preflightOk'))
+      }
+      return result
+    } catch (e) {
+      toast.error(tStatic('tools.workspace.restoreFailed', { message: (e as Error).message }))
+      return null
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function restore(id: string): Promise<void> {
     if (busy) return
     setBusy(true)
@@ -156,6 +192,8 @@ function WorkspaceCard(): JSX.Element {
       if (!workspace) throw new Error('Workspace not found')
       const snap = workspace.snapshot
       const s = useStore.getState()
+      const preflight = await inspectWorkspaceImport(workspace, s, true)
+      setWorkspacePreflights((current) => ({ ...current, [id]: preflight }))
       const refs = snap.imageReferences
       const missingReferences: string[] = []
       const [
@@ -221,7 +259,9 @@ function WorkspaceCard(): JSX.Element {
       s.patchAdetailer(snap.adetailer as Partial<typeof s.adetailer>)
       s.patchDynThres(snap.dynThres as Partial<typeof s.dynThres>)
       s.patchFreeu(snap.freeu as Partial<typeof s.freeu>)
-      if (missingReferences.length > 0) {
+      if (preflight.issues.length > 0) {
+        toast(tStatic('tools.workspace.preflightIssues', { count: preflight.issues.length }), { icon: '!' })
+      } else if (missingReferences.length > 0) {
         toast(tStatic('tools.workspace.referencesMissing', { count: missingReferences.length }), { icon: '!' })
       } else {
         toast.success(tStatic('tools.workspace.restored'))
@@ -291,42 +331,82 @@ function WorkspaceCard(): JSX.Element {
       </div>
       {workspaces.length > 0 && (
         <div className="border-t border-line pt-3 space-y-1.5">
-          {workspaces.slice(0, 6).map((workspace) => (
-            <div
-              key={workspace.id}
-              className="rounded-md border border-line bg-bg-2/50 p-2 text-xs"
-              data-testid={`workspace-row-${workspace.id}`}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="font-medium text-ink-1 truncate">{workspace.name}</span>
-                <span className="ml-auto font-mono text-[10px] text-ink-3 shrink-0">
-                  {new Date(workspace.updatedAt).toLocaleDateString()}
-                </span>
+          {workspaces.slice(0, 6).map((workspace) => {
+            const preflight = workspacePreflights[workspace.id]
+            return (
+              <div
+                key={workspace.id}
+                className="rounded-md border border-line bg-bg-2/50 p-2 text-xs"
+                data-testid={`workspace-row-${workspace.id}`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-medium text-ink-1 truncate">{workspace.name}</span>
+                  <span className="ml-auto font-mono text-[10px] text-ink-3 shrink-0">
+                    {new Date(workspace.updatedAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="font-mono text-[10px] text-ink-3 truncate mt-0.5">
+                  {workspace.model ?? t('titlebar.modelNotSelected')} / {workspace.promptPreview || '-'}
+                </div>
+                {preflight && (
+                  <div
+                    className={cn(
+                      'mt-2 rounded border px-2 py-1 text-[10px]',
+                      preflight.issues.length > 0
+                        ? 'border-warn/40 bg-warn/10 text-ink-1'
+                        : 'border-accent/30 bg-accent/10 text-ink-1'
+                    )}
+                    data-testid={`workspace-preflight-${workspace.id}`}
+                    data-workspace-preflight-status={preflight.issues.length > 0 ? 'warn' : 'ok'}
+                    data-workspace-preflight-issues={preflight.issues.length}
+                  >
+                    <div className="font-semibold">
+                      {preflight.issues.length > 0
+                        ? t('tools.workspace.preflightIssues', { count: preflight.issues.length })
+                        : t('tools.workspace.preflightOk')}
+                    </div>
+                    {preflight.issues.length > 0 && (
+                      <ul className="mt-1 space-y-0.5">
+                        {preflight.issues.slice(0, 4).map((issue) => (
+                          <li key={issue.key} className="truncate">
+                            {t(issue.messageKey, issue.params)}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+                <div className="mt-2 flex gap-1">
+                  <button
+                    className="btn btn-ghost text-[10px] py-0.5"
+                    onClick={() => { void restore(workspace.id) }}
+                    disabled={busy}
+                    data-testid={`workspace-restore-${workspace.id}`}
+                  >
+                    {t('history.restore')}
+                  </button>
+                  <button
+                    className="btn btn-ghost text-[10px] py-0.5"
+                    onClick={() => { void runPreflight(workspace.id) }}
+                    disabled={busy}
+                    data-testid={`workspace-preflight-run-${workspace.id}`}
+                  >
+                    <FileSearch className="h-3 w-3" />
+                    {t('tools.workspace.preflight')}
+                  </button>
+                  <button
+                    className="btn btn-ghost text-[10px] py-0.5 ml-auto"
+                    onClick={() => { void remove(workspace.id) }}
+                    disabled={busy}
+                    data-testid={`workspace-delete-${workspace.id}`}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    {t('history.delete')}
+                  </button>
+                </div>
               </div>
-              <div className="font-mono text-[10px] text-ink-3 truncate mt-0.5">
-                {workspace.model ?? t('titlebar.modelNotSelected')} / {workspace.promptPreview || '-'}
-              </div>
-              <div className="mt-2 flex gap-1">
-                <button
-                  className="btn btn-ghost text-[10px] py-0.5"
-                  onClick={() => { void restore(workspace.id) }}
-                  disabled={busy}
-                  data-testid={`workspace-restore-${workspace.id}`}
-                >
-                  {t('history.restore')}
-                </button>
-                <button
-                  className="btn btn-ghost text-[10px] py-0.5 ml-auto"
-                  onClick={() => { void remove(workspace.id) }}
-                  disabled={busy}
-                  data-testid={`workspace-delete-${workspace.id}`}
-                >
-                  <Trash2 className="h-3 w-3" />
-                  {t('history.delete')}
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -367,6 +447,124 @@ function WorkspaceModeOption({
 }
 
 type StoreSnapshot = ReturnType<typeof useStore.getState>
+
+async function inspectWorkspaceImport(
+  workspace: WorkspaceFile,
+  store: StoreSnapshot,
+  resolveReferences: boolean
+): Promise<WorkspacePreflightResult> {
+  const snap = workspace.snapshot
+  const issues: WorkspacePreflightIssue[] = []
+  const modelTitle = snap.selectedModelTitle?.trim()
+  if (modelTitle && !hasModel(store, modelTitle)) {
+    issues.push(issue('model', modelTitle, 'tools.workspace.issueModel'))
+  }
+
+  const vae = snap.selectedVae?.trim()
+  if (vae && !isBuiltinVae(vae) && !store.vaes.some((item) => item.modelName === vae)) {
+    issues.push(issue('vae', vae, 'tools.workspace.issueVae'))
+  }
+
+  for (const active of snap.activeLoras ?? []) {
+    const adapterName = active.tokenName || active.name
+    if (adapterName && !hasAdapter(store, active.name, active.tokenName, active.sourceRoot)) {
+      issues.push(issue('adapter', adapterName, 'tools.workspace.issueAdapter'))
+    }
+  }
+
+  if (resolveReferences) {
+    for (const ref of collectWorkspaceImageReferences(snap.imageReferences)) {
+      const restored = await resolveWorkspaceImageForPreflight(ref.reference)
+      if (!restored) {
+        issues.push(issue(`reference-${ref.label}`, ref.label, 'tools.workspace.issueReference'))
+      }
+    }
+  }
+
+  return { checkedAt: Date.now(), issues }
+}
+
+function issue(kind: string, name: string, messageKey: string): WorkspacePreflightIssue {
+  return {
+    key: `${kind}:${name}`,
+    messageKey,
+    params: { name }
+  }
+}
+
+function hasModel(store: StoreSnapshot, selectedModelTitle: string): boolean {
+  return store.models.some((model) =>
+    model.title === selectedModelTitle ||
+    model.modelName === selectedModelTitle ||
+    model.filename === selectedModelTitle
+  )
+}
+
+function hasAdapter(
+  store: StoreSnapshot,
+  name: string,
+  tokenName: string | undefined,
+  sourceRoot: string | undefined
+): boolean {
+  const wantedName = normalizeLookup(name)
+  const wantedToken = normalizeLookup(tokenName)
+  const wantedRoot = normalizeLookup(sourceRoot)
+  if (wantedName && store.loras.some((lora) => normalizeLookup(lora.name) === wantedName)) {
+    return true
+  }
+  if (wantedRoot && wantedToken) {
+    return store.loras.some((lora) =>
+      normalizeLookup(lora.sourceRoot) === wantedRoot &&
+      normalizeLookup(lora.tokenName ?? lora.name) === wantedToken
+    )
+  }
+  return store.loras.some((lora) => {
+    const keys = [lora.name, lora.tokenName, lora.alias].filter(Boolean).map((value) => normalizeLookup(value))
+    return keys.includes(wantedToken || wantedName)
+  })
+}
+
+function isBuiltinVae(value: string): boolean {
+  return ['automatic', 'none'].includes(value.toLowerCase())
+}
+
+function normalizeLookup(value: string | undefined): string {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function collectWorkspaceImageReferences(
+  refs: WorkspaceImageReferences | undefined
+): Array<{ label: string; reference: WorkspaceImageReference }> {
+  if (!refs) return []
+  const entries: Array<{ label: string; reference: WorkspaceImageReference }> = []
+  const push = (label: string, ref: WorkspaceImageReference | null | undefined): void => {
+    if (ref) entries.push({ label, reference: ref })
+  }
+  push('inputImage', refs.inputImage)
+  push('inpaintMask', refs.inpaintMask)
+  push('lastImage', refs.lastImage)
+  push('upscaleInputImage', refs.upscaleInputImage)
+  push('upscaleOutputImage', refs.upscaleOutputImage)
+  for (const [index, ref] of (refs.controlnetUnits ?? []).entries()) {
+    push(`controlnet-${index + 1}`, ref)
+  }
+  for (const [index, ref] of (refs.fabricPositive ?? []).entries()) {
+    push(`fabric-positive-${index + 1}`, ref)
+  }
+  for (const [index, ref] of (refs.fabricNegative ?? []).entries()) {
+    push(`fabric-negative-${index + 1}`, ref)
+  }
+  return entries
+}
+
+async function resolveWorkspaceImageForPreflight(ref: WorkspaceImageReference): Promise<boolean> {
+  try {
+    const image = await api.storage.resolveImageReference(ref)
+    return Boolean(image)
+  } catch {
+    return false
+  }
+}
 
 function restoreFabricImages(
   rawFabric: Partial<StoreSnapshot['fabric']> | undefined,

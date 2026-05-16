@@ -50,6 +50,10 @@ export function TitleBar({
       await api.forge.refreshModels()
       const updated = await api.forge.listModels()
       setModels(updated)
+      const current = useStore.getState().selectedModelTitle
+      if (updated.length > 0 && (!current || !updated.some((model) => model.title === current))) {
+        onModelChanged(updated[0].title)
+      }
       toast.success(t('toast.modelsRefreshed'))
     } catch (e) {
       toast.error(t('toast.refreshFailed', { message: (e as Error).message }))
@@ -69,6 +73,10 @@ export function TitleBar({
       if (!r) return // cancelled
       const updated = await api.forge.listModels()
       setModels(updated)
+      const current = useStore.getState().selectedModelTitle
+      if (updated.length > 0 && (!current || !updated.some((model) => model.title === current))) {
+        onModelChanged(updated[0].title)
+      }
       const action = mode === 'move' ? t('toast.actionMoved') : t('toast.actionCopied')
       if (r.imported.length > 0 && r.skipped.length === 0) {
         toast.success(t('toast.imported', { count: r.imported.length, action }))

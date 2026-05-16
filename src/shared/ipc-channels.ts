@@ -12,6 +12,7 @@ export const IPC = {
   forgeListSamplers: 'forge:list-samplers',
   forgeListSchedulers: 'forge:list-schedulers',
   forgeRefreshModels: 'forge:refresh-models',
+  forgeSetCurrentModel: 'forge:set-current-model',
   forgeTxt2Img: 'forge:txt2img',
   forgeImg2Img: 'forge:img2img',
   forgeProgress: 'forge:progress',

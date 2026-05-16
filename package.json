@@ -25,6 +25,12 @@
     "qa:dom:history-review-prompt": "node scripts/dom-qa.cjs history-review-prompt-bridge",
     "qa:dom:history-review-report-source": "node scripts/dom-qa.cjs history-review-report-source",
     "qa:dom:prompt-helper-review": "node scripts/dom-qa.cjs prompt-helper-review-tags",
+    "qa:dom:prompt-format": "node scripts/dom-qa.cjs prompt-format",
+    "qa:dom:dynamic-prompt": "node scripts/dom-qa.cjs dynamic-prompt",
+    "qa:dom:generation-modes": "node scripts/dom-qa.cjs generation-modes",
+    "qa:dom:generation-sections": "node scripts/dom-qa.cjs generation-modes",
+    "qa:dom:adapter-scan": "node scripts/dom-qa.cjs adapter-scan-collision",
+    "qa:dom:workspace-preflight": "node scripts/dom-qa.cjs workspace-preflight",
     "qa:tagger:compare": "node scripts/tagger-accuracy-compare.cjs",
     "package": "electron-vite build && electron-builder --dir",
     "dist": "electron-vite build && electron-builder"

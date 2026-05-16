@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yoitomoshi Art Generator App Map 2026-05-15</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101214;
+      --panel: #171b1f;
+      --panel-2: #20262b;
+      --panel-3: #262e34;
+      --line: #34404a;
+      --ink: #eef3f6;
+      --muted: #a9b6bf;
+      --subtle: #75838d;
+      --accent: #8bd3dd;
+      --accent-2: #f4c95d;
+      --ok: #74d99f;
+      --warn: #ffb86b;
+      --danger: #ff7b8a;
+      --blue: #8eb4ff;
+      --green: #8fd9b6;
+      --purple: #c4a7ff;
+      --radius: 8px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(139, 211, 221, 0.08), transparent 260px),
+        var(--bg);
+      color: var(--ink);
+      letter-spacing: 0;
+    }
+
+    a { color: var(--accent); }
+    code {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: rgba(0, 0, 0, 0.24);
+      padding: 0.08rem 0.32rem;
+      color: var(--ink);
+      font-size: 0.92em;
+    }
+
+    .page {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 28px 18px 60px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 44px);
+      line-height: 1.05;
+      font-weight: 800;
+    }
+
+    .lead {
+      max-width: 900px;
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.75;
+      font-size: 15px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+      color: var(--subtle);
+      font-size: 12px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.035);
+      padding: 6px 10px;
+      white-space: nowrap;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: minmax(240px, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      margin: 18px 0;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(23, 27, 31, 0.92);
+      backdrop-filter: blur(12px);
+    }
+
+    .search {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #0d0f11;
+      color: var(--ink);
+      padding: 10px 12px;
+      font: inherit;
+    }
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .filter {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel-2);
+      color: var(--muted);
+      padding: 8px 10px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+    }
+
+    .filter[aria-pressed="true"] {
+      border-color: var(--accent);
+      color: var(--ink);
+      background: rgba(139, 211, 221, 0.16);
+    }
+
+    .section {
+      margin-top: 22px;
+    }
+
+    .section h2 {
+      margin: 0 0 12px;
+      font-size: 19px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 14px;
+      min-width: 0;
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.65;
+      font-size: 13px;
+    }
+
+    .tagline {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .mini {
+      display: inline-flex;
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.035);
+      color: var(--muted);
+      padding: 4px 7px;
+      font-size: 11px;
+      line-height: 1.2;
+    }
+
+    .map {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .lane {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 12px;
+      min-height: 220px;
+    }
+
+    .lane::after {
+      content: ">";
+      position: absolute;
+      right: -12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--subtle);
+      font-weight: 700;
+    }
+
+    .lane:last-child::after { display: none; }
+    .lane h3 { margin: 0 0 8px; font-size: 14px; color: var(--accent); }
+    .lane ul, .card ul {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .tab-card {
+      border-top: 3px solid var(--accent);
+    }
+
+    .tab-card:nth-child(2) { border-top-color: var(--green); }
+    .tab-card:nth-child(3) { border-top-color: var(--accent-2); }
+    .tab-card:nth-child(4) { border-top-color: var(--purple); }
+
+    .flow {
+      display: grid;
+      gap: 8px;
+      counter-reset: step;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel-2);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      display: grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: rgba(139, 211, 221, 0.14);
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .matrix {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      font-size: 12px;
+    }
+
+    .matrix th,
+    .matrix td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .matrix th {
+      background: var(--panel-3);
+      color: var(--ink);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .matrix td {
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.015);
+    }
+
+    .callout {
+      border: 1px solid rgba(244, 201, 93, 0.35);
+      border-radius: var(--radius);
+      background: rgba(244, 201, 93, 0.08);
+      padding: 14px;
+      color: #f6e6ad;
+      line-height: 1.7;
+      font-size: 13px;
+    }
+
+    .danger {
+      border-color: rgba(255, 123, 138, 0.45);
+      background: rgba(255, 123, 138, 0.08);
+      color: #ffc7ce;
+    }
+
+    .ok {
+      border-color: rgba(116, 217, 159, 0.42);
+      background: rgba(116, 217, 159, 0.08);
+      color: #c8f3d7;
+    }
+
+    .footer {
+      margin-top: 26px;
+      color: var(--subtle);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    [data-hidden="true"] { display: none !important; }
+
+    @media (max-width: 980px) {
+      .topbar,
+      .toolbar,
+      .grid.two,
+      .grid.three,
+      .grid.four,
+      .tabs,
+      .map {
+        grid-template-columns: 1fr;
+      }
+      .lane::after { display: none; }
+      .filters { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div>
+        <h1>Yoitomoshi Art Generator App Map</h1>
+        <p class="lead">
+          このHTMLはアプリ本体ではなく、現在のコードベースが自分で説明できるようにするための設計地図です。
+          人間はこのHTMLで全体像を掴み、次のチャットや別の作業者には隣のJSONを渡します。
+        </p>
+      </div>
+      <div class="meta">
+        <span class="pill">Generated: 2026-05-15</span>
+        <span class="pill">Companion JSON: <code>APP_MAP_2026-05-15.json</code></span>
+        <span class="pill">Repo: <code>C:\宵灯工房アート\Yoitomoshi-Art-Generator</code></span>
+      </div>
+    </header>
+
+    <div class="toolbar" aria-label="map filters">
+      <input id="search" class="search" type="search" placeholder="検索: Forge, History, Upscale, IPC, Tagger, Civitai など">
+      <div class="filters">
+        <button class="filter" data-filter="all" aria-pressed="true">All</button>
+        <button class="filter" data-filter="architecture" aria-pressed="false">Architecture</button>
+        <button class="filter" data-filter="workflow" aria-pressed="false">Workflow</button>
+        <button class="filter" data-filter="risk" aria-pressed="false">Contracts</button>
+        <button class="filter" data-filter="next" aria-pressed="false">Next Work</button>
+      </div>
+    </div>
+
+    <section class="section" data-group="architecture">
+      <h2>1. いまの頭の中の地図</h2>
+      <div class="map">
+        <article class="lane" data-search="react renderer ui tabs prompt preview sidepanel components">
+          <h3>Renderer UI</h3>
+          <p>制作画面。4タブ、Prompt、Preview、SidePanel、Upscale、Toolsを表示する。</p>
+          <ul>
+            <li><code>src/App.tsx</code></li>
+            <li><code>src/components/*.tsx</code></li>
+            <li><code>src/index.css</code></li>
+          </ul>
+        </article>
+        <article class="lane" data-search="zustand store state generation lora history upscale controlnet">
+          <h3>Zustand Store</h3>
+          <p>現在の制作状態。prompt、params、LoRA、拡張、Upscale、履歴、Forge catalogを保持する。</p>
+          <ul>
+            <li><code>src/lib/store.ts</code></li>
+            <li><code>src/shared/types.ts</code></li>
+          </ul>
+        </article>
+        <article class="lane" data-search="ipc preload boundary validation electron typed api">
+          <h3>Typed IPC</h3>
+          <p>rendererとmainの安全境界。path、URL、画像、settings、script argsをmain側で検証する。</p>
+          <ul>
+            <li><code>electron/preload.ts</code></li>
+            <li><code>electron/ipc-handlers.ts</code></li>
+            <li><code>src/shared/ipc-channels.ts</code></li>
+          </ul>
+        </article>
+        <article class="lane" data-search="electron main storage forge manager civitai huggingface tools">
+          <h3>Electron Services</h3>
+          <p>Forge起動、Storage、Civitai/Hugging Face、Download、Model Library、Toolsを実行する。</p>
+          <ul>
+            <li><code>electron/forge-manager.ts</code></li>
+            <li><code>electron/storage.ts</code></li>
+            <li><code>electron/civitai-api.ts</code></li>
+          </ul>
+        </article>
+        <article class="lane" data-search="forge runtime stable diffusion api models extensions controlnet adetailer">
+          <h3>Forge Runtime</h3>
+          <p>生成の実処理。API専用起動で、Gradio UIは埋め込まない。</p>
+          <ul>
+            <li><code>runtime/forge</code></li>
+            <li><code>webui/models</code></li>
+            <li><code>webui/extensions</code></li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" data-group="architecture">
+      <h2>2. 4つのトップレベルタブ</h2>
+      <div class="tabs">
+        <article class="card tab-card" data-search="txt2img prompt generation preflight lora dynamic thresholding freeu adetailer controlnet">
+          <h3>txt2img</h3>
+          <p>テキストから新規生成。Prompt Helper、QuickPreset、LoRA提案、Preflight、拡張パネルが集まる主導線。</p>
+          <div class="tagline">
+            <span class="mini">PromptPanel</span>
+            <span class="mini">PreviewPanel</span>
+            <span class="mini">SidePanel</span>
+            <span class="mini">forge.txt2img</span>
+          </div>
+        </article>
+        <article class="card tab-card" data-search="img2img input image inpaint mask character compose metadata controlnet">
+          <h3>img2img</h3>
+          <p>入力画像、Inpaint mask、Character Compose、ControlNetを使って再生成する。</p>
+          <div class="tagline">
+            <span class="mini">InputImagePanel</span>
+            <span class="mini">CharacterComposePanel</span>
+            <span class="mini">forge.img2img</span>
+            <span class="mini">PNG metadata</span>
+          </div>
+        </article>
+        <article class="card tab-card" data-search="upscale simple diffusion ultimate tile controlnet denoise comparison">
+          <h3>Upscale</h3>
+          <p>Simple/Diffusion/Ultimateの3経路。Tile ControlNetとdenoise比較でdrift/seamを抑える。</p>
+          <div class="tagline">
+            <span class="mini">UpscaleWorkspace</span>
+            <span class="mini">Tile ControlNet</span>
+            <span class="mini">Denoise Compare</span>
+            <span class="mini">save manifest</span>
+          </div>
+        </article>
+        <article class="card tab-card" data-search="tools workspace startup tagger model library merger converter health">
+          <h3>Tools</h3>
+          <p>制作基盤の管理画面。Workspace、起動診断、Tagger、Model Library、Merger、Converterを束ねる。</p>
+          <div class="tagline">
+            <span class="mini">WorkspaceCard</span>
+            <span class="mini">TaggerCatalog</span>
+            <span class="mini">ModelLibrary</span>
+            <span class="mini">Inspector</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" data-group="workflow">
+      <h2>3. 主要ワークフロー</h2>
+      <div class="grid two">
+        <article class="card" data-search="workflow txt2img generation history lora usage">
+          <h3>txt2img生成</h3>
+          <div class="flow">
+            <div class="step">Prompt/Negative/Params/Extensionsを編集する。</div>
+            <div class="step">Preflightで不足や危険設定を確認する。</div>
+            <div class="step"><code>buildGenerationPlan</code>がForge requestを組み立てる。</div>
+            <div class="step"><code>forge.txt2img</code>で生成し、画像とthumbnailを履歴へ保存する。</div>
+            <div class="step">LoRA使用ログを保存し、次回提案に使う。</div>
+          </div>
+        </article>
+        <article class="card" data-search="workflow metadata image drop img2img reuse civitai identify">
+          <h3>画像投入と再利用</h3>
+          <div class="flow">
+            <div class="step">D&DまたはClipboardで画像を投入する。</div>
+            <div class="step">PNG/JPEG/WebP metadataをbest-effortで解析する。</div>
+            <div class="step">設定を復元し、Civitai照合をバックグラウンドで実行する。</div>
+            <div class="step">img2img、Upscale、Variation、Recipe保存へ分岐する。</div>
+          </div>
+        </article>
+        <article class="card" data-search="workflow upscale diffusion ultimate tile controlnet denoise comparison">
+          <h3>Upscale品質判断</h3>
+          <div class="flow">
+            <div class="step">画像寸法とmetadataから推奨設定を出す。</div>
+            <div class="step">Simple、Diffusion、Ultimateから方式を選ぶ。</div>
+            <div class="step">必要ならUpscale専用Tile ControlNetを有効にする。</div>
+            <div class="step">denoise 0.25/0.35/0.45とTile ON/OFFを比較する。</div>
+            <div class="step">判断基準と候補画像を保存する。</div>
+          </div>
+        </article>
+        <article class="card" data-search="workflow history review tagger prompt helper accepted rejected">
+          <h3>History review -> Prompt Helper</h3>
+          <div class="flow">
+            <div class="step">履歴画像をTagger reviewで開く。</div>
+            <div class="step">PixAI ONNXの候補をaccepted/rejectedに整理する。</div>
+            <div class="step"><code>userdata/history/index.json</code>へ保存する。</div>
+            <div class="step">Prompt Helperや比較スクリプトが保存済みレビューを再利用する。</div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" data-group="architecture">
+      <h2>4. データの置き場</h2>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>場所</th>
+            <th>Git</th>
+            <th>役割</th>
+            <th>注意</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>src/</code>, <code>electron/</code></td>
+            <td>管理する</td>
+            <td>Renderer、main、IPC、Storage、Forge連携の実装。</td>
+            <td>既存の責務境界に合わせて小さく変更する。</td>
+          </tr>
+          <tr>
+            <td><code>resources/</code></td>
+            <td>管理する</td>
+            <td>同梱プロンプトライブラリ。</td>
+            <td>YAML変更時はparse検証を行う。</td>
+          </tr>
+          <tr>
+            <td><code>docs/</code></td>
+            <td>管理する</td>
+            <td>ロードマップ、QA、構造、調査、今回の可視化成果物。</td>
+            <td>コード変更後は実装状況とズレないよう更新する。</td>
+          </tr>
+          <tr>
+            <td><code>runtime/</code></td>
+            <td>管理しない</td>
+            <td>Forge本体、モデル、拡張、Python/Git。</td>
+            <td>巨大で環境依存。原則Gitに入れない。</td>
+          </tr>
+          <tr>
+            <td><code>userdata/</code></td>
+            <td>管理しない</td>
+            <td>設定、秘密情報、履歴、Civitai cache、downloads、workspaces。</td>
+            <td>実データやAPIキーを含む。QA fixtureは必ず戻す。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" data-group="risk">
+      <h2>5. 壊してはいけない契約</h2>
+      <div class="grid three">
+        <article class="card danger" data-search="risk adetailer payload dicts only">
+          <h3>ADetailer payload</h3>
+          <p>dicts-only形式を維持する。bool配列形式へ戻すと拡張側の引数解釈が壊れやすい。</p>
+        </article>
+        <article class="card danger" data-search="risk ultimate sd upscale script args order">
+          <h3>Ultimate SD upscale args</h3>
+          <p><code>script_args</code>18個の順序は拡張の<code>ui()</code>戻り順に依存する。並べ替えない。</p>
+        </article>
+        <article class="card danger" data-search="risk upscale controlnet separation alwayson scripts">
+          <h3>Upscale専用ControlNet</h3>
+          <p>通常ControlNetとTile ControlNetを混ぜない。<code>forUpscaleDiffusion</code>などの専用contextを維持する。</p>
+        </article>
+        <article class="card" data-search="risk four tabs ui top level">
+          <h3>4タブ方針</h3>
+          <p>トップレベルはtxt2img/img2img/Upscale/Tools。新機能は既存タブ内の折りたたみパネルへ入れる。</p>
+        </article>
+        <article class="card" data-search="risk dom qa selector data-testid i18n">
+          <h3>DOM QAセレクタ</h3>
+          <p>表示文言ではなく<code>data-testid</code>と状態属性を使う。ja/en/ru/ptで壊れないようにする。</p>
+        </article>
+        <article class="card" data-search="risk runtime userdata output generated git ignore">
+          <h3>生成物と実データ</h3>
+          <p><code>runtime/</code>、<code>userdata/</code>、<code>output/</code>、<code>out/</code>、<code>dist/</code>は原則Gitに入れない。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" data-group="workflow">
+      <h2>6. 主要ファイル早見表</h2>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>ファイル</th>
+            <th>責務</th>
+            <th>触る時の見方</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>src/App.tsx</code></td>
+            <td>bootstrap、Forge ready後のcatalog load、生成入口、4タブ切替。</td>
+            <td>初期ロードを重くしない。履歴やCivitai重処理は遅延させる。</td>
+          </tr>
+          <tr>
+            <td><code>src/lib/store.ts</code></td>
+            <td>Zustand store。制作状態の中心。</td>
+            <td>機能スライスを既存パターンに合わせ、永続化はStorageへ寄せる。</td>
+          </tr>
+          <tr>
+            <td><code>src/lib/extension-payload.ts</code></td>
+            <td>Forge拡張payloadの中核。</td>
+            <td>一番壊れやすい。変更時はtxt2img/img2img/Upscaleの副作用を確認する。</td>
+          </tr>
+          <tr>
+            <td><code>electron/ipc-handlers.ts</code></td>
+            <td>安全検証付きIPC handler群。</td>
+            <td>URL/path/size/schema検証を弱めない。rendererを信用しない。</td>
+          </tr>
+          <tr>
+            <td><code>electron/storage.ts</code></td>
+            <td>userdata配下の永続化。</td>
+            <td>schema normalizeと復旧動線を保つ。実データ破壊に注意。</td>
+          </tr>
+          <tr>
+            <td><code>src/components/HistoryGallery.tsx</code></td>
+            <td>履歴、ラベル、Tagger review、Prompt diff、Fabric素材化。</td>
+            <td>一時レビューfixtureは開始時と終了時に戻す。</td>
+          </tr>
+          <tr>
+            <td><code>src/components/ToolsWorkspace.tsx</code></td>
+            <td>管理機能の集約画面。</td>
+            <td>重いscanやpreflightは開いた時だけ走る方針を維持する。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" data-group="next">
+      <h2>7. 次に進めるなら</h2>
+      <div class="grid two">
+        <article class="card ok" data-search="next controlnet qa pose lineart depth model">
+          <h3>1. 実素材QA - ControlNet入力生成</h3>
+          <p>pose / lineart / depth用ControlNet model追加後に実生成確認。Depthは<code>depth_midas</code>優先。</p>
+        </article>
+        <article class="card" data-search="next workspace reference missing relative path">
+          <h3>2. Workspace参照保存</h3>
+          <p>欠落参照の差し替えUIと、プロジェクトフォルダ内素材の相対パス化を検討する。</p>
+        </article>
+        <article class="card" data-search="next download library recovery partial jobs">
+          <h3>3. Download / Library復旧</h3>
+          <p>実際の中断download jobで<code>running -> failed</code>と<code>completed</code>補正を確認する。</p>
+        </article>
+        <article class="card" data-search="next upscale comparison tile denoise drift seam">
+          <h3>4. Upscale比較保存</h3>
+          <p>人物素材でTile ON/OFFとdenoise候補を比較し、drift/seam/detailの判断基準を蓄積する。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" data-group="risk">
+      <h2>8. 検証ゲート</h2>
+      <div class="grid three">
+        <div class="callout ok" data-search="validation typecheck build diff check">
+          <strong>最低線</strong><br>
+          <code>npm.cmd run typecheck</code><br>
+          ビルド影響がある変更では<code>npm.cmd run build</code>も実行。
+        </div>
+        <div class="callout" data-search="validation dom qa electron remote debugging selectors">
+          <strong>UI/IPC変更</strong><br>
+          remote debugging付きElectronを起動し、該当する<code>qa:dom:*</code>を絞って実行。
+        </div>
+        <div class="callout danger" data-search="validation error recurrence protocol repeated failure">
+          <strong>同じ失敗が2回出たら</strong><br>
+          当てずっぽうを止め、原因調査、修正案比較、最小実装、検証、記録へ切り替える。
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>
+        このHTMLは視覚的な把握用です。次のチャットに渡す場合は、同じフォルダの
+        <code>APP_MAP_2026-05-15.json</code> を添付または貼り付けてください。
+        JSONにはこの画面の要点に加えて、workflow、state slices、IPC surface、critical contracts、validation、next workを構造化してあります。
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    const searchInput = document.getElementById('search');
+    const filters = Array.from(document.querySelectorAll('.filter'));
+    const items = Array.from(document.querySelectorAll('[data-search], [data-group]'));
+    let activeFilter = 'all';
+
+    function normalize(value) {
+      return String(value || '').toLowerCase();
+    }
+
+    function update() {
+      const query = normalize(searchInput.value).trim();
+      items.forEach((item) => {
+        const group = item.getAttribute('data-group') || item.closest('[data-group]')?.getAttribute('data-group') || '';
+        const haystack = normalize([
+          item.textContent,
+          item.getAttribute('data-search'),
+          group
+        ].join(' '));
+        const filterMatch = activeFilter === 'all' || group === activeFilter;
+        const searchMatch = !query || haystack.includes(query);
+        item.dataset.hidden = filterMatch && searchMatch ? 'false' : 'true';
+      });
+    }
+
+    filters.forEach((button) => {
+      button.addEventListener('click', () => {
+        activeFilter = button.dataset.filter;
+        filters.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+        update();
+      });
+    });
+
+    searchInput.addEventListener('input', update);
+  </script>
+</body>
+</html>

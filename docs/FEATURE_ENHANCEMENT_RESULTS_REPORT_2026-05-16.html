@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yoitomoshi Art Generator Feature Enhancement Results - 2026-05-16</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101216;
+      --panel: #171b22;
+      --panel-2: #202631;
+      --line: #303847;
+      --text: #e8edf4;
+      --muted: #a7b0bf;
+      --accent: #7cc7ff;
+      --ok: #8bdc9b;
+      --warn: #ffd479;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.65 "Segoe UI", "Noto Sans JP", sans-serif;
+    }
+    main { max-width: 1120px; margin: 0 auto; padding: 32px 20px 48px; }
+    h1, h2, h3 { line-height: 1.25; margin: 0; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 20px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
+    h3 { font-size: 15px; margin-top: 18px; color: var(--accent); }
+    p { color: var(--muted); }
+    a { color: var(--accent); }
+    code { font-family: Consolas, "Cascadia Mono", monospace; color: #d8e8ff; }
+    .hero {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #1a2029 0%, #131820 100%);
+      border-radius: 8px;
+      padding: 24px;
+    }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .chip {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      border-radius: 999px;
+      color: var(--muted);
+      padding: 3px 9px;
+      font-size: 12px;
+    }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+    .card {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 14px;
+      min-height: 120px;
+    }
+    .card strong { display: block; color: var(--text); margin-bottom: 6px; }
+    .status { font-weight: 700; }
+    .done { color: var(--ok); }
+    .partial { color: var(--warn); }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; overflow: hidden; border-radius: 8px; }
+    th, td { border: 1px solid var(--line); padding: 9px 10px; vertical-align: top; }
+    th { background: var(--panel-2); text-align: left; font-size: 12px; color: var(--muted); }
+    td { background: rgba(23, 27, 34, 0.72); }
+    ul { margin: 10px 0 0; padding-left: 20px; color: var(--muted); }
+    .qa li { font-family: Consolas, "Cascadia Mono", monospace; }
+    .note { border-left: 3px solid var(--accent); padding-left: 12px; }
+    @media (max-width: 880px) { .grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 560px) { main { padding: 20px 12px 36px; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <h1>Yoitomoshi Art Generator 機能強化結果レポート</h1>
+    <p>作成日: 2026-05-16 / 対象: <code>docs/FUTURE_FEATURE_ENHANCEMENT_REPORT_2026-05-16.md</code> のP0からP3</p>
+    <div class="meta">
+      <span class="chip">P0 Prompt Formatter</span>
+      <span class="chip">P0 CivitaiHttpClient</span>
+      <span class="chip">P0 SHA付きDL</span>
+      <span class="chip">P1 Adapter Library基盤</span>
+      <span class="chip">P1 Adapter token parser</span>
+      <span class="chip">P2 safe recon plan</span>
+      <span class="chip">P3 deferred list</span>
+      <span class="chip">Follow-up QA実装済み</span>
+    </div>
+  </section>
+
+  <h2>Executive Summary</h2>
+  <p class="note">
+    今回は重い外部依存やForge payload契約を変えず、Yoitomoshi側の「Prompt理解」「Adapter理解」「Civitai通信の堅牢化」を進めた。
+    P2のbrowser-api-reconは安全ゲートに従い、認証済みブラウザ通信のcaptureは実施せず、公式API中心のrecon設計に留めた。
+    P3のLoRA抽出や外部生成サービス連携は、仕様・依存・検証コストが重いため後回しを維持した。
+  </p>
+
+  <div class="grid">
+    <div class="card"><strong>P0</strong><span class="status done">実装済み</span><p>Prompt Formatter、Civitai HTTP分類、SHA付きDL導線を追加。</p></div>
+    <div class="card"><strong>P1</strong><span class="status done">実装済み</span><p>LyCORIS複数root、Adapter subtype、旧LyCO parser警告を追加。</p></div>
+    <div class="card"><strong>P2</strong><span class="status partial">設計・安全整理</span><p>公式API疎通を確認し、browser recon候補と制限を分離。</p></div>
+    <div class="card"><strong>P3</strong><span class="status partial">後回し</span><p>LoRA抽出、adapter変換、外部生成サービス連携は保留。</p></div>
+  </div>
+
+  <h2>Implemented Changes</h2>
+  <table>
+    <thead><tr><th>Priority</th><th>Area</th><th>Result</th><th>Main files</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>P0</td>
+        <td>Prompt Formatter</td>
+        <td>Prompt/Negative欄の整形ボタン、Preflight警告、Quick Fixを追加。<code>&lt;lora:...&gt;</code> / <code>&lt;lyco:...&gt;</code> / <code>BREAK</code> / <code>score_9</code>系を保護。</td>
+        <td><code>src/lib/prompt-utils.ts</code><br><code>src/components/PromptPanel.tsx</code><br><code>src/components/GenerationPreflightPanel.tsx</code></td>
+      </tr>
+      <tr>
+        <td>P0</td>
+        <td>CivitaiHttpClient</td>
+        <td><code>CivitaiHttpError</code> を追加し、auth/rate-limit/server/network/unknownへ分類。tags取得は既存cache fallbackに対応。</td>
+        <td><code>electron/civitai-api.ts</code><br><code>electron/ipc-handlers.ts</code></td>
+      </tr>
+      <tr>
+        <td>P0</td>
+        <td>Dropped Image SHA付きDL</td>
+        <td><code>CivitaiQuickRef.primaryFileSha256</code> を追加し、不足LoRA/VAE/ModelのDL時にSHA検証へ渡す。</td>
+        <td><code>src/shared/types.ts</code><br><code>src/components/DroppedImageInsight.tsx</code><br><code>src/components/RecommendationCard.tsx</code></td>
+      </tr>
+      <tr>
+        <td>P1</td>
+        <td>Adapter Library基盤</td>
+        <td><code>models/Lora</code> と <code>models/LyCORIS</code> をスキャン。<code>sourceRoot</code>、<code>tokenName</code>、<code>adapterSubtype</code>、<code>baseModelHint</code> を保持。</td>
+        <td><code>electron/lora-scanner.ts</code><br><code>electron/safetensors-inspect.ts</code><br><code>src/shared/types.ts</code></td>
+      </tr>
+      <tr>
+        <td>P1</td>
+        <td>Adapter token parser</td>
+        <td><code>&lt;lora:...&gt;</code>、旧 <code>&lt;lyco:...&gt;</code>、検出用 <code>&lt;hypernet:...&gt;</code> を共通parserで認識。旧LyCO/複雑weight記法はPreflightで警告。</td>
+        <td><code>src/lib/adapter-tokens.ts</code><br><code>src/lib/lora-suggest.ts</code><br><code>src/lib/png-metadata.ts</code></td>
+      </tr>
+      <tr>
+        <td>P2</td>
+        <td>Civitai API recon</td>
+        <td>公式APIの軽量疎通を確認し、browser-api-recon対象はUI filter/favorites/collections/job flowに限定。</td>
+        <td><code>docs/CIVITAI_API_RECON_REPORT_2026-05-16.md</code></td>
+      </tr>
+      <tr>
+        <td>Follow-up</td>
+        <td>LoRA / LyCORIS同名衝突QA</td>
+        <td>実際に <code>runtime/forge/webui/models/Lora</code> と <code>runtime/forge/webui/models/LyCORIS</code> へ同名fixtureを置き、scannerが <code>Lora/name</code> と <code>LyCORIS/name</code> に分離しつつ <code>tokenName</code> を保持することをDOM QAで確認。</td>
+        <td><code>scripts/dom-qa.cjs</code><br><code>package.json</code></td>
+      </tr>
+      <tr>
+        <td>Follow-up</td>
+        <td>LoRAカード Civitai利用条件</td>
+        <td>Civitai metadataの <code>allowCommercialUse</code>、<code>allowNoCredit</code>、<code>allowDerivatives</code> をcompact badgeとして表示。制限・要クレジット系は警告色で見えるようにした。</td>
+        <td><code>src/components/LoraCard.tsx</code><br><code>src/lib/i18n.ts</code></td>
+      </tr>
+      <tr>
+        <td>Follow-up</td>
+        <td>Workspace Import Preflight</td>
+        <td>保存済みworkspaceの復元前に、未導入checkpoint、VAE、adapter、参照切れ画像を検出するUIとDOM QAを追加。復元ボタン実行時にも同じpreflight結果を表示する。</td>
+        <td><code>src/components/ToolsWorkspace.tsx</code><br><code>scripts/dom-qa.cjs</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Validation</h2>
+  <ul class="qa">
+    <li>node --check scripts\dom-qa.cjs: PASS</li>
+    <li>npm.cmd run typecheck: PASS</li>
+    <li>npm.cmd run build: PASS</li>
+    <li>npm.cmd run qa:dom:prompt-format -- --port=9338: PASS</li>
+    <li>npm.cmd run qa:dom:workspace-preflight -- --port=9338: PASS (未導入model / VAE / adapter / 参照切れ画像の4件を検出)</li>
+    <li>npm.cmd run qa:dom:adapter-scan -- --port=9338: PASS (実ファイルfixtureで Lora / LyCORIS 同名衝突を確認)</li>
+    <li>npm.cmd run qa:dom -- selectors --port=9338: PASS</li>
+    <li>git diff --check: PASS with existing Yoitomoshi.bat LF/CRLF warning only</li>
+    <li>Civitai tags smoke: GET /api/v1/tags?limit=1 -> 200</li>
+    <li>Civitai models smoke: GET /api/v1/models?limit=1&amp;types=LORA... -> 200</li>
+  </ul>
+
+  <h2>P2 Recon Boundary</h2>
+  <table>
+    <thead><tr><th>Candidate</th><th>Status</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr><td>Official REST API</td><td class="done">Use now</td><td>models/tags/by-hash/search/download metadata are enough for current implementation.</td></tr>
+      <tr><td>Web UI filter capture</td><td class="partial">Future</td><td>Useful only for filter mappings not represented in REST docs.</td></tr>
+      <tr><td>Favorites / Collections</td><td class="partial">Future with permission</td><td>Requires authorized own-account browser trace and redaction.</td></tr>
+      <tr><td>Generation job flow</td><td class="partial">Future with explicit permission</td><td>Must avoid bypassing Buzz, auth, rate limit, or private data boundaries.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>P3 Deferred</h2>
+  <ul>
+    <li>LoRA抽出、adapter変換、LoRA package管理は、入力種別・ライセンス・破損時復旧の安全仕様が未確定。</li>
+    <li>自然言語編集AIは、外部API依存とVRAM/コスト制約が重い。</li>
+    <li>外部生成サービス連携は、認証・課金・制限回避に触れやすいため現時点では対象外。</li>
+  </ul>
+
+  <h2>Follow-up Results</h2>
+  <ul>
+    <li>実ファイルを使った <code>models/Lora</code> と <code>models/LyCORIS</code> の同名衝突確認は完了。</li>
+    <li>LoRAカードのCivitai利用条件表示は実装済み。</li>
+    <li>Workspace Import Preflightで未導入adapter/参照切れを検出するUIとQAを追加済み。</li>
+    <li>browser-api-reconは、対象flow、許可アカウント、保存/変更操作の可否、redaction方針が未確認のため未実行。公式APIで足りないUI通信だけを次回候補に残す。</li>
+  </ul>
+
+  <h2>References</h2>
+  <ul>
+    <li><a href="https://developer.civitai.com/docs/api/public-rest">Civitai Public REST API</a></li>
+    <li><a href="https://github.com/civitai/civitai/wiki/REST-API-Reference/de63434512878133a5788a25f4b94af0c06de4bc">Civitai REST API Reference snapshot</a></li>
+    <li><code>docs/FUTURE_FEATURE_ENHANCEMENT_REPORT_2026-05-16.md</code></li>
+    <li><code>docs/CIVITAI_API_RECON_REPORT_2026-05-16.md</code></li>
+  </ul>
+</main>
+</body>
+</html>

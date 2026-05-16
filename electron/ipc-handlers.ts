@@ -2498,6 +2498,11 @@ export function registerIpcHandlers(deps: {
   // Forge API passthrough ------------------------------------------------
   ipcMain.handle(IPC.forgeListModels, () => api.listModels())
   ipcMain.handle(IPC.forgeRefreshModels, () => api.refreshModels())
+  ipcMain.handle(IPC.forgeSetCurrentModel, (_e, rawTitle: string) => {
+    const title = typeof rawTitle === 'string' ? rawTitle.trim() : ''
+    if (!title) throw new Error('Model title is required')
+    return api.setCurrentModel(title)
+  })
   ipcMain.handle(IPC.forgeListSamplers, () => api.listSamplers())
   ipcMain.handle(IPC.forgeListSchedulers, () => api.listSchedulers())
   // Forge ≥ f2 doesn't expose /sdapi/v1/loras, so we scan the filesystem
@@ -2982,6 +2987,14 @@ export function registerIpcHandlers(deps: {
         throw new Error('このダウンロードは既に実行中です')
       }
       const destPath = join(destDir, req.filename)
+      if (existsSync(destPath)) {
+        if (req.assetType === 'Checkpoint') {
+          await api.refreshModels().catch(() => undefined)
+        } else if (req.assetType === 'VAE') {
+          await api.refreshVaes().catch(() => undefined)
+        }
+        return { destPath, sha256: null }
+      }
       const partialPath = `${destPath}.partial`
       const job = storage.createDownloadJob(req, destPath, partialPath)
       const controller = new AbortController()
@@ -3164,9 +3177,15 @@ export function registerIpcHandlers(deps: {
     const cached = !opts?.force ? storage.getCachedTags() : null
     if (cached) return cached
     const settings = storage.getSettings()
-    const tags = await listCivitaiTags(settings.civitaiApiKey, 80)
-    storage.saveCachedTags(tags)
-    return tags
+    try {
+      const tags = await listCivitaiTags(settings.civitaiApiKey, 80)
+      storage.saveCachedTags(tags)
+      return tags
+    } catch (error) {
+      const fallback = storage.getCachedTags()
+      if (fallback) return fallback
+      throw error
+    }
   })
 
   ipcMain.handle(IPC.civitaiCheckUpdates, async (_e, opts?: { force?: boolean }) => {

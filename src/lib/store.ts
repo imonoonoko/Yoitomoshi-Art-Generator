@@ -29,6 +29,7 @@ import type {
  * than splitting into many tabs.
  */
 export type WorkspaceTab = 'txt2img' | 'img2img' | 'upscale' | 'tools'
+export type GenerationWorkspaceMode = 'create' | 'refine' | 'advanced'
 
 /**
  * Dynamic Thresholding (CFG-Fix) settings — Forge's built-in
@@ -423,6 +424,8 @@ export interface AppState {
   // existing tab instead.
   currentTab: WorkspaceTab
   setCurrentTab(t: WorkspaceTab): void
+  generationMode: GenerationWorkspaceMode
+  setGenerationMode(mode: GenerationWorkspaceMode): void
 
   // Extension-feature settings. Each lives as a flat slice with a `patch*`
   // setter so panels can update individual fields without spreading the
@@ -609,9 +612,62 @@ export const defaultParams: GenerationParams = {
   denoisingStrength: 0.65
 }
 
+export function normalizeClipSkip(value: unknown): number {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n < 1) return 1
+  return Math.max(1, Math.min(12, Math.round(n)))
+}
+
+export function normalizeGenerationParams(
+  params: Partial<GenerationParams>,
+  fallback: GenerationParams = defaultParams
+): GenerationParams {
+  return {
+    steps: finiteInt(params.steps, fallback.steps),
+    cfgScale: finiteNumber(params.cfgScale, fallback.cfgScale),
+    width: finiteInt(params.width, fallback.width),
+    height: finiteInt(params.height, fallback.height),
+    sampler: nonEmptyString(params.sampler, fallback.sampler),
+    scheduler: typeof params.scheduler === 'string' ? params.scheduler : fallback.scheduler,
+    seed: finiteInt(params.seed, fallback.seed),
+    batchSize: finiteInt(params.batchSize, fallback.batchSize),
+    iterations: finiteInt(params.iterations, fallback.iterations),
+    clipSkip: normalizeClipSkip(params.clipSkip ?? fallback.clipSkip),
+    denoisingStrength: finiteNumber(params.denoisingStrength, fallback.denoisingStrength)
+  }
+}
+
+function mergeGenerationParams(
+  current: GenerationParams,
+  patch: Partial<GenerationParams>
+): GenerationParams {
+  const next: Partial<GenerationParams> = { ...current }
+  for (const [key, value] of Object.entries(patch) as Array<[keyof GenerationParams, unknown]>) {
+    if (value === undefined || value === null) continue
+    ;(next as Record<keyof GenerationParams, unknown>)[key] = value
+  }
+  return normalizeGenerationParams(next, current)
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function finiteInt(value: unknown, fallback: number): number {
+  const n = Number(value)
+  return Number.isFinite(n) ? Math.round(n) : fallback
+}
+
+function nonEmptyString(value: unknown, fallback: string): string {
+  return typeof value === 'string' && value.trim() ? value : fallback
+}
+
 export const useStore = create<AppState>((set) => ({
   currentTab: 'txt2img',
   setCurrentTab: (t) => set({ currentTab: t }),
+  generationMode: 'create',
+  setGenerationMode: (mode) => set({ generationMode: mode }),
 
   dynThres: DEFAULT_DYN_THRES,
   patchDynThres: (patch) => set((s) => ({ dynThres: { ...s.dynThres, ...patch } })),
@@ -720,7 +776,7 @@ export const useStore = create<AppState>((set) => ({
   params: defaultParams,
   setPrompt: (p) => set({ prompt: p }),
   setNegativePrompt: (p) => set({ negativePrompt: p }),
-  patchParams: (p) => set((s) => ({ params: { ...s.params, ...p } })),
+  patchParams: (p) => set((s) => ({ params: mergeGenerationParams(s.params, p) })),
 
   isGenerating: false,
   progress: null,
@@ -832,7 +888,14 @@ export const useStore = create<AppState>((set) => ({
       return {
         activeLoras: exists
           ? s.activeLoras.filter((a) => a.name !== lora.name)
-          : [...s.activeLoras, { name: lora.name, weight, triggerWords }]
+          : [...s.activeLoras, {
+              name: lora.name,
+              tokenName: lora.tokenName ?? lora.name,
+              sourceRoot: lora.sourceRoot,
+              adapterSubtype: lora.adapterSubtype,
+              weight,
+              triggerWords
+            }]
       }
     }),
   patchActiveLora: (name, patch) =>

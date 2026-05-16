@@ -15,13 +15,15 @@ import {
   makeThumbnail
 } from '@/lib/generation-utils'
 import { getExtensionGuardIssues } from '@/lib/extension-guards'
+import { hasDynamicPromptSyntax } from '@/lib/dynamic-prompts'
 
-type VariationAxis = 'seed' | 'cfg' | 'denoise'
+type VariationAxis = 'seed' | 'prompt' | 'cfg' | 'denoise'
 type VariationCount = 2 | 4 | 8
 
 interface VariantSpec {
   params: GenerationParams
   label: string
+  dynamicPromptSeed?: number
 }
 
 interface Candidate {
@@ -31,7 +33,7 @@ interface Candidate {
   historyId: string
 }
 
-const AXES: VariationAxis[] = ['seed', 'cfg', 'denoise']
+const AXES: VariationAxis[] = ['seed', 'prompt', 'cfg', 'denoise']
 const COUNTS: VariationCount[] = [2, 4, 8]
 
 export function VariationPanel(): JSX.Element {
@@ -66,6 +68,10 @@ export function VariationPanel(): JSX.Element {
       toast.error(tStatic('variation.denoiseNeedsImg2Img'))
       return
     }
+    if (axis === 'prompt' && !hasDynamicPromptSyntax(base.prompt) && !hasDynamicPromptSyntax(base.negativePrompt)) {
+      toast.error(tStatic('dynamicPrompt.noSyntax'))
+      return
+    }
     if (endpoint === 'img2img' && !base.inputImage) {
       toast.error(tStatic('toast.img2imgNeedsImage'))
       return
@@ -91,9 +97,12 @@ export function VariationPanel(): JSX.Element {
       for (const variant of variants) {
         const plan = buildGenerationPlan(base, {
           endpoint,
-          params: variant.params
+          params: variant.params,
+          dynamicPromptSeed: variant.dynamicPromptSeed
         })
         if (!plan) throw new Error(tStatic('variation.noModel'))
+        const dynamicBlocker = plan.dynamicPromptIssues.find((issue) => issue.severity === 'error')
+        if (dynamicBlocker) throw new Error(tStatic('dynamicPrompt.blocked', { message: dynamicBlocker.message }))
 
         const res = endpoint === 'img2img'
           ? await api.forge.img2img(buildImg2ImgRequest(plan, inputImage!, variant.params.denoisingStrength))
@@ -108,7 +117,8 @@ export function VariationPanel(): JSX.Element {
           pngBase64,
           thumbDataUrl: thumb,
           prompt: plan.finalPrompt,
-          negativePrompt: base.negativePrompt,
+          negativePrompt: plan.baseReq.negative_prompt,
+          dynamicPrompt: plan.dynamicPrompt,
           params: {
             steps: variant.params.steps,
             cfgScale: variant.params.cfgScale,
@@ -149,7 +159,11 @@ export function VariationPanel(): JSX.Element {
           {
             id: `${item.id}-${prev.length}`,
             image: dataUrl,
-            label: axis === 'seed' ? `seed ${actualSeed}` : variant.label,
+            label: axis === 'seed'
+              ? `seed ${actualSeed}`
+              : axis === 'prompt' && plan.dynamicPrompt
+                ? compactPromptLabel(plan.dynamicPrompt.resolvedPrompt)
+                : variant.label,
             historyId: item.id
           }
         ]))
@@ -288,6 +302,14 @@ function buildVariants(
     seed: axis === 'seed' ? base.seed : fixedSeed
   }
 
+  if (axis === 'prompt') {
+    return Array.from({ length: count }, (_item, i) => ({
+      params: common,
+      dynamicPromptSeed: fixedSeed + i,
+      label: `prompt ${i + 1}`
+    }))
+  }
+
   if (axis === 'seed') {
     return Array.from({ length: count }, (_, i) => {
       const seed = base.seed >= 0 ? base.seed + i : -1
@@ -338,4 +360,9 @@ function round1(n: number): number {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
+}
+
+function compactPromptLabel(prompt: string): string {
+  const first = prompt.split(',').map((part) => part.trim()).find(Boolean) ?? 'prompt'
+  return first.length > 18 ? `${first.slice(0, 17)}...` : first
 }

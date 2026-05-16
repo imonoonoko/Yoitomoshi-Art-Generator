@@ -464,7 +464,7 @@ export function ResearchWorkflowPanel(): JSX.Element {
   ])
 
   return (
-    <section className="border border-line rounded-md bg-bg-0/60">
+    <section className="border border-line rounded-md bg-bg-0/60" data-testid="research-workflow-panel">
       <button
         type="button"
         className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-bg-2 transition-colors"
@@ -511,6 +511,7 @@ export function ResearchWorkflowPanel(): JSX.Element {
               ))}
             </div>
           </div>
+
         </div>
       )}
     </section>
@@ -646,7 +647,7 @@ function CheckItem({
 
 function RecipeCard({ recipe, language }: { recipe: ResearchRecipe; language: UiLanguage }): JSX.Element {
   return (
-    <article className="rounded border border-line bg-bg-2/35 p-2">
+    <article className="rounded border border-line bg-bg-2/35 p-2" data-testid={`recipe-card-${recipe.id}`}>
       <div className="flex items-start gap-2">
         <span className="mt-0.5 text-accent">{renderRecipeIcon(recipe.id)}</span>
         <div className="min-w-0 flex-1">

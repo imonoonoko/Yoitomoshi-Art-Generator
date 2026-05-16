@@ -13,10 +13,12 @@
  *
  * The parameters string format is the same across formats — A1111-style:
  *
- *     <prompt — possibly multi-line>
- *     Negative prompt: <negative — single line>
+ *     <prompt - possibly multi-line>
+ *     Negative prompt: <negative - single line>
  *     Steps: 25, Sampler: DPM++ 2M Karras, CFG scale: 7, Seed: 1234, ...
  */
+import { parseAdapterTokens } from './adapter-tokens'
+
 export interface ParsedPngMetadata {
   prompt: string
   negativePrompt: string
@@ -32,8 +34,8 @@ export interface ParsedPngMetadata {
   /** VAE filename if present in the metadata. */
   vae: string | null
   clipSkip: number | null
-  /** All `<lora:name:weight>` references found in the prompt. */
-  loras: { name: string; weight: number }[]
+  /** All managed adapter references (`<lora:...>` and legacy `<lyco:...>`) found in the prompt. */
+  loras: { name: string; weight: number; legacyKind?: 'lora' | 'lyco' }[]
   raw: string
 }
 
@@ -439,12 +441,7 @@ export function parseParametersString(raw: string): ParsedPngMetadata {
   const size = fields['Size']
   const sizeMatch = size?.match(/(\d+)\s*x\s*(\d+)/i)
 
-  const loras: { name: string; weight: number }[] = []
-  const loraRe = /<lora:([^:>]+):([^>]+)>/gi
-  let m: RegExpExecArray | null
-  while ((m = loraRe.exec(prompt)) !== null) {
-    loras.push({ name: m[1].trim(), weight: parseFloat(m[2]) || 1 })
-  }
+  const loras = parseMetadataAdapters(prompt)
 
   return {
     prompt: prompt.replace(/\r\n/g, '\n'),
@@ -633,12 +630,7 @@ function parseLabelValueFormat(text: string): ParsedPngMetadata {
   const sizeText = single('size')
   const sizeMatch = sizeText?.match(/(\d+)\s*[x×]\s*(\d+)/i)
 
-  const loras: { name: string; weight: number }[] = []
-  const loraRe = /<lora:([^:>]+):([^>]+)>/gi
-  let m: RegExpExecArray | null
-  while ((m = loraRe.exec(prompt)) !== null) {
-    loras.push({ name: m[1].trim(), weight: parseFloat(m[2]) || 1 })
-  }
+  const loras = parseMetadataAdapters(prompt)
 
   return {
     prompt,
@@ -656,6 +648,16 @@ function parseLabelValueFormat(text: string): ParsedPngMetadata {
     loras,
     raw: text
   }
+}
+
+function parseMetadataAdapters(prompt: string): { name: string; weight: number; legacyKind?: 'lora' | 'lyco' }[] {
+  return parseAdapterTokens(prompt)
+    .filter((token) => token.kind === 'lora' || token.kind === 'lyco')
+    .map((token) => ({
+      name: token.name,
+      weight: token.weight,
+      legacyKind: token.kind as 'lora' | 'lyco'
+    }))
 }
 
 function parseIntOrNull(s: string | null): number | null {

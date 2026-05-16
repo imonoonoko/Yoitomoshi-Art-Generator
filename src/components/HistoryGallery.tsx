@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Trash2, RotateCcw, Search, Filter, ImageUpscale, GitCompare, Star, CheckCircle2, XCircle, PackageCheck, ThumbsUp, ThumbsDown, Loader2, Tag, ScanLine, Save, ShieldX } from 'lucide-react'
+import { Trash2, RotateCcw, Search, Filter, ImageUpscale, GitCompare, Star, CheckCircle2, XCircle, PackageCheck, ThumbsUp, ThumbsDown, Loader2, Tag, ScanLine, Save, ShieldX, Braces } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore, type FabricFeedbackItem } from '@/lib/store'
 import { api } from '@/lib/ipc'
@@ -643,6 +643,12 @@ export function HistoryGallery(): JSX.Element {
                     <span className="absolute top-8 left-1 z-10 inline-flex items-center gap-1 rounded bg-bg-2/90 px-1.5 py-1 text-[10px] text-ok backdrop-blur">
                       <Tag className="h-3 w-3" />
                       {h.tagReview.acceptedTags.length}
+                    </span>
+                  ) : null}
+                  {h.dynamicPrompt ? (
+                    <span className="absolute top-8 right-1 z-10 inline-flex items-center gap-1 rounded bg-bg-2/90 px-1.5 py-1 text-[10px] text-accent backdrop-blur" title={`prompt seed ${h.dynamicPrompt.promptSeed}`}>
+                      <Braces className="h-3 w-3" />
+                      {h.dynamicPrompt.usedWildcards.length || 1}
                     </span>
                   ) : null}
                   <img

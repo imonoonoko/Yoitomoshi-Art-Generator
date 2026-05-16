@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Romptn Stable Diffusion プロンプト横断リサーチ - 2026-05-16</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101218;
+      --panel: #171c24;
+      --panel2: #202733;
+      --line: #333c4c;
+      --ink: #f2f5f8;
+      --muted: #aab3c1;
+      --subtle: #7f8998;
+      --accent: #86a7ff;
+      --accent2: #61c8b6;
+      --ok: #76d48d;
+      --warn: #edc461;
+      --bad: #e77c7c;
+      --code: #0d1017;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.76 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    }
+    a { color: #a6b8ff; }
+    code {
+      padding: 1px 5px;
+      border-radius: 5px;
+      border: 1px solid #2d3542;
+      background: var(--code);
+      color: #e5eaff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #151b26 0%, #101218 100%);
+    }
+    .wrap { max-width: 1260px; margin: 0 auto; padding: 30px; }
+    .eyebrow {
+      margin: 0;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.25; letter-spacing: 0; }
+    h1 { margin-top: 8px; font-size: clamp(28px, 4vw, 43px); }
+    h2 { margin: 34px 0 12px; font-size: 21px; }
+    h3 { margin-bottom: 8px; font-size: 16px; }
+    p { margin: 8px 0 0; }
+    ul, ol { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 5px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+    th, td { border: 1px solid var(--line); padding: 10px; vertical-align: top; }
+    th { background: #1c2430; text-align: left; color: #dce6ff; font-size: 12px; }
+    td { background: rgba(255,255,255,.015); }
+    footer { margin-top: 42px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--subtle); }
+    .lead { max-width: 1000px; color: var(--muted); font-size: 16px; }
+    .meta, .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill, .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.02);
+      white-space: nowrap;
+      font-weight: 700;
+    }
+    .pill { padding: 4px 10px; color: var(--muted); font-size: 12px; }
+    .tag { padding: 2px 8px; font-size: 11px; }
+    .ok { color: var(--ok); border-color: rgba(118,212,141,.45); }
+    .warn { color: var(--warn); border-color: rgba(237,196,97,.45); }
+    .bad { color: var(--bad); border-color: rgba(231,124,124,.45); }
+    .info { color: var(--accent2); border-color: rgba(97,200,182,.45); }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+    .card.soft { background: rgba(255,255,255,.025); }
+    .callout {
+      margin-top: 14px;
+      border: 1px solid rgba(134,167,255,.42);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      background: rgba(134,167,255,.08);
+      padding: 14px;
+    }
+    .risk {
+      border-color: rgba(237,196,97,.45);
+      border-left-color: var(--warn);
+      background: rgba(237,196,97,.07);
+    }
+    .badbox {
+      border-color: rgba(231,124,124,.45);
+      border-left-color: var(--bad);
+      background: rgba(231,124,124,.07);
+    }
+    .source {
+      color: var(--subtle);
+      font-size: 12px;
+    }
+    .score {
+      display: inline-flex;
+      min-width: 26px;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 1px 7px;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: #222a36;
+      font-weight: 800;
+    }
+    .priority {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+    .kpi {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .kpi strong { display: block; font-size: 24px; line-height: 1.1; }
+    .kpi span { color: var(--muted); font-size: 12px; }
+    .mono {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--code);
+      padding: 12px;
+      color: #dfe4ff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    @media (max-width: 920px) {
+      .wrap { padding: 20px; }
+      .grid, .grid2, .kpi { grid-template-columns: 1fr; }
+      .priority { grid-template-columns: 1fr; }
+      table { table-layout: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">Research Report</p>
+      <h1>Romptn Stable Diffusion プロンプト横断リサーチ</h1>
+      <p class="lead">
+        指定された Romptn 記事21本を、Yoitomoshi Art Generator の Prompt Library、Prompt Helper、
+        履歴・補完、投稿準備にどう取り込めるかという観点で横断整理したレポート。
+        記事本文は辞書資産として有用だが、アプリ実装では「大量のタグ表」ではなく、制作目的別の短い操作導線へ変換するのが効果的。
+      </p>
+      <div class="meta">
+        <span class="pill">調査日: 2026-05-16</span>
+        <span class="pill">対象: Romptn 21記事 + 関連公式GitHub 2件</span>
+        <span class="pill">納品: 単一HTML</span>
+        <span class="pill">対象アプリ: Yoitomoshi Art Generator</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <h2>結論</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>1. 最優先は Prompt Library の体系化</h3>
+          <p>表情、視線、髪、年齢、肌、メイク、靴、構図、背景、照明、色、画風、品質、negative まで、記事群はタグの網羅性が高い。既存の <code>resources/prompt-library.yoitomoshi.ja.yaml</code> を、制作目的別のカテゴリとタグチップに拡張する価値が最も高い。</p>
+          <div class="tags">
+            <span class="tag ok">実装優先度 A</span>
+            <span class="tag info">低リスク</span>
+          </div>
+        </article>
+        <article class="card">
+          <h3>2. 拡張機能は導入よりUX抽出</h3>
+          <p>Prompt All in One は公式GitHubでもメンテナンス停止が明記されているため、Forgeへそのまま入れる対象ではなく、翻訳、重み調整、並べ替え、無効化、履歴のUI発想だけをReact側へ取り込むのが妥当。</p>
+          <div class="tags">
+            <span class="tag warn">直接導入は非推奨</span>
+            <span class="tag info">UI参考</span>
+          </div>
+        </article>
+        <article class="card">
+          <h3>3. 投稿準備はアプリの出口機能にできる</h3>
+          <p>投稿サイト記事は、生成後の「AI生成明記」「規約確認」「タグ・キャプション作成」「作風と投稿先の相性確認」を示している。Historyから投稿準備チェックリストを出すと、生成後ワークフローの価値が上がる。</p>
+          <div class="tags">
+            <span class="tag ok">実装優先度 B</span>
+            <span class="tag info">出口導線</span>
+          </div>
+        </article>
+      </div>
+
+      <div class="callout">
+        <h3>推奨方針</h3>
+        <p>
+          「Romptnの記事をそのままコピーした辞書」ではなく、ローカル制作補助として再構成する。
+          具体的には、Prompt Helper が自然文や現在のpromptから不足カテゴリを検出し、短い候補セットを提示する。
+          ユーザーが必要なタグだけをチップで追加し、重み・順番・positive/negative移動を既存UIで調整できる形がよい。
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>対象記事のカバレッジ</h2>
+      <div class="kpi">
+        <div class="card soft"><strong>21</strong><span>指定記事数</span></div>
+        <div class="card soft"><strong>15+</strong><span>Prompt Libraryに直結するカテゴリ</span></div>
+        <div class="card soft"><strong>4</strong><span>Inpaint / ControlNet / ADetailer / Styles 系の運用示唆</span></div>
+        <div class="card soft"><strong>2</strong><span>公式GitHubで現状確認した拡張機能</span></div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 20%">領域</th>
+            <th style="width: 35%">主な記事</th>
+            <th>アプリへ取り込むなら</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>顔・人物属性</td>
+            <td>
+              <a href="https://romptn.com/article/2515">表情・顔</a>、
+              <a href="https://romptn.com/article/7410">視線</a>、
+              <a href="https://romptn.com/article/2657">髪型・髪色</a>、
+              <a href="https://romptn.com/article/10429">年齢</a>、
+              <a href="https://romptn.com/article/13479">肌</a>、
+              <a href="https://romptn.com/article/21283">メイク</a>
+            </td>
+            <td>キャラクター調整パネル、表情差分レシピ、髪・目・肌・メイクのタグ群、Inpaintへの部分修正ガイド。</td>
+          </tr>
+          <tr>
+            <td>服飾・身体・構図</td>
+            <td>
+              <a href="https://romptn.com/article/21279">靴・靴下</a>、
+              <a href="https://romptn.com/article/2089">ポーズ・構図</a>
+            </td>
+            <td>全身キャラ用の足元タグ、立ち絵・座り・寝姿勢・手足・OpenPose/ControlNet候補のプリセット。</td>
+          </tr>
+          <tr>
+            <td>背景・光・色・品質</td>
+            <td>
+              <a href="https://romptn.com/article/6449">背景</a>、
+              <a href="https://romptn.com/article/11980">ライティング</a>、
+              <a href="https://romptn.com/article/28078">色</a>、
+              <a href="https://romptn.com/article/28082">品質</a>
+            </td>
+            <td>背景/時間帯/季節/光源方向/色調/品質タグを、制作レシピとQuickPresetへ分離して登録。</td>
+          </tr>
+          <tr>
+            <td>画風・モデル別の組み立て</td>
+            <td>
+              <a href="https://romptn.com/article/12412">画風</a>、
+              <a href="https://romptn.com/article/8381">リアル・実写</a>、
+              <a href="https://romptn.com/article/9549">アニメ調</a>、
+              <a href="https://romptn.com/article/5012">リアル生成のコツ</a>
+            </td>
+            <td>モデルタイプ別のprompt順序、LoRA併用注意、構図・品質・negativeの不足検出をPreflightへ追加。</td>
+          </tr>
+          <tr>
+            <td>negative / 保存 / 補完</td>
+            <td>
+              <a href="https://romptn.com/article/2905">ネガティブプロンプト</a>、
+              <a href="https://romptn.com/article/4784">保存・削除</a>、
+              <a href="https://romptn.com/article/18298">Prompt All in One</a>、
+              <a href="https://romptn.com/article/16616">TagComplete</a>
+            </td>
+            <td>negativeの目的別プリセット、Styles相当の保存、ローカル辞書補完、タグの無効化・並べ替え・重み調整。</td>
+          </tr>
+          <tr>
+            <td>投稿・公開</td>
+            <td><a href="https://romptn.com/article/63903">AIイラスト投稿サイト</a></td>
+            <td>History画像から投稿候補、AI生成明記、規約確認、タイトル・説明・タグ生成のチェックリストを出す。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>記事別メモ</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 22%">記事</th>
+            <th style="width: 16%">要点</th>
+            <th>Yoitomoshi向けの解釈</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><a href="https://romptn.com/article/2515">表情・顔</a><br><span class="source">2026-04-01</span></td>
+            <td>喜怒哀楽、恐怖、驚きなどの表情タグと、Inpaint / ControlNet reference_only / ADetailer による表情差分。</td>
+            <td>「表情差分」レシピを作り、seed固定、顔だけInpaint、ADetailer顔補修を一括で準備する導線が有効。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/7410">目線・視線</a><br><span class="source">2026-04-01</span></td>
+            <td>カメラ目線、よそ見、見上げ、見下ろし、横目、振り返りなどの視線タグ。</td>
+            <td>Prompt Helperで「こちらを見る」「横を見る」など自然文から視線タグへ変換するルールを増やす。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/2657">髪型・髪色・髪質・髪飾り</a><br><span class="source">2026-04-01</span></td>
+            <td>髪の長さ、女性/男性髪型、前髪、質感、色、髪飾りなど約200種。髪だけ変える場合はInpaintを推奨。</td>
+            <td>髪カテゴリはタグ数が多くなりやすいので、長さ、前髪、結び方、色、アクセサリに分けて絞り込みUIを用意する。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/21279">靴・靴下</a><br><span class="source">2026-04-01</span></td>
+            <td>靴はスニーカー、ハイヒール、ローファー、ブーツなど。靴下は丈別の指定。</td>
+            <td>全身絵の「足元が曖昧」対策として、衣装カテゴリ内の小カテゴリへ追加。足元を出す構図との組み合わせが必要。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/2089">ポーズ・構図</a><br><span class="source">2026-04-01</span></td>
+            <td>プロンプト、ControlNet、OpenPose Editorでポーズ・構図を制御。全身、手、腕、足、座り、寝姿勢など。</td>
+            <td>ControlNet Builderと接続し、自然文のポーズ指定からOpenPose候補、縦横比、先頭配置を提案する。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/10429">年齢指定</a><br><span class="source">2026-04-01</span></td>
+            <td>年齢は数値だけでは反映が弱く、年齢層タグや外見特徴の補正が必要。Age Slider LoRAも万能ではない。</td>
+            <td>年齢はセンシティブな属性なので、通常タグ辞書には入れても自動推奨は控えめにし、成人/高齢など安全な範囲の表現に寄せる。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/13479">肌色・肌質</a><br><span class="source">2026-04-01</span></td>
+            <td>肌色は「skin」形式、肌質は光沢・油分・汗・水滴など。モデルによって効きが変わる。</td>
+            <td>肌タグは色より質感を優先して候補化する。色指定はモデル依存・表現配慮が必要なため、明示操作時のみ追加する。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/21283">化粧・メイク</a><br><span class="source">2026-04-01</span></td>
+            <td>顔全体、眉、目元、頬、唇の5カテゴリ。自然メイク、濃いメイク、アイライン、リップなど。</td>
+            <td>表情・顔カテゴリと統合し、キャラ印象を変える「メイク」サブカテゴリを作る。ADetailerとの併用にも向く。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/6449">背景・風景・場所</a><br><span class="source">2026-04-01</span></td>
+            <td>天気、自然、日常、公共施設、エンタメ、国/地域など。背景メインは横長、wide shot、no humans が有効。</td>
+            <td>背景だけ生成、人物あり、素材化の3用途でプリセットを分ける。5W1H式の質問UIにすると初心者が選びやすい。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/11980">光・ライティング</a><br><span class="source">2026-04-01</span></td>
+            <td>自然光、方向、光の効果、強さ、明るさ調整。モデルによって明るさ・彩度・コントラストの効きが変わる。</td>
+            <td>照明は「明るくする」より「光源方向・時間帯・質感」で提案する。Preflightで背景/表情/構図との不足を見せる。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/28082">品質</a><br><span class="source">2026-04-01</span></td>
+            <td>masterpiece、ultra detailed などの品質タグ、negative、ADetailerとの組み合わせ。</td>
+            <td>品質タグを足しすぎるとPromptが膨らむため、QuickPresetは「軽量」「標準」「高品質」「顔補修」の4段階程度にする。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/28078">色</a><br><span class="source">2026-04-01</span></td>
+            <td>118種類の色指定。赤、黄、緑、青、紫、白、黒、グレーなど系統別。</td>
+            <td>色は髪、目、服、背景へ対象を明示して挿入する必要がある。単独タグではなく「対象 + 色」のチップ化が向く。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/12412">画風</a><br><span class="source">2026-04-01</span></td>
+            <td>画風変更はプロンプト、ControlNet LineArt、LoRA、Hypernetworks。LoRA等は固定力が高い。</td>
+            <td>画風はPromptだけで完結させず、LoRA選択・ControlNet LineArt候補と一緒に出す。Forge拡張のGradio埋め込みは不要。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/8381">リアル・実写系</a><br><span class="source">2026-04-01</span></td>
+            <td>リアル系はモデル選択が重要。品質タグ、img2img、Interrogate CLIPの活用も紹介。</td>
+            <td>モデル種別がrealisticの時だけ、RAW photo系、光源、レンズ、肌質、negativeの推奨セットを出す。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/9549">アニメ調</a><br><span class="source">2026-04-01</span></td>
+            <td>2D系モデル、LoRA、キャラ・外見・構図・表情・ポーズ・衣服・雰囲気・背景の構成要素。</td>
+            <td>既存のアニメ/イラスト向け辞書と相性がよい。カテゴリをPrompt Builderの標準スロットとして採用できる。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/2905">ネガティブプロンプト</a><br><span class="source">2026-04-01</span></td>
+            <td>品質低下、作画崩壊、不適切表現、分割生成、手指崩れなどを目的別に除外。EasyNegative等のembeddingも紹介。</td>
+            <td>negativeは1つの巨大テンプレではなく、目的別チップにする。手、顔、分割、低品質、不要物、投稿不可表現を分ける。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/5012">リアルな画像生成のコツ</a><br><span class="source">2026-04-01</span></td>
+            <td>先頭ほど効きやすい、75トークン目安、強調構文、モデル/LoRAごとの推奨prompt確認。</td>
+            <td>既存のPrompt formatterとTokenMeterに直結。重要タグの前方移動、重複整理、長すぎるprompt警告を強化する。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/4784">プロンプト保存・削除</a><br><span class="source">2026-04-01</span></td>
+            <td>Styles保存、Styles.csv編集、PNG InfoやImage Browserからの復元。</td>
+            <td>Yoitomoshiは既にPresets/History/PNG metadataがあるため、Styles.csv互換より「現在の状態を丸ごと保存」のWorkspace化を優先。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/18298">Prompt All in One</a><br><span class="source">2026-04-01</span></td>
+            <td>翻訳、ボタン化、重み調整、並べ替え、履歴、一時無効化、ChatGPT連携、LoRA検索など。</td>
+            <td>公式GitHubではメンテナンス停止。直接導入ではなく、React側PromptTagChips、PromptHelper、HistoryにUXだけ移植する。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/16616">a1111-sd-webui-tagcomplete</a><br><span class="source">2026-04-01</span></td>
+            <td>入力中の候補表示、人気度表示、スペルミス防止、人物/表情/衣装/ポーズ/背景の発想補助。</td>
+            <td>公式GitHubではDanbooru/e621タグ、wildcards、LoRA/Embedding/Hypernet候補、翻訳、プレビューに対応。ローカル辞書補完として取り込む価値が高い。</td>
+          </tr>
+          <tr>
+            <td><a href="https://romptn.com/article/63903">AIイラスト投稿サイト</a><br><span class="source">2026-03-09</span></td>
+            <td>chichi-pui、SeaArt、Aipictors、ourt AI、iromirai、DeviantArt、pixiv、Civitai等。AI生成明記、規約、作風相性、収益化を確認。</td>
+            <td>投稿サイト連携APIではなく、Historyから「投稿準備カード」を作る。タイトル、キャプション、タグ、AI生成表記、ライセンス確認を支援する。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>実装候補の比較</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 18%">候補</th>
+            <th style="width: 16%">根本対応</th>
+            <th style="width: 15%">実装コスト</th>
+            <th>評価</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="score">A</span> Prompt Library拡張</td>
+            <td>高い</td>
+            <td>低〜中</td>
+            <td>既存YAMLとPrompt Library UIに沿う。記事のタグ資産を一番安全に活用でき、外部依存も増えない。</td>
+          </tr>
+          <tr>
+            <td><span class="score">A</span> Prompt Helperの目的別候補</td>
+            <td>高い</td>
+            <td>中</td>
+            <td>自然文から「表情」「髪」「背景」「照明」「negative不足」を候補化できる。初心者向け価値が大きい。</td>
+          </tr>
+          <tr>
+            <td><span class="score">B</span> ローカルタグ補完</td>
+            <td>中〜高</td>
+            <td>中</td>
+            <td>TagCompleteの発想をReact側へ移植。辞書、History、LoRA trigger、favoritesを候補ソースにできる。</td>
+          </tr>
+          <tr>
+            <td><span class="score">B</span> 投稿準備カード</td>
+            <td>中</td>
+            <td>低〜中</td>
+            <td>Historyから公開前チェックを作るだけなら安全。各投稿サイトAPIや自動投稿は規約・認証リスクがあるため後回し。</td>
+          </tr>
+          <tr>
+            <td><span class="score">C</span> Prompt All in One導入</td>
+            <td>低</td>
+            <td>中〜高</td>
+            <td>メンテナンス停止、Gradio UI依存、Forge/API専用運用との相性が悪い。直接導入は採用しない。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>機能へ落とす場合の設計案</h2>
+      <div class="grid2">
+        <article class="card">
+          <div class="priority">
+            <span class="tag ok">Phase 1</span>
+            <div>
+              <h3>Prompt Library: Romptn inspired packs</h3>
+              <p>タグを以下のように分けて追加する。既存カテゴリへ無理に押し込まず、検索・フィルタしやすい粒度を維持する。</p>
+              <div class="mono">人物: 表情 / 視線 / 髪 / メイク / 肌質
+構図: 立ち絵 / 座り / 手足 / カメラ距離 / 余白
+環境: 背景 / 天気 / 時間帯 / 場所 / 季節
+仕上げ: 品質 / 照明 / 色調 / 画風 / negative</div>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="priority">
+            <span class="tag ok">Phase 2</span>
+            <div>
+              <h3>Prompt Helper: 不足診断と短い候補</h3>
+              <p>現在のpromptを解析し、足りないカテゴリを提示する。長大な辞書一覧を出すより、「今の画像で効く候補」を3〜8個に絞る。</p>
+              <div class="mono">例:
+表情が未指定です -> smile / serious / surprised
+背景が弱いです -> city street / forest / classroom
+全身構図です -> shoes + socks + full body negative</div>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="priority">
+            <span class="tag info">Phase 3</span>
+            <div>
+              <h3>Tag Autocomplete風のローカル補完</h3>
+              <p>入力中にPrompt Library、History review、LoRA trigger、QuickPresetから候補を出す。NSFW語を含む外部booru辞書は最初から混ぜず、ローカル管理の安全な辞書を基準にする。</p>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="priority">
+            <span class="tag info">Phase 4</span>
+            <div>
+              <h3>投稿準備チェックリスト</h3>
+              <p>History画像に対して、投稿サイト選定、AI生成明記、モデル/LoRAライセンス確認、タイトル、キャプション、タグ候補を出す。自動投稿ではなく手元の整理に留める。</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>注意点</h2>
+      <div class="grid2">
+        <article class="callout risk">
+          <h3>記事のプロンプトはモデル依存</h3>
+          <p>年齢、肌色、明るさ、彩度、リアル/アニメ表現は、モデル、LoRA、seed、解像度で効き方が変わる。アプリでは「必ず効く」と表示せず、モデル依存の候補として扱う。</p>
+        </article>
+        <article class="callout risk">
+          <h3>Prompt All in Oneは直接導入しない</h3>
+          <p>公式GitHubでメンテナンス停止が明記されている。ForgeのAPI専用起動方針とも衝突しやすいため、UXだけをReact側で再実装する。</p>
+        </article>
+        <article class="callout badbox">
+          <h3>NSFW/投稿規約の扱い</h3>
+          <p>TagComplete公式はデフォルトタグリストにNSFW語が含まれると注意している。公開・投稿導線ではAI生成明記、成人向け規約、モデルライセンス、サイトごとの禁止事項を確認させる。</p>
+        </article>
+        <article class="callout">
+          <h3>辞書追加時の検証</h3>
+          <p>Prompt Library YAMLを触る場合は、既存AGENTS.mdの通り <code>resources/prompt-library.yoitomoshi.ja.yaml</code> を <code>js-yaml</code> でparseし、カテゴリ数、タグ数、追加タグの存在を確認する。</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>次にやるなら</h2>
+      <ol>
+        <li><strong>Prompt Library増補案をJSON/YAML設計に落とす。</strong> まずは表情、視線、髪、背景、照明、negativeの6カテゴリだけを追加対象にする。</li>
+        <li><strong>Prompt Helperのルールを増やす。</strong> 自然文から「表情差分」「髪だけ変更」「背景を綺麗に」「投稿向けタグ」などへ変換する。</li>
+        <li><strong>PromptTagChipsに一時無効化を足す。</strong> Prompt All in Oneの有用な操作だけを既存React UIへ持ち込む。</li>
+        <li><strong>Historyの投稿準備カードを作る。</strong> AI生成明記、タグ、キャプション、規約確認のチェックリストをローカルで出す。</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>参照元</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 32%">記事</th>
+            <th>URL</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Stable Diffusionでリアルな表情・顔を生成する呪文</td><td><a href="https://romptn.com/article/2515">https://romptn.com/article/2515</a></td></tr>
+          <tr><td>Stable Diffusionで目線・視線を指定する呪文</td><td><a href="https://romptn.com/article/7410">https://romptn.com/article/7410</a></td></tr>
+          <tr><td>髪型・髪色・髪質・髪飾りの呪文</td><td><a href="https://romptn.com/article/2657">https://romptn.com/article/2657</a></td></tr>
+          <tr><td>靴・靴下に関する呪文</td><td><a href="https://romptn.com/article/21279">https://romptn.com/article/21279</a></td></tr>
+          <tr><td>ポーズ・構図に関する呪文</td><td><a href="https://romptn.com/article/2089">https://romptn.com/article/2089</a></td></tr>
+          <tr><td>年齢指定をする方法と呪文</td><td><a href="https://romptn.com/article/10429">https://romptn.com/article/10429</a></td></tr>
+          <tr><td>肌の色・肌質・肌に関する呪文</td><td><a href="https://romptn.com/article/13479">https://romptn.com/article/13479</a></td></tr>
+          <tr><td>化粧・メイクに関する呪文</td><td><a href="https://romptn.com/article/21283">https://romptn.com/article/21283</a></td></tr>
+          <tr><td>背景・風景・場所が綺麗に生成できる呪文</td><td><a href="https://romptn.com/article/6449">https://romptn.com/article/6449</a></td></tr>
+          <tr><td>光・ライティング・明るさを指定する呪文</td><td><a href="https://romptn.com/article/11980">https://romptn.com/article/11980</a></td></tr>
+          <tr><td>品質に関する呪文</td><td><a href="https://romptn.com/article/28082">https://romptn.com/article/28082</a></td></tr>
+          <tr><td>色に関する呪文</td><td><a href="https://romptn.com/article/28078">https://romptn.com/article/28078</a></td></tr>
+          <tr><td>画風を指定する方法</td><td><a href="https://romptn.com/article/12412">https://romptn.com/article/12412</a></td></tr>
+          <tr><td>リアル・実写系の生成に使える呪文</td><td><a href="https://romptn.com/article/8381">https://romptn.com/article/8381</a></td></tr>
+          <tr><td>アニメ調イラストに使えるプロンプト</td><td><a href="https://romptn.com/article/9549">https://romptn.com/article/9549</a></td></tr>
+          <tr><td>ネガティブプロンプト一覧</td><td><a href="https://romptn.com/article/2905">https://romptn.com/article/2905</a></td></tr>
+          <tr><td>リアルな画像生成をするためのコツ12選</td><td><a href="https://romptn.com/article/5012">https://romptn.com/article/5012</a></td></tr>
+          <tr><td>呪文を保存・削除する方法</td><td><a href="https://romptn.com/article/4784">https://romptn.com/article/4784</a></td></tr>
+          <tr><td>Prompt All in Oneの使い方</td><td><a href="https://romptn.com/article/18298">https://romptn.com/article/18298</a></td></tr>
+          <tr><td>a1111-sd-webui-tagcompleteの使い方</td><td><a href="https://romptn.com/article/16616">https://romptn.com/article/16616</a></td></tr>
+          <tr><td>AIイラスト投稿サイト総まとめ</td><td><a href="https://romptn.com/article/63903">https://romptn.com/article/63903</a></td></tr>
+          <tr><td>Prompt All in One 公式GitHub</td><td><a href="https://github.com/Physton/sd-webui-prompt-all-in-one">https://github.com/Physton/sd-webui-prompt-all-in-one</a></td></tr>
+          <tr><td>a1111-sd-webui-tagcomplete 公式GitHub</td><td><a href="https://github.com/DominikDoom/a1111-sd-webui-tagcomplete">https://github.com/DominikDoom/a1111-sd-webui-tagcomplete</a></td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <p>作成: Codex / 2026-05-16。既存の生成物・runtime・userdataには変更を加えていない。</p>
+  </footer>
+</body>
+</html>

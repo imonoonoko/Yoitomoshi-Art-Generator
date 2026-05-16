@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prompt / LyCORIS 拡張リサーチ - 2026-05-15</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d0f14;
+      --panel: #151922;
+      --panel2: #1b202b;
+      --line: #303746;
+      --ink: #f3f5f8;
+      --muted: #aab2c0;
+      --subtle: #7b8595;
+      --accent: #7c8cff;
+      --accent2: #5ec7b5;
+      --ok: #67c587;
+      --warn: #e2ba5b;
+      --bad: #e36f6f;
+      --code: #0f1219;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.7 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    }
+    a { color: #9aa7ff; }
+    code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: var(--code);
+      color: #dfe4ff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #141824 0%, #0d0f14 100%);
+    }
+    .wrap { max-width: 1220px; margin: 0 auto; padding: 28px; }
+    .eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.25; }
+    h1 { margin-top: 8px; font-size: clamp(28px, 4vw, 44px); }
+    h2 { margin: 32px 0 12px; font-size: 21px; }
+    h3 { font-size: 16px; margin-bottom: 8px; }
+    p { margin: 8px 0 0; }
+    .lead { max-width: 960px; color: var(--muted); font-size: 16px; }
+    .meta, .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill, .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      white-space: nowrap;
+      font-weight: 700;
+    }
+    .pill { padding: 4px 10px; color: var(--muted); font-size: 12px; }
+    .tag { padding: 2px 8px; font-size: 11px; margin: 0 5px 5px 0; }
+    .ok { color: var(--ok); border-color: rgba(103,197,135,.45); }
+    .warn { color: var(--warn); border-color: rgba(226,186,91,.45); }
+    .bad { color: var(--bad); border-color: rgba(227,111,111,.45); }
+    .info { color: var(--accent2); border-color: rgba(94,199,181,.45); }
+    .grid { display: grid; gap: 14px; }
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 16px;
+    }
+    .card.flat { background: var(--panel2); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 8px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      color: #dce1ea;
+      background: #1a1f2a;
+      font-size: 12px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    tr:last-child td { border-bottom: 0; }
+    td.small, .small { color: var(--muted); font-size: 12px; }
+    ul { margin: 8px 0 0; padding-left: 20px; }
+    li + li { margin-top: 4px; }
+    .callout {
+      border: 1px solid rgba(124,140,255,.45);
+      border-radius: 8px;
+      background: rgba(124,140,255,.08);
+      padding: 14px 16px;
+      margin-top: 18px;
+    }
+    .risk { border-color: rgba(227,111,111,.45); background: rgba(227,111,111,.08); }
+    .rec { border-color: rgba(103,197,135,.45); background: rgba(103,197,135,.08); }
+    .mono {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--code);
+      padding: 12px;
+      color: #d9def0;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    footer {
+      margin-top: 36px;
+      border-top: 1px solid var(--line);
+      color: var(--subtle);
+      font-size: 12px;
+    }
+    @media (max-width: 860px) {
+      .wrap { padding: 20px; }
+      .cols-2, .cols-3 { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="eyebrow">Extension Research</div>
+      <h1>Prompt / LyCORIS 拡張リサーチ</h1>
+      <p class="lead">
+        指定された3つの Stable Diffusion WebUI 拡張について、公式README、GitHub APIメタデータ、主要実装ファイル、二次情報、ローカルForge構成を照合した調査メモ。
+        Yoitomoshi Art Generator へ入れる場合は「Forgeへ直接拡張を追加する」より「React/Electron側に安全に取り込む」観点で評価した。
+      </p>
+      <div class="meta">
+        <span class="pill">調査日: 2026-05-15 JST</span>
+        <span class="pill">対象: A1111 / Forge extension</span>
+        <span class="pill">前提: Yoitomoshi は Forge API + React UI</span>
+        <span class="pill">判断軸: 導入価値 / 競合リスク / 既存機能シナジー</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="callout rec">
+      <h2>結論</h2>
+      <p>
+        直接導入の優先度は <code>sd-webui-prompt-format</code> の発想をReact側へ取り込む案が最も高い。
+        <code>stable-diffusion-webui-text2prompt</code> は自然文からDanbooruタグ候補を出す設計がPrompt Helper改善に使えるが、拡張本体はGradioタブとPython/Hugging Face依存が重く、現行UIにはそのまま馴染みにくい。
+        <code>a1111-sd-webui-lycoris</code> は現行Forge側にLyCORIS/LoHa/LoKr系の処理が既に入っているため、直接追加は重複・競合リスクが高い。
+      </p>
+    </section>
+
+    <section>
+      <h2>導入判断サマリ</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>拡張</th>
+            <th>目的</th>
+            <th>状態</th>
+            <th>Yoitomoshiでの扱い</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <strong>text2prompt</strong><br>
+              <span class="small">MIT / Python / stars 169 / latest push 2024-05-28</span>
+            </td>
+            <td>短い自然文・テーマからDanbooruタグ候補を生成する。</td>
+            <td>README上はA1111拡張。内部はGradioタブ、DanbooruタグDB、sentence-transformers系モデルで類似度検索。</td>
+            <td>
+              <span class="tag warn">直接導入は低優先</span>
+              <span class="tag ok">Prompt Helper強化の参考</span>
+              既存のローカルPrompt Helperへ「テーマから候補タグを出す」軽量版として吸収するのがよい。
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <strong>Prompt Format</strong><br>
+              <span class="small">MIT / JavaScript / stars 90 / latest push 2026-04-08</span>
+            </td>
+            <td>プロンプトの余分な空白・カンマ・重複タグ・アンダースコアを整形する。</td>
+            <td>Forge互換をREADMEで明記。主処理はブラウザJSで、設定はA1111 settingsへ追加。</td>
+            <td>
+              <span class="tag ok">採用候補</span>
+              <span class="tag ok">React実装向き</span>
+              拡張本体ではなく、YoitomoshiのPrompt欄に「整形」「重複削除」「貼り付け整形」として実装する価値が高い。
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <strong>a1111-sd-webui-lycoris</strong><br>
+              <span class="small">Apache-2.0 / Python / stars 890 / latest push 2024-02-16</span>
+            </td>
+            <td>旧A1111や一部ForgeでLyCORISモデルを読み込む。</td>
+            <td>README上は sd-webui &lt; 1.5.0 とForgeのlegacy用途。A1111 1.5.0以降はLoRA側へ統合。</td>
+            <td>
+              <span class="tag bad">直接導入しない</span>
+              <span class="tag info">ローカル確認済み</span>
+              同梱ForgeにLyCORIS系実装があるため、UI側はモデル管理・検出・説明を整える方が安全。
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>1. stable-diffusion-webui-text2prompt</h2>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>機能</h3>
+          <ul>
+            <li><code>Input Theme</code> と <code>Input Negative Theme</code> から、Danbooruタグを生成するA1111用タブ拡張。</li>
+            <li>READMEでは、Danbooruタグ説明文の埋め込みと入力文のcosine similarityでタグを選ぶと説明されている。</li>
+            <li><code>Cutoff and Power</code> / <code>Softmax</code>、<code>Top-k</code> / <code>Top-p</code>、最大タグ数、重み付き選択などを持つ。</li>
+            <li>実装上は <code>scripts/main.py</code> がGradio UIを作り、<code>WDLike</code> がHugging Faceモデルをロードして推論する。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Yoitomoshiへの適合</h3>
+          <ul>
+            <li>既存の <code>PromptHelperPanel</code> はローカル規則・Prompt Library・履歴レビュータグを使って候補を追加する設計。</li>
+            <li>text2prompt本体をForge拡張として入れても、YoitomoshiのReact UIから自然に触れない。</li>
+            <li>48MB級の事前計算DBやTransformerロードが入り、起動時間・環境依存・GPU/CPUメモリ面の負担が増える。</li>
+            <li>採用するなら「Danbooruタグ辞書 + 類似候補ランキング」の発想だけを軽量なPrompt Helper候補として取り込む。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout">
+        <h3>実装案</h3>
+        <p>
+          P1候補として、Prompt Helperに「テーマ語からタグ候補」を追加する。初期実装はHugging Face依存を避け、
+          既存のPrompt Library、レビュー済み正解タグ、PixAI/WD14比較結果からローカル辞書を作る。
+          将来必要になった場合だけ、埋め込み検索を任意機能として分離する。
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. sd-webui-prompt-format</h2>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>機能</h3>
+          <ul>
+            <li>txt2img / img2img / Hires prompt / Negative prompt を対象に整形する。</li>
+            <li>余分な空白・カンマ、括弧まわり、ピリオド前後、行末カンマを補正する。</li>
+            <li>同一行内の重複タグ削除、アンダースコア除去、タグalias、Booruサイトからの貼り付け整形を持つ。</li>
+            <li>実装は <code>javascript/prompt_format.js</code> 中心で、LoRAタグや <code>AND</code> / <code>BREAK</code> / <code>ADDROW</code> / <code>ADDCOL</code> を保護してから整形している。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Yoitomoshiへの適合</h3>
+          <ul>
+            <li>これはForge側へ入れるより、ReactのPrompt欄に直接入れる方が相性がよい。</li>
+            <li>既存の <code>promptAppend()</code>、Prompt Helper、History review、Tagger比較とシナジーがある。</li>
+            <li>「保存前に整形」「生成前に確認」「貼り付け時だけ整形」を選べると、初心者にも扱いやすい。</li>
+            <li>自動整形は意図しないプロンプト変更が起きるため、初期値は手動ボタンまたはPreflight警告が安全。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout rec">
+        <h3>最優先の取り込み案</h3>
+        <p>
+          P0候補として、YoitomoshiのPrompt入力まわりに「整形」アクションを追加する。
+          最小範囲は、空白/カンマ正規化、同一行重複削除、<code>&lt;lora:...&gt;</code> 保護、<code>AND</code>/<code>BREAK</code>保護、除外タグリストの維持。
+          その後、Taggerのblacklistや履歴レビューの除外タグをPrompt Formatのalias/除外設定へ接続できる。
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. a1111-sd-webui-lycoris</h2>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3>機能</h3>
+          <ul>
+            <li>旧A1111向けにLyCORISをExtra Networksとして登録し、<code>&lt;lyco:MODEL:WEIGHT&gt;</code> 形式で利用できるようにする。</li>
+            <li><code>--lyco-dir</code> でモデル格納先を指定でき、デフォルトは <code>models/LyCORIS</code>。</li>
+            <li>APIとして <code>/sdapi/v1/lycos</code> と <code>/sdapi/v1/refresh-lycos</code> を追加する実装がある。</li>
+            <li>README上も sd-webui &lt; 1.5.0 とForge legacy用途であることを明記している。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>ローカルForge確認</h3>
+          <ul>
+            <li><code>runtime\forge\webui\extensions-builtin\sd_forge_lora\preload.py</code> に <code>--lyco-dir</code> / <code>--lyco-dir-backcompat</code> がある。</li>
+            <li><code>runtime\forge\webui\backend\patcher\lora.py</code> に <code>lokr</code> / <code>loha</code> のpatch処理がある。</li>
+            <li><code>runtime\forge\webui\packages_3rdparty\webui_lora_collection</code> と <code>comfyui_lora_collection</code> にLyCORIS系処理が入っている。</li>
+            <li>そのため、拡張を追加すると旧ローダーとForge内蔵ローダーが重なり、モデル一覧・prompt syntax・infotext変換が混乱する可能性がある。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout risk">
+        <h3>導入しない理由</h3>
+        <p>
+          A1111 1.5.0のリリースノートではLyCORIS拡張が扱っていたネットワーク種別をLoRA拡張へ統合したと説明されている。
+          LyCORIS本体READMEも、1.5.0以降は <code>models/Lora</code> または <code>models/LyCORIS</code> に置いて <code>&lt;lora:filename:multiplier&gt;</code> を使う流れを示している。
+          YoitomoshiではForge側へ旧拡張を入れるより、LoRA/LyCORISモデルを安全に検出・分類・説明するUIを整えるべき。
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>既存機能とのシナジー</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>既存機能</th>
+            <th>つなげる拡張知見</th>
+            <th>改善案</th>
+            <th>優先度</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Prompt Helper</td>
+            <td>text2promptのテーマ入力 / Prompt Formatの整形</td>
+            <td>自然文候補生成後に、整形・重複削除・タグ正規化を同じ導線で実行する。</td>
+            <td><span class="tag ok">P0-P1</span></td>
+          </tr>
+          <tr>
+            <td>History review / Tagger比較</td>
+            <td>Prompt Formatのalias / exclusion発想</td>
+            <td>何度も除外されたタグをPrompt整形の除外・blacklist候補へ出す。正解タグは重複削除のcanonical tagとして扱う。</td>
+            <td><span class="tag ok">P0</span></td>
+          </tr>
+          <tr>
+            <td>LoRA管理 / Civitai補助</td>
+            <td>LyCORISのモデル種別と格納先</td>
+            <td><code>models/LyCORIS</code> もスキャン対象・説明対象にし、<code>&lt;lyco:&gt;</code> 旧記法を <code>&lt;lora:&gt;</code> 推奨へ誘導する。</td>
+            <td><span class="tag warn">P1</span></td>
+          </tr>
+          <tr>
+            <td>Generation Preflight</td>
+            <td>Prompt Formatの危険な自動変更への注意</td>
+            <td>生成前に「重複タグが多い」「旧LyCO syntaxがある」「余分なメタタグがある」を警告し、ワンクリック修正にする。</td>
+            <td><span class="tag ok">P0</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>次の実装候補</h2>
+      <div class="grid cols-3">
+        <div class="card">
+          <h3>P0: Prompt Formatter</h3>
+          <p>プロンプト欄に手動の整形ボタンを追加。LoRAタグ、BREAK/AND、Regional Prompter系キーワードを保護しながら空白・カンマ・重複を整える。</p>
+          <div class="tags">
+            <span class="tag ok">低リスク</span>
+            <span class="tag ok">即効性あり</span>
+            <span class="tag info">React実装</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>P1: Theme to Tags</h3>
+          <p>text2promptの発想を、Prompt Library + 履歴レビュー + Tagger正解タグのローカル辞書で軽量化。最初は埋め込み検索なしで候補提示する。</p>
+          <div class="tags">
+            <span class="tag warn">設計必要</span>
+            <span class="tag ok">既存資産活用</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>P1: LyCORIS UX</h3>
+          <p>旧 <code>&lt;lyco:&gt;</code> prompt を検出して <code>&lt;lora:&gt;</code> に案内。モデルライブラリではLoRA/LyCORIS/LoCon/LoHa/LoKrを説明付きで表示する。</p>
+          <div class="tags">
+            <span class="tag warn">検証必要</span>
+            <span class="tag info">直接拡張不要</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>採用しない選択肢</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>案</th>
+            <th>採用しない理由</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>3拡張をForgeへそのままclone</td>
+            <td>Gradio UI前提の拡張はReact UIから扱いにくい。起動・依存・設定・DOMが増え、API主導の安定性を落とす。</td>
+          </tr>
+          <tr>
+            <td>text2promptのTransformer依存をすぐ組み込む</td>
+            <td>モデルダウンロード、デバイス差、起動時間、メモリ消費が増える。まずローカル辞書ベースで価値を確認すべき。</td>
+          </tr>
+          <tr>
+            <td>LyCORIS legacy extensionを同梱Forgeへ追加</td>
+            <td>Forge内蔵LoRA/LyCORIS処理と責務が重なる。モデル適用の不具合時に原因分離が難しくなる。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>調査メモ</h2>
+      <div class="mono">GitHub API snapshot:
+- toshiaki1729/stable-diffusion-webui-text2prompt: MIT, Python, stars 169, forks 16, open issues 2, pushed_at 2024-05-28
+- Haoming02/sd-webui-prompt-format: MIT, JavaScript, stars 90, forks 6, open issues 0, pushed_at 2026-04-08
+- KohakuBlueleaf/a1111-sd-webui-lycoris: Apache-2.0, Python, stars 890, forks 109, open issues 3, pushed_at 2024-02-16
+
+Local Forge evidence:
+- extensions-builtin\sd_forge_lora\preload.py has --lyco-dir / --lyco-dir-backcompat
+- backend\patcher\lora.py handles lokr and loha patch types
+- packages_3rdparty\webui_lora_collection and comfyui_lora_collection include LyCORIS-related network code</div>
+    </section>
+
+    <section>
+      <h2>参照元</h2>
+      <ul>
+        <li><a href="https://github.com/toshiaki1729/stable-diffusion-webui-text2prompt">toshiaki1729/stable-diffusion-webui-text2prompt</a></li>
+        <li><a href="https://raw.githubusercontent.com/toshiaki1729/stable-diffusion-webui-text2prompt/main/scripts/main.py">text2prompt scripts/main.py</a></li>
+        <li><a href="https://raw.githubusercontent.com/toshiaki1729/stable-diffusion-webui-text2prompt/main/scripts/t2p/prompt_generator/wd_like.py">text2prompt WDLike implementation</a></li>
+        <li><a href="https://github.com/Haoming02/sd-webui-prompt-format">Haoming02/sd-webui-prompt-format</a></li>
+        <li><a href="https://raw.githubusercontent.com/Haoming02/sd-webui-prompt-format/main/javascript/prompt_format.js">Prompt Format prompt_format.js</a></li>
+        <li><a href="https://raw.githubusercontent.com/Haoming02/sd-webui-prompt-format/main/scripts/pf_settings.py">Prompt Format pf_settings.py</a></li>
+        <li><a href="https://github.com/KohakuBlueleaf/a1111-sd-webui-lycoris">KohakuBlueleaf/a1111-sd-webui-lycoris</a></li>
+        <li><a href="https://raw.githubusercontent.com/KohakuBlueleaf/a1111-sd-webui-lycoris/main/scripts/lyco_script.py">LyCORIS extension lyco_script.py</a></li>
+        <li><a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui/releases/tag/v1.5.0">AUTOMATIC1111 stable-diffusion-webui v1.5.0 release</a></li>
+        <li><a href="https://github.com/kohakublueleaf/lycoris">KohakuBlueleaf/LyCORIS</a></li>
+        <li><a href="https://ctrs-jp.com/text2prompt/">シトラズム: text2prompt使い方記事</a></li>
+        <li><a href="https://gift-by-gifted.com/stable-diffusion-text2prompt/">Gift by Gifted: text2prompt紹介記事</a></li>
+        <li><a href="https://romptn.com/article/19201">romptn Magazine: Prompt Format使い方記事</a></li>
+        <li><a href="https://stable-diffusion-art.com/lycoris/">Stable Diffusion Art: LyCORIS解説</a></li>
+        <li><a href="https://techtactician.com/lycoris-models-in-stable-diffusion-webui-guide/">Tech Tactician: LyCORIS WebUI guide</a></li>
+      </ul>
+      <p class="small">
+        二次情報は操作感・利用者側の文脈確認に限定して扱った。導入可否の判断はGitHub README、実装ファイル、A1111 release、ローカルForge確認を優先した。
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      Generated for Yoitomoshi Art Generator. Report file: docs/EXTENSION_RESEARCH_PROMPT_LYCORIS_2026-05-15.html
+    </div>
+  </footer>
+</body>
+</html>

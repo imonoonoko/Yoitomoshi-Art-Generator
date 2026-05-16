@@ -89,7 +89,37 @@ export function LoraCard({ lora, compact = false, badge, badgeTooltip }: Props):
   }
 
   const baseModelBadge = meta?.baseModel
+  const adapterBadge = lora.adapterSubtype && lora.adapterSubtype !== 'Unknown'
+    ? lora.adapterSubtype
+    : lora.sourceRoot === 'LyCORIS'
+      ? 'LyCORIS'
+      : 'LoRA'
   const triggerWords = meta?.trainedWords ?? []
+  const usageBadges: Array<{ key: string; label: string; title: string; tone?: 'warn' | 'ok' }> = []
+  if (meta?.usage?.allowCommercialUse) {
+    usageBadges.push({
+      key: 'commercial',
+      label: t('loraCard.usageCommercialShort'),
+      title: t('loraCard.usageCommercialTitle', { value: formatCommercialUse(meta.usage.allowCommercialUse) }),
+      tone: meta.usage.allowCommercialUse.toLowerCase() === 'none' ? 'warn' : 'ok'
+    })
+  }
+  if (typeof meta?.usage?.allowNoCredit === 'boolean') {
+    usageBadges.push({
+      key: 'credit',
+      label: meta.usage.allowNoCredit ? t('loraCard.usageNoCreditShort') : t('loraCard.usageCreditRequiredShort'),
+      title: meta.usage.allowNoCredit ? t('loraCard.usageNoCreditTitle') : t('loraCard.usageCreditRequiredTitle'),
+      tone: meta.usage.allowNoCredit ? 'ok' : 'warn'
+    })
+  }
+  if (typeof meta?.usage?.allowDerivatives === 'boolean') {
+    usageBadges.push({
+      key: 'derivatives',
+      label: meta.usage.allowDerivatives ? t('loraCard.usageDerivativesShort') : t('loraCard.usageNoDerivativesShort'),
+      title: meta.usage.allowDerivatives ? t('loraCard.usageDerivativesTitle') : t('loraCard.usageNoDerivativesTitle'),
+      tone: meta.usage.allowDerivatives ? 'ok' : 'warn'
+    })
+  }
 
   return (
     <div
@@ -159,6 +189,19 @@ export function LoraCard({ lora, compact = false, badge, badgeTooltip }: Props):
             {baseModelBadge && (
               <span className="px-1 py-0.5 bg-bg-3 rounded text-ink-1">{baseModelBadge}</span>
             )}
+            <span
+              className={cn(
+                'px-1 py-0.5 rounded text-ink-1',
+                lora.sourceRoot === 'LyCORIS' ? 'bg-warn/20' : 'bg-bg-3'
+              )}
+              title={`${lora.sourceRoot ?? 'Lora'} / ${lora.tokenName ?? lora.name}`}
+              data-testid="lora-adapter-badge"
+            >
+              {adapterBadge}
+            </span>
+            {lora.baseModelHint && !baseModelBadge && (
+              <span className="px-1 py-0.5 bg-bg-3 rounded text-ink-1">{lora.baseModelHint}</span>
+            )}
             {triggerWords.slice(0, 3).map((t) => (
               <span key={t} className="px-1 py-0.5 bg-accent-dim/30 text-ink-1 rounded font-mono">
                 {t}
@@ -167,6 +210,32 @@ export function LoraCard({ lora, compact = false, badge, badgeTooltip }: Props):
             {triggerWords.length > 3 && (
               <span className="text-ink-3">+{triggerWords.length - 3}</span>
             )}
+            {meta?.availability?.primaryFileFormat && (
+              <span className="px-1 py-0.5 bg-bg-3 rounded text-ink-1">
+                {meta.availability.primaryFileFormat}
+              </span>
+            )}
+            {meta?.availability?.primaryFileSha256 && (
+              <span
+                className="px-1 py-0.5 bg-bg-3 rounded text-ink-1 font-mono"
+                title={meta.availability.primaryFileSha256}
+              >
+                SHA
+              </span>
+            )}
+            {usageBadges.slice(0, 3).map((badge) => (
+              <span
+                key={badge.key}
+                className={cn(
+                  'px-1 py-0.5 rounded text-ink-1',
+                  badge.tone === 'warn' ? 'bg-warn/20' : 'bg-bg-3'
+                )}
+                title={badge.title}
+                data-testid="lora-usage-badge"
+              >
+                {badge.label}
+              </span>
+            ))}
             {meta?.civitaiUrl && (
               <button
                 className="ml-auto text-ink-3 hover:text-ink-1"
@@ -216,4 +285,12 @@ export function LoraCard({ lora, compact = false, badge, badgeTooltip }: Props):
       </div>
     </div>
   )
+}
+
+function formatCommercialUse(value: string): string {
+  const normalized = value.trim()
+  if (!normalized) return '-'
+  return normalized
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/^None$/i, 'None')
 }

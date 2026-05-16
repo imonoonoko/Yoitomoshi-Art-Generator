@@ -11,6 +11,15 @@ import type {
   ControlNetDetectRequest,
   ControlNetDetectResult
 } from '../src/shared/types.js'
+import { inspectSafetensors } from './safetensors-inspect.js'
+
+type RawSdModel = {
+  title: string
+  model_name: string
+  filename: string
+  hash: string | null
+  sha256: string | null
+}
 
 /**
  * Thin REST client for Forge's A1111-compatible API.
@@ -43,21 +52,19 @@ export class ForgeApi {
   }
 
   async listModels(): Promise<SdModel[]> {
-    type Raw = {
-      title: string
-      model_name: string
-      filename: string
-      hash: string | null
-      sha256: string | null
+    const raw = await this.req<RawSdModel[]>('/sdapi/v1/sd-models')
+    const models: SdModel[] = []
+    for (const m of raw) {
+      if (!(await isUsableForgeCheckpoint(m))) continue
+      models.push({
+        title: m.title,
+        modelName: m.model_name,
+        filename: m.filename,
+        hash: m.hash,
+        sha256: m.sha256
+      })
     }
-    const raw = await this.req<Raw[]>('/sdapi/v1/sd-models')
-    return raw.map((m) => ({
-      title: m.title,
-      modelName: m.model_name,
-      filename: m.filename,
-      hash: m.hash,
-      sha256: m.sha256
-    }))
+    return models
   }
 
   async refreshModels(): Promise<void> {
@@ -306,4 +313,18 @@ export class ForgeApi {
       })
     })
   }
+}
+
+async function isUsableForgeCheckpoint(model: RawSdModel): Promise<boolean> {
+  if (!model.title || !model.filename) return false
+  if (model.hash || model.sha256) return true
+  if (!model.filename.toLowerCase().endsWith('.safetensors')) return true
+
+  const inspected = await inspectSafetensors(model.filename)
+  if (inspected.kind === 'checkpoint') return true
+
+  console.warn(
+    `[forge-api] hiding unrecognized checkpoint candidate: ${model.title} (${inspected.kind})`
+  )
+  return false
 }

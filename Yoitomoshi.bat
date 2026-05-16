@@ -61,8 +61,7 @@ if errorlevel 1 (
 echo.
 
 echo Starting app...
-if not exist "%~dp0userdata" mkdir "%~dp0userdata"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$root=(Resolve-Path '.').Path; $exe=Join-Path $root 'node_modules\electron\dist\electron.exe'; $out=Join-Path $root 'userdata\launcher-electron.out.log'; $err=Join-Path $root 'userdata\launcher-electron.err.log'; Add-Content -LiteralPath $out ('--- launch ' + (Get-Date).ToString('yyyy-MM-dd HH:mm:ss') + ' ---'); Add-Content -LiteralPath $err ('--- launch ' + (Get-Date).ToString('yyyy-MM-dd HH:mm:ss') + ' ---'); $p=Start-Process -FilePath $exe -ArgumentList @($root) -WorkingDirectory $root -RedirectStandardOutput $out -RedirectStandardError $err -PassThru; Start-Sleep -Seconds 8; if($p.HasExited){ Write-Host '[!] Electron exited during startup. Recent stderr log:'; if(Test-Path $err){ Get-Content -LiteralPath $err -Tail 40 }; exit 1 }; exit 0"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\launch-electron.ps1" -Root "%CD%"
 if errorlevel 1 (
     echo.
     echo [!] The app exited during startup.

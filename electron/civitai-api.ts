@@ -9,6 +9,7 @@ import type {
   CivitaiDownloadRequest,
   CivitaiQuickRef,
   CivitaiRecommended,
+  CivitaiSearchFile,
   CivitaiSearchItem,
   CivitaiSearchOptions,
   CivitaiSearchResult,
@@ -20,6 +21,102 @@ import type {
 
 const CIVITAI_BASE = 'https://civitai.com/api/v1'
 const HASH_CACHE = new Map<string, string>() // filepath → sha256
+
+type CivitaiErrorKind =
+  | 'auth'
+  | 'rate-limit'
+  | 'not-found'
+  | 'server'
+  | 'network'
+  | 'unknown'
+
+export class CivitaiHttpError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number | null,
+    public readonly kind: CivitaiErrorKind,
+    public readonly retriable: boolean
+  ) {
+    super(message)
+    this.name = 'CivitaiHttpError'
+  }
+}
+
+function civitaiHeaders(apiKey: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'User-Agent': 'Yoitomoshi-Art-Generator/0.1'
+  }
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
+  return headers
+}
+
+async function civitaiJson<T>(
+  pathOrUrl: string,
+  apiKey: string | null,
+  label: string,
+  init?: RequestInit
+): Promise<T | null> {
+  const url = pathOrUrl.startsWith('http') ? pathOrUrl : `${CIVITAI_BASE}${pathOrUrl}`
+  let response: Response
+  try {
+    response = await fetch(url, {
+      ...init,
+      headers: {
+        ...civitaiHeaders(apiKey),
+        ...(init?.headers as Record<string, string> | undefined)
+      }
+    })
+  } catch (error) {
+    throw new CivitaiHttpError(
+      `${label}: Civitaiへ接続できません (${(error as Error).message})`,
+      null,
+      'network',
+      true
+    )
+  }
+
+  if (response.status === 404) return null
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    throw classifyCivitaiError(label, response.status, body)
+  }
+  return (await response.json()) as T
+}
+
+function classifyCivitaiError(label: string, status: number, body: string): CivitaiHttpError {
+  const detail = body.trim().slice(0, 200)
+  if (status === 401 || status === 403) {
+    return new CivitaiHttpError(
+      `${label}: Civitai APIキーが未設定、期限切れ、または権限不足です`,
+      status,
+      'auth',
+      false
+    )
+  }
+  if (status === 429) {
+    return new CivitaiHttpError(
+      `${label}: Civitaiのレート制限に達しました。時間を置くかAPIキーを設定してください`,
+      status,
+      'rate-limit',
+      true
+    )
+  }
+  if (status >= 500) {
+    return new CivitaiHttpError(
+      `${label}: Civitai側の一時エラーです (${status})${detail ? `: ${detail}` : ''}`,
+      status,
+      'server',
+      true
+    )
+  }
+  return new CivitaiHttpError(
+    `${label}: Civitai API ${status}${detail ? `: ${detail}` : ''}`,
+    status,
+    'unknown',
+    false
+  )
+}
 
 /**
  * Compute SHA-256 of a model file.
@@ -78,6 +175,9 @@ interface CivitaiFile {
   downloadUrl?: string
   hashes?: { SHA256?: string; AutoV2?: string }
   primary?: boolean
+  metadata?: { format?: string; fp?: string; size?: string }
+  pickleScanResult?: string
+  virusScanResult?: string
 }
 
 interface CivitaiVersion {
@@ -93,6 +193,10 @@ interface CivitaiVersion {
     type: string
     nsfw: boolean
     tags?: string[]
+    allowNoCredit?: boolean
+    allowCommercialUse?: string
+    allowDerivatives?: boolean
+    allowDifferentLicense?: boolean
   }
 }
 
@@ -107,16 +211,12 @@ export async function fetchByHash(
   sha256: string,
   apiKey: string | null
 ): Promise<CivitaiRecommended | null> {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'User-Agent': 'Yoitomoshi-Art-Generator/0.1'
-  }
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
-
-  const r = await fetch(`${CIVITAI_BASE}/model-versions/by-hash/${sha256}`, { headers })
-  if (r.status === 404) return null
-  if (!r.ok) throw new Error(`Civitai API ${r.status}: ${(await r.text()).slice(0, 200)}`)
-  const v = (await r.json()) as CivitaiVersion
+  const v = await civitaiJson<CivitaiVersion>(
+    `/model-versions/by-hash/${sha256}`,
+    apiKey,
+    'Civitai hash lookup'
+  )
+  if (!v) return null
 
   return {
     modelName: v.model.name,
@@ -175,23 +275,36 @@ export async function fetchLoraByHash(
   sha256: string,
   apiKey: string | null
 ): Promise<LoraCivitaiMetadata | null> {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'User-Agent': 'Yoitomoshi-Art-Generator/0.1'
-  }
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
-
-  const r = await fetch(`${CIVITAI_BASE}/model-versions/by-hash/${sha256}`, { headers })
-  if (r.status === 404) return null
-  if (!r.ok) throw new Error(`Civitai API ${r.status}: ${(await r.text()).slice(0, 200)}`)
-  const v = (await r.json()) as CivitaiVersion
+  const v = await civitaiJson<CivitaiVersion>(
+    `/model-versions/by-hash/${sha256}`,
+    apiKey,
+    'Civitai LoRA hash lookup'
+  )
+  if (!v) return null
+  const primaryFile = pickPrimaryModelFile(v.files ?? [])
 
   return {
+    modelId: v.modelId,
+    modelVersionId: v.id,
     modelName: v.model.name,
     versionName: v.name,
     baseModel: v.baseModel,
     trainedWords: v.trainedWords ?? [],
     tags: v.model.tags ?? [],
+    files: normalizeCivitaiFiles(v.files ?? []),
+    availability: {
+      primaryFileSha256: primaryFile?.hashes?.SHA256 ?? null,
+      primaryFileName: primaryFile?.name ?? null,
+      primaryFileFormat: primaryFile?.metadata?.format ?? null,
+      pickleScanResult: primaryFile?.pickleScanResult ?? null,
+      virusScanResult: primaryFile?.virusScanResult ?? null
+    },
+    usage: {
+      allowNoCredit: typeof v.model.allowNoCredit === 'boolean' ? v.model.allowNoCredit : null,
+      allowCommercialUse: v.model.allowCommercialUse ?? null,
+      allowDerivatives: typeof v.model.allowDerivatives === 'boolean' ? v.model.allowDerivatives : null,
+      allowDifferentLicense: typeof v.model.allowDifferentLicense === 'boolean' ? v.model.allowDifferentLicense : null
+    },
     thumbnailUrl: pickThumbnail(v.images ?? []),
     civitaiUrl: `https://civitai.com/models/${v.modelId}?modelVersionId=${v.id}`,
     fetchedAt: Date.now()
@@ -210,7 +323,7 @@ function extractRecommendedLoras(
   images: CivitaiImage[]
 ): { name: string; weight: number; frequency: number }[] {
   const counts = new Map<string, { weights: number[]; freq: number }>()
-  const re = /<lora:([^:>]+):([^>]+)>/gi
+  const re = /<(?:lora|lyco):([^:>]+):([^>]+)>/gi
   for (const img of images) {
     const prompt = img.meta?.prompt
     if (!prompt) continue
@@ -219,7 +332,7 @@ function extractRecommendedLoras(
     while ((m = re.exec(prompt)) !== null) {
       const name = m[1].trim()
       if (!name) continue
-      const weight = parseFloat(m[2]) || 1
+      const weight = parseAdapterWeight(m[2])
       const e = counts.get(name) ?? { weights: [], freq: 0 }
       e.weights.push(weight)
       e.freq++
@@ -360,17 +473,21 @@ export async function searchCivitai(
     params.set('page', String(opts.page ?? 1))
   }
 
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'User-Agent': 'Yoitomoshi-Art-Generator/0.1'
+  const data = await civitaiJson<RawSearchResponse>(
+    `/models?${params.toString()}`,
+    apiKey,
+    'Civitai search'
+  )
+  if (!data) {
+    return {
+      items: [],
+      totalItems: 0,
+      totalPages: 1,
+      currentPage: opts.page ?? 1,
+      nextPage: null,
+      nextCursor: null
+    }
   }
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
-
-  const r = await fetch(`${CIVITAI_BASE}/models?${params.toString()}`, { headers })
-  if (!r.ok) {
-    throw new Error(`Civitai search ${r.status}: ${(await r.text()).slice(0, 200)}`)
-  }
-  const data = (await r.json()) as RawSearchResponse
   return {
     items: (data.items ?? []).map(normalizeSearchItem),
     totalItems: data.metadata?.totalItems ?? 0,
@@ -459,6 +576,25 @@ function normalizeSearchItem(raw: RawSearchItem): CivitaiSearchItem {
       }))
     }))
   }
+}
+
+function normalizeCivitaiFiles(files: CivitaiFile[]): CivitaiSearchFile[] {
+  return files.map((f) => ({
+    id: f.id,
+    name: f.name,
+    type: f.type ?? 'Model',
+    sizeKB: f.sizeKB ?? null,
+    downloadUrl: f.downloadUrl ?? null,
+    primary: !!f.primary,
+    hashes: { sha256: f.hashes?.SHA256 ?? null }
+  }))
+}
+
+function pickPrimaryModelFile(files: CivitaiFile[]): CivitaiFile | undefined {
+  return files.find((f) => f.primary && /^model$/i.test(f.type ?? 'Model')) ??
+    files.find((f) => /^model$/i.test(f.type ?? 'Model')) ??
+    files.find((f) => f.primary) ??
+    files[0]
 }
 
 /**
@@ -568,10 +704,7 @@ export async function downloadCivitaiFile(
 
   const res = await fetch(req.url, { headers, signal, redirect: 'follow' })
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) {
-      throw new Error('Civitai が認証を要求しています。設定から API キーを登録してください')
-    }
-    throw new Error(`ダウンロード失敗 ${res.status}`)
+    throw classifyCivitaiError('Civitai download', res.status, await res.text().catch(() => ''))
   }
   if (!res.body) throw new Error('レスポンスボディがありません')
 
@@ -779,11 +912,11 @@ function aggregateMinedSamples(
       }
     } else if (typeof meta.prompt === 'string') {
       // Fallback: pull <lora:name:weight> from the prompt string.
-      const re = /<lora:([^:>]+):([^>]+)>/gi
+      const re = /<(?:lora|lyco):([^:>]+):([^>]+)>/gi
       let m: RegExpExecArray | null
       while ((m = re.exec(meta.prompt)) !== null) {
         const name = m[1].trim()
-        const w = parseFloat(m[2]) || 1
+        const w = parseAdapterWeight(m[2])
         const arr = loraOccurrences.get(name) ?? []
         arr.push(w)
         loraOccurrences.set(name, arr)
@@ -819,6 +952,16 @@ function aggregateMinedSamples(
     commonPositivePhrases: extractCommonPhrases(positivePrompts, 0.3, 12),
     commonNegativePhrases: extractCommonPhrases(negativePrompts, 0.3, 8)
   }
+}
+
+function parseAdapterWeight(raw: string): number {
+  const direct = parseFloat(raw)
+  if (Number.isFinite(direct)) return direct
+  const unet = raw.match(/(?:^|:)unet=(-?\d+(?:\.\d+)?)/i)
+  if (unet) return Number(unet[1])
+  const te = raw.match(/(?:^|:)te=(-?\d+(?:\.\d+)?)/i)
+  if (te) return Number(te[1])
+  return 1
 }
 
 function counts<T>(arr: T[]): { name: T; freq: number }[] {
@@ -932,23 +1075,17 @@ async function refFromHash(
   hash: string,
   apiKey: string | null
 ): Promise<CivitaiQuickRef | null> {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'User-Agent': 'Yoitomoshi-Art-Generator/0.1'
-  }
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
   try {
-    const r = await fetch(`${CIVITAI_BASE}/model-versions/by-hash/${hash}`, { headers })
-    if (!r.ok) return null
-    const v = (await r.json()) as {
+    const v = await civitaiJson<{
       id: number
       modelId: number
       name: string
       baseModel?: string
       images?: Array<{ url: string; nsfw: boolean | string }>
-      files?: Array<{ name: string; downloadUrl?: string; primary?: boolean; type?: string }>
+      files?: Array<{ name: string; downloadUrl?: string; primary?: boolean; type?: string; hashes?: { SHA256?: string } }>
       model: { name: string; type: string }
-    }
+    }>(`/model-versions/by-hash/${hash}`, apiKey, 'Civitai image hash lookup')
+    if (!v) return null
     const primaryFile = v.files?.find((f) => f.primary) ?? v.files?.[0]
     return {
       modelId: v.modelId,
@@ -961,6 +1098,7 @@ async function refFromHash(
       ),
       pageUrl: `https://civitai.com/models/${v.modelId}?modelVersionId=${v.id}`,
       downloadUrl: primaryFile?.downloadUrl ?? null,
+      primaryFileSha256: primaryFile?.hashes?.SHA256 ?? null,
       filenames: (v.files ?? []).map((f) => f.name).filter(Boolean) as string[]
     }
   } catch {
@@ -1005,6 +1143,7 @@ async function refFromNameSearch(
     thumbnailUrl: version?.thumbnailUrl ?? null,
     pageUrl: item.pageUrl,
     downloadUrl: primaryFile?.downloadUrl ?? null,
+    primaryFileSha256: primaryFile?.hashes.sha256 ?? null,
     filenames: (version?.files ?? []).map((f) => f.name)
   }
 }
@@ -1021,16 +1160,9 @@ export async function listCivitaiTags(
   apiKey: string | null,
   limit = 50
 ): Promise<CivitaiTag[]> {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'User-Agent': 'Yoitomoshi-Art-Generator/0.1'
-  }
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
-
   type Resp = { items: Array<{ name: string; modelCount?: number }> }
-  const r = await fetch(`${CIVITAI_BASE}/tags?limit=${limit}`, { headers })
-  if (!r.ok) throw new Error(`Civitai tags ${r.status}`)
-  const data = (await r.json()) as Resp
+  const data = await civitaiJson<Resp>(`/tags?limit=${limit}`, apiKey, 'Civitai tags')
+  if (!data) return []
   return (data.items ?? [])
     .filter((t) => typeof t.name === 'string' && t.name.length > 0)
     .map((t) => ({ name: t.name, modelCount: t.modelCount ?? 0 }))

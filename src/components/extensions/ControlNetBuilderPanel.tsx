@@ -379,7 +379,6 @@ export function ControlNetBuilderPanel(): JSX.Element {
     <CollapsiblePanel
       title={t('cnBuilder.title')}
       hint={t('cnBuilder.hint')}
-      defaultOpen
       testId="controlnet-builder-panel"
     >
       <div className="grid grid-cols-1 gap-2">

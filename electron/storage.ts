@@ -552,6 +552,7 @@ export class Storage {
     prompt: string
     negativePrompt: string
     params: HistoryItem['params']
+    dynamicPrompt?: HistoryItem['dynamicPrompt']
   }): HistoryItem {
     const id = randomUUID()
     const imagePath = join(this.root, 'history', `${id}.png`)
@@ -562,6 +563,7 @@ export class Storage {
       createdAt: Date.now(),
       prompt: args.prompt,
       negativePrompt: args.negativePrompt,
+      ...(args.dynamicPrompt ? { dynamicPrompt: args.dynamicPrompt } : {}),
       params: args.params,
       imagePath,
       thumbDataUrl: args.thumbDataUrl

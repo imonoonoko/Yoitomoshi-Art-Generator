@@ -116,7 +116,18 @@ function Row({ label, fallbackName, fallbackHash, ref, localCheck }: RowProps): 
         url: ref.downloadUrl,
         filename,
         assetType: ref.type,
-        expectedSha256: null
+        expectedSha256: ref.primaryFileSha256 ?? null,
+        source: {
+          provider: 'civitai',
+          name: ref.name,
+          pageUrl: ref.pageUrl,
+          downloadUrl: ref.downloadUrl,
+          thumbnailUrl: ref.thumbnailUrl,
+          expectedSha256: ref.primaryFileSha256 ?? null,
+          modelId: ref.modelId,
+          modelVersionId: ref.modelVersionId,
+          baseModel: ref.baseModel
+        }
       })
       toast.success(tStatic('insight.downloadDone', { filename }))
       // Refresh the relevant local list so isLocal flips on next render

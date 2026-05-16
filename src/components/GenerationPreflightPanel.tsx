@@ -5,11 +5,12 @@ import { useStore, type AppState } from '@/lib/store'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { getExtensionGuardIssues } from '@/lib/extension-guards'
 import { baseModelsCompatible } from '@/lib/lora-suggest'
-import { approxTokenCount, promptAppend } from '@/lib/prompt-utils'
+import { approxTokenCount, formatPromptText, promptAppend, promptNeedsFormatting } from '@/lib/prompt-utils'
+import { parseAdapterTokens } from '@/lib/adapter-tokens'
+import { buildDynamicPromptContext, hasDynamicPromptSyntax, resolveDynamicPrompt } from '@/lib/dynamic-prompts'
 import { cn } from '@/lib/utils'
 
 export type PreflightSeverity = 'block' | 'warn' | 'ok'
-
 export interface PreflightItem {
   severity: PreflightSeverity
   key: string
@@ -122,6 +123,13 @@ export function buildPreflightItems(state: AppState): PreflightItem[] {
   }
   if (!state.selectedModelTitle) {
     items.push({ severity: 'block', key: 'model', messageKey: 'preflight.noModel' })
+  } else if (!state.models.some((model) => model.title === state.selectedModelTitle)) {
+    items.push({
+      severity: 'block',
+      key: 'model',
+      messageKey: 'preflight.invalidModel',
+      params: { name: state.selectedModelTitle }
+    })
   }
   if (state.currentTab !== 'txt2img' && state.currentTab !== 'img2img') {
     items.push({
@@ -163,6 +171,57 @@ export function buildPreflightItems(state: AppState): PreflightItem[] {
       key: 'prompt-tokens',
       messageKey: 'preflight.promptTooLong',
       params: { tokens: promptTokens }
+    })
+  }
+  if (promptNeedsFormatting(state.prompt) || promptNeedsFormatting(state.negativePrompt)) {
+    items.push({
+      severity: 'warn',
+      key: 'prompt-format',
+      messageKey: 'preflight.promptFormatSuggested'
+    })
+  }
+  if (hasDynamicPromptSyntax(state.prompt) || hasDynamicPromptSyntax(state.negativePrompt)) {
+    const context = buildDynamicPromptContext({
+      library: state.library,
+      customLibrary: state.customLibrary,
+      history: state.history,
+      recentTags: state.recentTags,
+      favorites: state.favorites
+    })
+    const promptSeed = state.params.seed >= 0 ? state.params.seed : 1001
+    const issues = [
+      ...resolveDynamicPrompt(state.prompt, context, promptSeed).issues,
+      ...resolveDynamicPrompt(state.negativePrompt, context, promptSeed + 1).issues
+    ]
+    const blocker = issues.find((issue) => issue.severity === 'error')
+    if (blocker) {
+      items.push({
+        severity: 'block',
+        key: 'dynamic-prompt',
+        messageKey: 'preflight.dynamicPromptError',
+        params: { message: blocker.message }
+      })
+    } else {
+      items.push({
+        severity: 'warn',
+        key: 'dynamic-prompt',
+        messageKey: 'preflight.dynamicPromptActive'
+      })
+    }
+  }
+  const adapterTokens = parseAdapterTokens(state.prompt)
+  if (adapterTokens.some((token) => token.kind === 'lyco')) {
+    items.push({
+      severity: 'warn',
+      key: 'adapter-legacy-lyco',
+      messageKey: 'preflight.adapterLegacyLyco'
+    })
+  }
+  if (adapterTokens.some((token) => token.kind !== 'hypernet' && token.complex)) {
+    items.push({
+      severity: 'warn',
+      key: 'adapter-complex-weight',
+      messageKey: 'preflight.adapterComplexWeight'
     })
   }
 
@@ -262,11 +321,25 @@ export function buildPreflightItems(state: AppState): PreflightItem[] {
 }
 
 function canQuickFixPreflightItem(key: string): boolean {
-  return key === 'lora-trigger' || key === 'sdxl-size'
+  return key === 'lora-trigger' || key === 'sdxl-size' || key === 'prompt-format'
 }
 
 function quickFixPreflightItem(key: string): void {
   const state = useStore.getState()
+  if (key === 'prompt-format') {
+    const promptResult = formatPromptText(state.prompt)
+    const negativeResult = formatPromptText(state.negativePrompt)
+    if (!promptResult.summary.changed && !negativeResult.summary.changed) {
+      focusPreflightItem(key)
+      return
+    }
+    if (promptResult.summary.changed) state.setPrompt(promptResult.prompt)
+    if (negativeResult.summary.changed) state.setNegativePrompt(negativeResult.prompt)
+    toast.success(tStatic('preflight.fixedPromptFormat'))
+    focusPreflightItem(key)
+    return
+  }
+
   if (key === 'lora-trigger') {
     const promptLower = state.prompt.toLowerCase()
     const missingWords = uniqueNonEmpty(
@@ -326,8 +399,14 @@ function preflightTargetForKey(key: string): PreflightTarget | null {
   if (key === 'img2img-image') {
     return { tab: 'img2img', testIds: ['input-image-panel', 'input-image-empty'] }
   }
-  if (key === 'prompt-tokens' || key === 'lora-trigger') {
+  if (key === 'prompt-tokens' || key === 'prompt-format' || key.startsWith('adapter-')) {
     return { tab: 'txt2img', testIds: ['prompt-positive-section'] }
+  }
+  if (key === 'dynamic-prompt') {
+    return { tab: 'txt2img', testIds: ['dynamic-prompt-lab', 'prompt-positive-section'] }
+  }
+  if (key === 'lora-trigger') {
+    return { tab: 'txt2img', sideTab: 'lora', testIds: ['generation-create-lora', 'side-content-lora'] }
   }
   if (key === 'lora' || key === 'lora-base') {
     return { tab: 'txt2img', sideTab: 'lora', testIds: ['side-tab-lora', 'side-content-lora'] }

@@ -6,6 +6,7 @@ import type {
   SdLora
 } from '@shared/types'
 import { t as tStatic } from './i18n'
+import { stripAdapterTokens } from './adapter-tokens'
 
 const RECENT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
 const SIMILAR_PROMPT_THRESHOLD = 0.6
@@ -236,25 +237,26 @@ function tokenize(s: string): Set<string> {
  */
 export function stripLoraTokens(prompt: string): {
   prompt: string
-  loras: { name: string; weight: number }[]
+  loras: { name: string; tokenName?: string; weight: number; legacyKind?: 'lora' | 'lyco' }[]
 } {
-  const loras: { name: string; weight: number }[] = []
-  const cleaned = prompt.replace(/<lora:([^:>]+):([^>]+)>/gi, (_m, name, w) => {
-    loras.push({ name: String(name).trim(), weight: parseFloat(w) || 1 })
-    return ''
-  })
+  const stripped = stripAdapterTokens(prompt)
   return {
-    prompt: cleaned.replace(/,\s*,/g, ',').replace(/\s{2,}/g, ' ').replace(/^[\s,]+|[\s,]+$/g, ''),
-    loras
+    prompt: stripped.prompt,
+    loras: stripped.tokens.map((token) => ({
+      name: token.name,
+      tokenName: token.name,
+      weight: token.weight,
+      legacyKind: token.kind === 'lyco' ? 'lyco' : 'lora'
+    }))
   }
 }
 
 /** Splice active LoRAs into a prompt string for the actual API request. */
 export function buildPromptWithLoras(
   prompt: string,
-  active: { name: string; weight: number }[]
+  active: { name: string; tokenName?: string; weight: number }[]
 ): string {
   if (active.length === 0) return prompt
-  const tags = active.map((a) => `<lora:${a.name}:${a.weight.toFixed(2)}>`).join(' ')
+  const tags = active.map((a) => `<lora:${a.tokenName ?? a.name}:${a.weight.toFixed(2)}>`).join(' ')
   return prompt.length > 0 ? `${prompt} ${tags}` : tags
 }

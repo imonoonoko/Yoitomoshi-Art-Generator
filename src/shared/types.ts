@@ -145,21 +145,56 @@ export interface Distribution {
 
 // -------------------- LoRA --------------------
 
+export type AdapterSourceRoot = 'Lora' | 'LyCORIS'
+
+export type AdapterSubtype =
+  | 'LoRA'
+  | 'LoCon'
+  | 'LoHa'
+  | 'LoKr'
+  | 'DoRA'
+  | 'GLoRA'
+  | 'BOFT'
+  | 'LyCORIS'
+  | 'Unknown'
+
 export interface SdLora {
-  name: string                  // unique identifier (filename stem in Forge)
+  name: string                  // unique identifier in the app
+  /** Name to put inside <lora:...>. Differs from name only when roots collide. */
+  tokenName?: string
   alias: string                 // display name (often = name)
   path: string                  // absolute path on disk
+  sourceRoot?: AdapterSourceRoot
+  adapterSubtype?: AdapterSubtype
+  sha256?: string | null
+  baseModelHint?: string | null
   /** Metadata embedded in the safetensors file (training info, ss_*) */
   metadata?: Record<string, unknown>
 }
 
 export interface LoraCivitaiMetadata {
+  modelId?: number
+  modelVersionId?: number
   modelName: string
   versionName: string
   baseModel: string
   trainedWords: string[]        // trigger words to insert with this LoRA
   /** Civitai's category tags ("character", "style", "concept", "clothing"…) */
   tags: string[]
+  files?: CivitaiSearchFile[]
+  availability?: {
+    primaryFileSha256: string | null
+    primaryFileName: string | null
+    primaryFileFormat: string | null
+    pickleScanResult: string | null
+    virusScanResult: string | null
+  }
+  usage?: {
+    allowNoCredit: boolean | null
+    allowCommercialUse: string | null
+    allowDerivatives: boolean | null
+    allowDifferentLicense: boolean | null
+  }
   thumbnailUrl: string | null
   civitaiUrl: string | null
   fetchedAt: number
@@ -168,6 +203,9 @@ export interface LoraCivitaiMetadata {
 /** A LoRA the user has activated for the next generation. */
 export interface ActiveLora {
   name: string                  // SdLora.name
+  tokenName?: string
+  sourceRoot?: AdapterSourceRoot
+  adapterSubtype?: AdapterSubtype
   weight: number                // 0.0..1.5 typical, slider clamped to 0..2
   /** Trigger words captured at activation; used for auto-insertion / removal. */
   triggerWords: string[]
@@ -300,6 +338,7 @@ export interface HistoryItem {
   createdAt: number
   label?: HistoryLabel | null
   tagReview?: HistoryTagReview | null
+  dynamicPrompt?: HistoryDynamicPromptMeta | null
   prompt: string
   negativePrompt: string
   params: {
@@ -318,6 +357,15 @@ export interface HistoryItem {
   }
   imagePath: string          // absolute path on disk
   thumbDataUrl: string       // small embedded thumbnail
+}
+
+export interface HistoryDynamicPromptMeta {
+  templatePrompt: string
+  templateNegativePrompt?: string
+  resolvedPrompt: string
+  resolvedNegativePrompt?: string
+  promptSeed: number
+  usedWildcards: string[]
 }
 
 export type HistoryLabel = 'favorite' | 'candidate' | 'rejected' | 'asset'
@@ -556,6 +604,8 @@ export interface CivitaiQuickRef {
   pageUrl: string
   /** Direct download URL of the primary file, when known. */
   downloadUrl: string | null
+  /** SHA-256 of the primary file, when Civitai exposes it. */
+  primaryFileSha256?: string | null
   /** Civitai-reported file name(s) — used for local-presence matching. */
   filenames: string[]
 }

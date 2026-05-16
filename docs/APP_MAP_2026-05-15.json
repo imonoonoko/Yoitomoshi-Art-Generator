@@ -1,0 +1,737 @@
+{
+  "schema": "yoitomoshi.app-map.v1",
+  "generatedAt": "2026-05-15",
+  "app": {
+    "name": "Yoitomoshi Art Generator",
+    "version": "0.1.0",
+    "repoRoot": "C:\\宵灯工房アート\\Yoitomoshi-Art-Generator",
+    "purpose": "個人ゲーム開発用のStable Diffusion WebUI Forgeフロントエンド。生成、img2img、Upscale、モデル管理、Civitai/Hugging Face連携、履歴再利用、制作ナレッジ補助をElectronアプリにまとめる。",
+    "mentalModel": "React rendererが制作UIを持ち、Zustandが現在の制作状態を保持し、typed IPCを通じてElectron mainがForge API、ローカルStorage、外部モデル検索、ファイル操作を受け持つ。runtime/とuserdata/は環境依存なのでGit管理外。",
+    "stack": {
+      "desktop": "Electron 33 + electron-vite",
+      "renderer": "React 19 + TypeScript + Tailwind CSS + Radix UI + lucide-react",
+      "state": "Zustand",
+      "runtime": "Stable Diffusion WebUI Forge API専用起動",
+      "localData": "JSON files under userdata/",
+      "externalServices": [
+        "Civitai API",
+        "Hugging Face model search/download"
+      ]
+    }
+  },
+  "humanReadableArtifact": {
+    "htmlFile": "docs/APP_MAP_2026-05-15.html",
+    "role": "人間が読むための全体可視化。タブ、責務、データ流、重要契約、次作業を1画面で把握する。"
+  },
+  "nextChatArtifact": {
+    "jsonFile": "docs/APP_MAP_2026-05-15.json",
+    "role": "次のチャット、別エージェント、レビュー担当に渡すための構造化コンテキスト。",
+    "suggestedPrompt": "このJSONはYoitomoshi Art Generatorの設計地図です。app.mentalModel、architecture.layers、workflows、criticalContracts、nextWorkを前提に、既存設計を崩さず次の作業を進めてください。"
+  },
+  "architecture": {
+    "layers": [
+      {
+        "name": "Renderer UI",
+        "responsibility": "制作ワークスペース、プロンプト編集、生成結果確認、履歴再利用、Tools画面を提供する。",
+        "entryFiles": [
+          "src/App.tsx",
+          "src/main.tsx",
+          "src/components/*.tsx",
+          "src/index.css"
+        ],
+        "keyDecisions": [
+          "トップレベルタブはtxt2img/img2img/Upscale/Toolsの4つに保つ。",
+          "新機能は既存タブ内の折りたたみパネルやモーダルとして増やす。",
+          "表示文言はsrc/lib/i18n.tsの独自辞書でja/en/ru/ptに対応する。"
+        ]
+      },
+      {
+        "name": "Renderer State",
+        "responsibility": "現在の制作状態、Forgeカタログ、履歴、LoRA、拡張設定、Upscale設定を保持する。",
+        "entryFiles": [
+          "src/lib/store.ts",
+          "src/shared/types.ts"
+        ],
+        "keyDecisions": [
+          "Zustandの単一storeに機能スライスをまとめる。",
+          "extension payloadに必要な状態はstoreから生成する。",
+          "履歴や設定の永続化はrendererではなくIPC越しのStorageに任せる。"
+        ]
+      },
+      {
+        "name": "Typed IPC Boundary",
+        "responsibility": "rendererからElectron mainへ安全に操作を渡す境界。Forge、Storage、Civitai、Tools、OS操作を型付きAPIとして露出する。",
+        "entryFiles": [
+          "electron/preload.ts",
+          "electron/ipc-handlers.ts",
+          "src/shared/ipc-channels.ts",
+          "src/lib/ipc.ts"
+        ],
+        "keyDecisions": [
+          "外部URL、file path、画像base64、script args、settingsはmain側で検証する。",
+          "表示文言ではなくdata-testidと状態属性をDOM QAの契約にする。",
+          "shell.showItemInFolderなどOS操作は許可された出力領域に限定する。"
+        ]
+      },
+      {
+        "name": "Electron Main Services",
+        "responsibility": "Forgeプロセス管理、Forge API呼び出し、ローカルStorage、モデル検査、ダウンロード管理、外部API連携を実行する。",
+        "entryFiles": [
+          "electron/main.ts",
+          "electron/forge-manager.ts",
+          "electron/forge-api.ts",
+          "electron/storage.ts",
+          "electron/civitai-api.ts",
+          "electron/huggingface-api.ts",
+          "electron/safetensors-inspect.ts",
+          "electron/lora-scanner.ts",
+          "electron/prompt-library.ts"
+        ],
+        "keyDecisions": [
+          "Forgeはruntime/forgeに統合し、Electron利用時はGradio UIを開かないAPI専用起動にする。",
+          "Civitai/Hugging Face downloadは.partialとjobs.jsonで再開可能にする。",
+          "大容量モデルや生成物はGit管理外のruntime/userdata/outputへ置く。"
+        ]
+      },
+      {
+        "name": "Forge Runtime",
+        "responsibility": "Stable Diffusion生成、img2img、ControlNet、ADetailer、Ultimate SD Upscale、interrogateなどの実処理を担う。",
+        "entryFiles": [
+          "runtime/forge/webui",
+          "runtime/forge/webui/models",
+          "runtime/forge/webui/extensions"
+        ],
+        "keyDecisions": [
+          "runtime/は巨大で環境依存のためGitに入れない。",
+          "Forge/Gradio/Python依存は安易に物理削除しない。",
+          "壊れた拡張はdisabled_extensionsで無効化する。"
+        ]
+      }
+    ],
+    "dataFlow": [
+      "User action in React component",
+      "Zustand store update or typed api call",
+      "preload exposes window.api",
+      "ipc-handlers validate request",
+      "Forge API, local storage, filesystem, or external API executes",
+      "Result returns to renderer and updates store",
+      "History/workspaces/model-library are persisted under userdata/"
+    ]
+  },
+  "topLevelTabs": [
+    {
+      "id": "txt2img",
+      "userGoal": "テキストから新規画像を生成する。",
+      "mainComponents": [
+        "PromptPanel",
+        "PreviewPanel",
+        "SidePanel",
+        "ParametersPanel",
+        "GenerationPreflightPanel"
+      ],
+      "stateSlices": [
+        "prompt",
+        "negativePrompt",
+        "params",
+        "selectedModelTitle",
+        "selectedVae",
+        "activeLoras",
+        "dynThres",
+        "freeu",
+        "adetailer",
+        "controlnet",
+        "regionalPrompter",
+        "fabric"
+      ],
+      "backendCalls": [
+        "forge.txt2img",
+        "storage.addHistory",
+        "storage.recordLoraUsage",
+        "civitai.lookup",
+        "civitai.mineCommunity"
+      ]
+    },
+    {
+      "id": "img2img",
+      "userGoal": "入力画像、Inpaint mask、キャラ合成、ControlNetを使って再生成する。",
+      "mainComponents": [
+        "InputImagePanel",
+        "CharacterComposePanel",
+        "PromptPanel",
+        "PreviewPanel",
+        "GenerationPreflightPanel"
+      ],
+      "stateSlices": [
+        "inputImage",
+        "inputImageFilename",
+        "inpaintMaskImage",
+        "droppedInsight",
+        "extractedTags",
+        "controlnet",
+        "fabric"
+      ],
+      "backendCalls": [
+        "forge.img2img",
+        "forge.interrogate",
+        "controlnet.detect",
+        "civitai.identifyFromPng",
+        "storage.saveCharacterComposite"
+      ]
+    },
+    {
+      "id": "upscale",
+      "userGoal": "生成済み画像や外部画像を高解像度化し、Tile ControlNetやdenoise比較で破綻を抑える。",
+      "mainComponents": [
+        "UpscaleWorkspace",
+        "TileControlNetPanel",
+        "DenoiseCompareGrid"
+      ],
+      "stateSlices": [
+        "upscale",
+        "upscalerList",
+        "controlnetModelList",
+        "controlnetModuleList",
+        "prompt",
+        "negativePrompt",
+        "params"
+      ],
+      "backendCalls": [
+        "forge.extraSingleImage",
+        "forge.img2img",
+        "storage.saveUpscaleComparison",
+        "storage.readHistoryImage"
+      ]
+    },
+    {
+      "id": "tools",
+      "userGoal": "モデル、ワークスペース、起動診断、Tagger、Download、Merger、Converterなど制作基盤を管理する。",
+      "mainComponents": [
+        "ToolsWorkspace",
+        "WorkspaceCard",
+        "StartupDiagnosticsCard",
+        "CatalogHealthCard",
+        "TaggerCatalogCard",
+        "ModelLibraryCard",
+        "ModelHealthScanCard",
+        "ModelInspectorCard",
+        "ModelMergerCard",
+        "FormatConverterCard"
+      ],
+      "stateSlices": [
+        "models",
+        "loras",
+        "vaes",
+        "settings",
+        "history",
+        "workspaces"
+      ],
+      "backendCalls": [
+        "storage.saveWorkspace",
+        "storage.listWorkspaces",
+        "tools.runTagger",
+        "tools.rescanModelLibrary",
+        "tools.checkLibraryIntegrity",
+        "tools.inspectModel",
+        "tools.runModelMerger",
+        "tools.convertModelFormat",
+        "huggingFace.search",
+        "civitai.search",
+        "civitai.download"
+      ]
+    }
+  ],
+  "sidePanels": [
+    {
+      "id": "library",
+      "component": "PromptLibrary",
+      "purpose": "組込/ユーザー追加タグを検索・挿入する。",
+      "data": [
+        "resources/prompt-library.ja.yaml",
+        "resources/prompt-library.yoitomoshi.ja.yaml",
+        "userdata/custom-prompt-library.json"
+      ]
+    },
+    {
+      "id": "lora",
+      "component": "LoraPanel",
+      "purpose": "LoRA一覧、Civitai metadata、複数LoRA適用、推奨、trigger word挿入を管理する。",
+      "data": [
+        "runtime/forge/webui/models/Lora",
+        "userdata/civitai/lora-*.json",
+        "userdata/lora-favorites.json",
+        "userdata/lora-usage.json"
+      ]
+    },
+    {
+      "id": "history",
+      "component": "HistoryGallery",
+      "purpose": "生成履歴の検索、復元、Upscale送信、ラベル付け、Tagger review、prompt diff、Fabric素材化を行う。",
+      "data": [
+        "userdata/history/index.json",
+        "userdata/history/*.png"
+      ]
+    },
+    {
+      "id": "presets",
+      "component": "PresetList",
+      "purpose": "プロンプトプリセット保存・読込・削除を行う。",
+      "data": [
+        "userdata/presets.json",
+        "userdata/quick-presets.json",
+        "userdata/hidden-quick-presets.json"
+      ]
+    }
+  ],
+  "workflows": [
+    {
+      "name": "txt2img generation",
+      "intent": "プロンプトと拡張設定から新規画像を生成し、履歴に残す。",
+      "steps": [
+        "PromptPanelでprompt/negative/params/extension stateを編集する。",
+        "GenerationPreflightPanelで不足や危険設定を検出する。",
+        "buildGenerationPlanがtxt2img requestを組み立てる。",
+        "api.forge.txt2imgでForgeへ送る。",
+        "返却画像をdata URL化し、thumbnailを作り、storage.addHistoryへ保存する。",
+        "active LoRAがあればstorage.recordLoraUsageへ学習用ログを保存する。"
+      ],
+      "keyFiles": [
+        "src/App.tsx",
+        "src/lib/generation-utils.ts",
+        "src/lib/extension-payload.ts",
+        "electron/forge-api.ts",
+        "electron/storage.ts"
+      ]
+    },
+    {
+      "name": "img2img and metadata reuse",
+      "intent": "入力画像や過去画像を再利用し、metadataから設定を復元する。",
+      "steps": [
+        "画像D&DまたはClipboard pasteでinputImageへ入れる。",
+        "PNG/JPEG/WebP metadataをbest-effortで解析する。",
+        "prompt/negative/paramsを復元し、Civitai照合をバックグラウンドで行う。",
+        "img2imgタブでGenerateするとbuildImg2ImgRequestがForge payloadを作る。",
+        "履歴に保存し、必要ならUpscaleやVariationへ送る。"
+      ],
+      "keyFiles": [
+        "src/components/PreviewPanel.tsx",
+        "src/components/InputImagePanel.tsx",
+        "src/lib/png-metadata.ts",
+        "electron/civitai-api.ts"
+      ]
+    },
+    {
+      "name": "upscale with drift control",
+      "intent": "Simple/Diffusion/Ultimateの3経路で拡大し、Tile ControlNetとdenoise比較で品質判断する。",
+      "steps": [
+        "UpscaleWorkspaceへ画像を投入する。",
+        "metadata/dimensionsからsuggestUpscaleSettingsで候補を出す。",
+        "simpleはextra-single-image、diffusion/ultimateはimg2imgで処理する。",
+        "Tile ControlNetをupscale専用contextでbuildAlwaysOnScriptsに渡す。",
+        "denoise 0.25/0.35/0.45とTile ON/OFFを比較し、manifestとして保存できる。"
+      ],
+      "keyFiles": [
+        "src/components/UpscaleWorkspace.tsx",
+        "src/lib/upscale-suggest.ts",
+        "src/lib/extension-payload.ts",
+        "electron/storage.ts"
+      ]
+    },
+    {
+      "name": "history review to prompt helper",
+      "intent": "生成履歴を正解タグ付きの制作知に変換し、Tagger比較とPrompt Helperへ再利用する。",
+      "steps": [
+        "HistoryGalleryで履歴画像を開く。",
+        "PixAI ONNX Taggerを実行し、accepted/rejected tagsを保存する。",
+        "tagReviewはuserdata/history/index.jsonに保存される。",
+        "Prompt Helperやtagger-accuracy-compareが保存済みtagReviewを読む。",
+        "acceptedはPromptへ、rejectedはNegativeへ送れる。"
+      ],
+      "keyFiles": [
+        "src/components/HistoryGallery.tsx",
+        "src/components/PromptHelperPanel.tsx",
+        "scripts/tagger-accuracy-compare.cjs",
+        "scripts/dom-qa.cjs"
+      ]
+    },
+    {
+      "name": "model library and downloads",
+      "intent": "Civitai/Hugging Face検索、再開可能download、metadata/preview保存、索引・整合性チェックをToolsへ集約する。",
+      "steps": [
+        "ToolsWorkspaceのModel Libraryから検索/scan/復旧を実行する。",
+        "download requestはasset typeごとにForge models配下へ保存先を決める。",
+        ".partialとjobs.jsonでrunning/completed/failed/canceledを管理する。",
+        "完了後にmodel-library indexへsource metadataとpreview pathを保存する。",
+        "必要に応じてForgeのmodels/vaeをrefreshする。"
+      ],
+      "keyFiles": [
+        "src/components/ToolsWorkspace.tsx",
+        "electron/civitai-api.ts",
+        "electron/huggingface-api.ts",
+        "electron/storage.ts",
+        "electron/ipc-handlers.ts"
+      ]
+    }
+  ],
+  "stateSlices": [
+    {
+      "name": "generation params",
+      "fields": [
+        "steps",
+        "cfgScale",
+        "width",
+        "height",
+        "sampler",
+        "scheduler",
+        "seed",
+        "batchSize",
+        "iterations",
+        "clipSkip",
+        "denoisingStrength"
+      ],
+      "default": {
+        "steps": 25,
+        "cfgScale": 7,
+        "width": 768,
+        "height": 1024,
+        "sampler": "DPM++ 2M Karras",
+        "seed": -1,
+        "clipSkip": 1,
+        "denoisingStrength": 0.65
+      }
+    },
+    {
+      "name": "upscale",
+      "fields": [
+        "method",
+        "inputImage",
+        "upscaler",
+        "scale",
+        "denoise",
+        "diffusionMethod",
+        "ultimateTileWidth",
+        "ultimatePadding",
+        "ultimateSeamsFixType",
+        "tileControlNetEnabled",
+        "outputImage"
+      ],
+      "default": {
+        "method": "simple",
+        "upscaler": "R-ESRGAN 4x+",
+        "scale": 2,
+        "denoise": 0.25,
+        "diffusionMethod": "Mixture of Diffusers",
+        "ultimatePadding": 64,
+        "ultimateSeamsFixType": 3,
+        "tileControlNetEnabled": false
+      }
+    },
+    {
+      "name": "extension controls",
+      "fields": [
+        "dynThres",
+        "freeu",
+        "adetailer",
+        "controlnet",
+        "regionalPrompter",
+        "fabric"
+      ],
+      "contract": "txt2img/img2img用ControlNetとUpscale専用Tile ControlNetは混ぜない。"
+    },
+    {
+      "name": "portable storage",
+      "fields": [
+        "settings",
+        "history",
+        "presets",
+        "quickPresets",
+        "favorites",
+        "loraUsage",
+        "workspaces",
+        "modelLibrary",
+        "downloads",
+        "startupMetrics"
+      ],
+      "root": "userdata/"
+    }
+  ],
+  "ipcSurface": {
+    "groups": [
+      {
+        "name": "forge",
+        "examples": [
+          "status",
+          "start",
+          "stop",
+          "txt2img",
+          "img2img",
+          "extraSingleImage",
+          "interrogate",
+          "interrupt",
+          "listModels",
+          "listLoras",
+          "listVaes",
+          "listSamplers",
+          "listSchedulers",
+          "listControlnetModels",
+          "listControlnetModules"
+        ]
+      },
+      {
+        "name": "storage",
+        "examples": [
+          "getSettings",
+          "setSettings",
+          "listHistory",
+          "addHistory",
+          "readHistoryImage",
+          "setHistoryLabel",
+          "setHistoryTagReview",
+          "saveWorkspace",
+          "loadWorkspace",
+          "saveUpscaleComparison",
+          "saveCharacterComposite",
+          "saveFabricFeedbackImage"
+        ]
+      },
+      {
+        "name": "external model sources",
+        "examples": [
+          "civitai.lookup",
+          "civitai.search",
+          "civitai.download",
+          "civitai.mineCommunity",
+          "civitai.identifyFromPng",
+          "huggingFace.search",
+          "huggingFace.download"
+        ]
+      },
+      {
+        "name": "tools",
+        "examples": [
+          "runTagger",
+          "rescanModelLibrary",
+          "checkLibraryIntegrity",
+          "deletePartialFile",
+          "inspectModel",
+          "inspectMergerSupport",
+          "estimateModelMerger",
+          "runModelMerger",
+          "cancelModelMerger",
+          "convertModelFormat"
+        ]
+      }
+    ],
+    "securityPosture": [
+      "URL allowlistを通した外部リンク/ダウンロードだけ許可する。",
+      "絶対パスやsubpath境界をmain側で検証する。",
+      "画像base64やscript argsにはサイズ上限を設ける。",
+      "settingsの言語、port、Forge pathなどを検証する。",
+      "secrets.local.jsonやruntime/userdataはGit管理しない。"
+    ]
+  },
+  "dataLocations": [
+    {
+      "path": "resources/",
+      "git": true,
+      "role": "組込プロンプトライブラリなど配布用静的資産。"
+    },
+    {
+      "path": "docs/",
+      "git": true,
+      "role": "ロードマップ、QA、構造、調査、今回の可視化成果物。"
+    },
+    {
+      "path": "runtime/",
+      "git": false,
+      "role": "Forge本体、Python/Git、モデル、拡張。巨大で環境依存。"
+    },
+    {
+      "path": "userdata/",
+      "git": false,
+      "role": "設定、秘密情報、履歴、Civitai cache、model-library、downloads、workspaces。"
+    },
+    {
+      "path": "output/",
+      "git": false,
+      "role": "QAや比較出力など生成物。"
+    }
+  ],
+  "criticalContracts": [
+    {
+      "name": "ADetailer payload",
+      "rule": "dicts-only形式を維持し、bool配列形式へ戻さない。",
+      "why": "ADetailer側のlist assignment系エラー再発を避ける。"
+    },
+    {
+      "name": "Ultimate SD upscale script_args",
+      "rule": "18個のscript_args順を維持する。",
+      "why": "Forge拡張のui()戻り順に依存するため、並び替えは破壊的。"
+    },
+    {
+      "name": "Upscale Tile ControlNet separation",
+      "rule": "buildAlwaysOnScripts(state, { forUpscaleDiffusion: true })など専用contextで通常ControlNetと分離する。",
+      "why": "txt2img/img2imgのControlNet設定がUpscaleへ混ざる副作用を防ぐ。"
+    },
+    {
+      "name": "4 top-level tabs",
+      "rule": "txt2img/img2img/Upscale/Toolsを維持し、新機能は既存タブ内に置く。",
+      "why": "UI複雑化を抑え、制作導線を覚えやすくする。"
+    },
+    {
+      "name": "DOM QA selectors",
+      "rule": "表示文言ではなくdata-testidと状態属性を使う。",
+      "why": "ja/en/ru/ptの言語切替でQAが壊れないようにする。"
+    },
+    {
+      "name": "Generated/runtime data",
+      "rule": "runtime/userdata/output/out/dist/node_modulesは原則編集・Git追加しない。",
+      "why": "巨大、秘密情報、環境依存、生成物が含まれるため。"
+    },
+    {
+      "name": "Error recurrence protocol",
+      "rule": "同じ失敗パターンに2回遭遇したら、追加の当てずっぽうを止め、原因調査、修正案比較、最小実装、検証へ切り替える。",
+      "why": "根拠のない3回目以降の試行錯誤を禁止し、再発防止を記録する。"
+    }
+  ],
+  "validation": {
+    "baseline": [
+      "npm.cmd run typecheck"
+    ],
+    "whenBuildRelevant": [
+      "npm.cmd run build"
+    ],
+    "docsOrResourceChanges": [
+      "git diff --check"
+    ],
+    "domQa": [
+      "npm.cmd run qa:dom -- selectors --port=9338",
+      "npm.cmd run qa:dom:preflight -- --port=9338",
+      "npm.cmd run qa:dom:p2 -- --port=9338",
+      "npm.cmd run qa:dom:api -- --port=9338",
+      "npm.cmd run qa:dom:history-review -- --port=9338",
+      "npm.cmd run qa:dom:prompt-helper-review -- --port=9338"
+    ],
+    "promptLibraryYaml": [
+      "Parse resources\\prompt-library.yoitomoshi.ja.yaml with js-yaml and confirm category/tag counts plus expected added tags."
+    ],
+    "electronRemoteDebugLaunch": [
+      "taskkill /F /IM electron.exe 2>$null",
+      "$exe = Join-Path (Get-Location) 'node_modules\\electron\\dist\\electron.exe'",
+      "Start-Process -FilePath $exe -ArgumentList @('--remote-debugging-port=9338', '.') -WorkingDirectory (Get-Location) -WindowStyle Hidden"
+    ]
+  },
+  "nextWork": [
+    {
+      "priority": 1,
+      "theme": "実素材QA - ControlNet入力生成",
+      "nextAction": "pose/lineart/depth用ControlNet model追加後に実生成で確認する。",
+      "watch": [
+        "depth_anythingは長時間戻らないことがあったためdepth_midas優先。",
+        "processorResは512固定が安定。"
+      ]
+    },
+    {
+      "priority": 2,
+      "theme": "Workspace参照保存",
+      "nextAction": "欠落参照の差し替えUIとプロジェクトフォルダ内素材の相対パス化を検討する。",
+      "watch": [
+        "embed/references/settings-onlyの3モードを壊さない。",
+        "外部file pathは許可境界と欠落検出が必要。"
+      ]
+    },
+    {
+      "priority": 3,
+      "theme": "Download / Library復旧",
+      "nextAction": "実際の中断Download jobでrunning->failedとcompleted補正を確認する。",
+      "watch": [
+        ".partial削除はテストprefix以外で誤削除しない。",
+        "metadata/preview/SHA queueの整合性を保つ。"
+      ]
+    },
+    {
+      "priority": 4,
+      "theme": "Upscale比較保存",
+      "nextAction": "人物素材でTile ON/OFFとdenoise候補を目視比較し、drift/seam/detailの判断基準を蓄積する。",
+      "watch": [
+        "標準候補はTile ON / denoise 0.25。",
+        "人物保持優先ならTile OFF / denoise 0.25も確認。"
+      ]
+    },
+    {
+      "priority": 5,
+      "theme": "公開準備",
+      "nextAction": "runtime/userdata/output等がGitに混ざっていないことを確認し、docs/READMEリンクを揃える。",
+      "watch": [
+        "generated/runtime/secretsをpushしない。",
+        "staged diffを必ず確認する。"
+      ]
+    }
+  ],
+  "importantFiles": [
+    {
+      "path": "src/App.tsx",
+      "role": "アプリ全体のbootstrap、Forge ready後のcatalog load、生成ボタンの入口、4タブ切替。"
+    },
+    {
+      "path": "src/lib/store.ts",
+      "role": "Zustand store。生成、拡張、Upscale、履歴、LoRA、Civitai、設定の中心。"
+    },
+    {
+      "path": "src/lib/extension-payload.ts",
+      "role": "Dynamic Thresholding、FreeU、ADetailer、ControlNet、Regional Prompter、Fabric、Upscale extension payloadの中核。壊れやすい。"
+    },
+    {
+      "path": "electron/ipc-handlers.ts",
+      "role": "安全検証付きIPC handler群。Forge/Storage/Civitai/HF/Tools/OS操作を集約。"
+    },
+    {
+      "path": "electron/storage.ts",
+      "role": "userdata配下の設定、履歴、presets、workspaces、model-library、downloads、比較結果を管理。"
+    },
+    {
+      "path": "src/components/PromptPanel.tsx",
+      "role": "Prompt Helper、Research Workflow、QuickPreset、Parameters、拡張パネル、Preflight、Generate button。"
+    },
+    {
+      "path": "src/components/PreviewPanel.tsx",
+      "role": "生成結果表示、metadata import、結果アクション、Variation/Upscale/Recipe導線。"
+    },
+    {
+      "path": "src/components/HistoryGallery.tsx",
+      "role": "履歴検索、復元、ラベル、Prompt diff、Tagger review、Fabric素材化。"
+    },
+    {
+      "path": "src/components/UpscaleWorkspace.tsx",
+      "role": "Simple/Diffusion/Ultimate upscale、Tile ControlNet、denoise比較保存。"
+    },
+    {
+      "path": "src/components/ToolsWorkspace.tsx",
+      "role": "Workspace保存、起動診断、Tagger、Model Library、Health、Inspector、Merger、Converter。"
+    },
+    {
+      "path": "scripts/dom-qa.cjs",
+      "role": "Electron remote debugging経由のDOM QA。data-testid契約の実行証跡。"
+    },
+    {
+      "path": "docs/ROADMAP.md",
+      "role": "現在の優先順位、完了済みPhase、後続計画、再発防止メモ。"
+    },
+    {
+      "path": "docs/QA_DOM_GUIDE_2026-05-14.md",
+      "role": "DOM QA手順と安定セレクタ一覧。"
+    }
+  ],
+  "knownLimits": [
+    "このJSON/HTMLは設計地図であり、アプリの全コードや全ロジックを完全再生成するものではない。",
+    "Forge runtime、ユーザー履歴、実モデル、Civitai cacheの現在値はGit管理外なので、この地図には構造だけを記録している。",
+    "実機生成、モデル存在、Download jobの状態は実行環境ごとに変わるため、作業前に再確認が必要。",
+    "HTMLは説明用の静的成果物。実生成やIPC操作は行わない。"
+  ],
+  "handoffSummary": [
+    "このアプリの中心は4タブUI、Zustand store、typed IPC、Electron main services、Forge runtimeの5層。",
+    "新機能はトップレベルタブ追加ではなく既存タブ内のパネルとして足す。",
+    "壊れやすい箇所はextension-payload、ADetailer payload、Ultimate SD upscale args、Upscale専用ControlNet分離。",
+    "検証はtypecheckを最低線にし、UI/state/IPC変更は該当DOM QAへ接続する。",
+    "runtime/userdata/outputは作業対象にする場合を除き触らず、Gitには入れない。"
+  ]
+}

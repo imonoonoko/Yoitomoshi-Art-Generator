@@ -40,6 +40,7 @@ export function DynamicThresholdingPanel(): JSX.Element {
       hint={t('dt.hint')}
       enabled={dt.enabled}
       onEnabledChange={(v) => patch({ enabled: v })}
+      testId="dynamic-thresholding-panel"
     >
       <Slider
         label={t('dt.mimicScale')}
@@ -136,4 +137,3 @@ export function DynamicThresholdingPanel(): JSX.Element {
     </CollapsiblePanel>
   )
 }
-

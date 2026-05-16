@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PixAI / Aipictors Browser API Recon Report - 2026-05-16</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101216;
+      --panel: #171b22;
+      --panel-2: #202631;
+      --line: #303847;
+      --text: #e8edf4;
+      --muted: #a7b0bf;
+      --accent: #7cc7ff;
+      --ok: #8bdc9b;
+      --warn: #ffd479;
+      --bad: #ff9a9a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.65 "Segoe UI", "Noto Sans JP", sans-serif;
+    }
+    main { max-width: 1160px; margin: 0 auto; padding: 32px 20px 52px; }
+    h1, h2, h3 { line-height: 1.25; margin: 0; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 20px; margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--line); }
+    h3 { font-size: 15px; margin-top: 18px; color: var(--accent); }
+    p, li { color: var(--muted); }
+    a { color: var(--accent); }
+    code { color: #d8e8ff; font-family: Consolas, "Cascadia Mono", monospace; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; border-radius: 8px; overflow: hidden; }
+    th, td { border: 1px solid var(--line); padding: 9px 10px; vertical-align: top; }
+    th { background: var(--panel-2); color: var(--muted); text-align: left; font-size: 12px; }
+    td { background: rgba(23, 27, 34, 0.72); }
+    ul { margin: 10px 0 0; padding-left: 20px; }
+    .hero {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #1b212b 0%, #131820 100%);
+      border-radius: 8px;
+      padding: 24px;
+    }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .chip {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      border-radius: 999px;
+      color: var(--muted);
+      padding: 3px 9px;
+      font-size: 12px;
+    }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+    .card {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 14px;
+      min-height: 126px;
+    }
+    .card strong { display: block; color: var(--text); margin-bottom: 6px; }
+    .ok { color: var(--ok); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    .bad { color: var(--bad); font-weight: 700; }
+    .note { border-left: 3px solid var(--accent); padding-left: 12px; }
+    .mono { font-family: Consolas, "Cascadia Mono", monospace; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 560px) { main { padding: 20px 12px 36px; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <h1>PixAI / Aipictors Browser API Recon レポート</h1>
+    <p>作成日: 2026-05-16 / 対象: Yoitomoshi Art Generator の外部トレンド・レシピ・推奨設定機能強化</p>
+    <div class="meta">
+      <span class="chip">browser-api-recon</span>
+      <span class="chip">未ログイン</span>
+      <span class="chip">公開ページのみ</span>
+      <span class="chip">読み取り専用</span>
+      <span class="chip">Cookie/API key保存なし</span>
+      <span class="chip">SDK化は未確定</span>
+    </div>
+  </section>
+
+  <h2>Executive Summary</h2>
+  <p class="note">
+    PixAI は公式 Platform API と公開Web GraphQLの両面から、モデルID、モデルバージョン、モデル別LoRA推薦、サンプラー候補を調べられる。
+    Aipictors は公開GraphQLとRemix SSRデータから、搭載モデル一覧、人気タグ、公開作品の生成設定を取得できる。
+    ただし、どちらも「外部サイトの生成・投稿・お気に入り・ログイン情報」をYoitomoshiから操作する方向は避け、まずはローカル制作を補助する
+    読み取り専用のトレンド辞書・レシピ取り込み・設定比較に落とすのが安全。
+  </p>
+
+  <div class="grid">
+    <div class="card"><strong>PixAI公式API</strong><span class="ok">採用候補</span><p>APIキー前提。生成タスクやmodelVersionId中心の連携は公式経路を優先。</p></div>
+    <div class="card"><strong>PixAI Web GraphQL</strong><span class="warn">低〜中信頼</span><p>公開read-only queryは動くが、未公開契約なのでトレンド調査・手動確認向け。</p></div>
+    <div class="card"><strong>Aipictors公開GraphQL</strong><span class="warn">中信頼</span><p>搭載モデル一覧と初期設定は取得可能。生成・投稿系は対象外。</p></div>
+    <div class="card"><strong>Yoitomoshi実装</strong><span class="ok">有用</span><p>外部トレンドをローカルモデル・LoRA・Prompt Helperへ変換する補助機能が向く。</p></div>
+  </div>
+
+  <h2>Safety Gate</h2>
+  <table>
+    <thead><tr><th>項目</th><th>今回の扱い</th></tr></thead>
+    <tbody>
+      <tr><td>対象flow</td><td>PixAI model / generator公開ページ、PixAI Platform docs、Aipictors models / search / public post page。</td></tr>
+      <tr><td>アカウント</td><td>未ログイン。ユーザーの許可アカウントや個人データは使っていない。</td></tr>
+      <tr><td>書き込み操作</td><td>未実行。生成、投稿、favorite、bookmark、download購入、Buzz/credit消費系は対象外。</td></tr>
+      <tr><td>Redaction</td><td>Cookie、Set-Cookie、Firebase系公開config、Sentry DSN、MicroCMS key、個人IDはレポートから除外。生成に関係する公開endpoint名と非秘密の設定値だけ記録。</td></tr>
+      <tr><td>制限回避</td><td>ログイン回避、paywall回避、rate-limit回避、private prompt取得は対象外。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Observed API Surface</h2>
+  <table>
+    <thead><tr><th>Site</th><th>Observed surface</th><th>確認内容</th><th>Yoitomoshiでの使いどころ</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>PixAI</td>
+        <td><code>POST https://api.pixai.art/v2/image/create</code></td>
+        <td>公式docs上で <code>modelVersionId</code> と <code>prompt</code> が必須。APIキーが必要。</td>
+        <td>外部生成連携をするなら公式APIのみ。ただし今はローカルForge優先なので後回し。</td>
+      </tr>
+      <tr>
+        <td>PixAI</td>
+        <td><code>POST https://api.pixai.art/graphql</code></td>
+        <td>公開JSから <code>listGenerationModels</code>、<code>listGenerationModelVersions</code>、<code>listLoraRecommendationsByModel</code>、<code>listSimilarLoras</code>、<code>getArtworkWithTaskDetail</code> を確認。</td>
+        <td>モデル別LoRA推薦や類似LoRAの研究用。ただし未公開契約なのでキャッシュ・手動更新・壊れてもよい補助に限定。</td>
+      </tr>
+      <tr>
+        <td>Aipictors</td>
+        <td><code>POST https://aipics.fly.dev</code></td>
+        <td><code>imageModels</code> queryで搭載モデル一覧、hash付きfilename、表示名、カテゴリ、推奨prompt、type、thumbnailを取得できた。</td>
+        <td>ローカルModel Libraryに「外部サービス搭載モデルとの対応候補」「初期prompt候補」を表示。</td>
+      </tr>
+      <tr>
+        <td>Aipictors</td>
+        <td>Remix SSR loader data</td>
+        <td><code>/search</code> に <code>popularTags</code> と <code>rankingWorks</code>、公開postに <code>prompt</code>、<code>negativePrompt</code>、<code>seed</code>、<code>steps</code>、<code>sampler</code>、<code>scale</code> が埋め込まれる。</td>
+        <td>公開promptだけをRecipe候補化。ランキング作品の設定分布からPreflight推奨値を作る。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Current Findings</h2>
+  <h3>PixAI</h3>
+  <ul>
+    <li>公式Helpは、Model/LoRA market、Variation、Use as Base Image、Enhance、Note、ControlNet、Composition、Prompt Helper相当の導線を説明している。</li>
+    <li>公式Platform APIは <code>modelVersionId</code> を中心にした v2 image create を案内しており、モデルページURLの最後のpath segmentをIDとして使う。</li>
+    <li>公開Web GraphQLでは、モデル一覧・モデルversion・model別LoRA推薦・類似LoRA・公開artwork task detailのoperationが確認できた。</li>
+    <li>実測例: <code>Anime Illustration Diffusion</code> のモデルID <code>1667980440770052992</code> / version <code>1667980443970306972</code> に対し、推薦LoRAとして <code>DMD2</code>、<code>Hyper SDXL</code>、<code>Hyper SDXL 2steps-lora</code> などが返った。</li>
+    <li>公式記事の設定指針は、探索ではsteps 15-20 / CFG 5、開発ではsteps 28、仕上げではsteps 35-40、CFGは概ね5前後を推奨。HelpではCFGは7未満を推奨している。</li>
+  </ul>
+
+  <h3>Aipictors</h3>
+  <ul>
+    <li><code>/models</code> から搭載モデル77件を確認。例: <code>ChromaFTv4</code>、<code>ChromaXLv1b</code>、<code>flux.1 schnell</code>、<code>flux.1 pro</code>、<code>zukiAnimeILL v5.0</code>、<code>animagineXL4.0 Opt</code>、<code>Visionary Illustrious Mix</code>、<code>PuellulaXL-1536</code>、<code>4nimaPencilXL</code>。</li>
+    <li>公開configから、default promptは <code>masterpiece, best quality, extremely detailed, anime, girl, skirt</code>、default negativeは <code>EasyNegative, bad_prompt_version2, badhandv4</code>。</li>
+    <li>公開configの既定値は steps 20、sampler <code>DPM++ 2M Karras</code>、scale 7、clip skip 2、VAE <code>vae-ft-mse-840000-ema-pruned</code>。steps範囲は9〜30として定義されている。</li>
+    <li>公開configのdefault LoRA名は <code>flat1</code> / <code>flatBG</code>。無料・liteではLoRA 2件、standard/premiumでは5件までの設定値が見える。</li>
+    <li><code>/search</code> の人気タグ例: <code>ホロライブ</code>、<code>美少年</code>、<code>メイク</code>、<code>パーカー</code>、<code>ワイン</code>、<code>ゴルフ</code>、<code>初音ミク</code>、<code>ぐっすり</code>、<code>カチューシャ</code>、<code>成人女性</code>。</li>
+    <li>公開ランキング作品例では、prompt / negative / seed / steps / sampler / scale / dailyRanking / weeklyRanking が公開データとして埋め込まれていた。prompt非公開作品は対象外にするべき。</li>
+  </ul>
+
+  <h2>Feature Proposals</h2>
+  <table>
+    <thead><tr><th>Priority</th><th>機能案</th><th>入力ソース</th><th>実装方針</th><th>リスク</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>P0</td>
+        <td>外部設定プリセット辞書</td>
+        <td>PixAI公式Help/Blog、Aipictors公開config</td>
+        <td>Prompt Helper / Preflightに「探索」「開発」「仕上げ」プリセットを追加。例: CFG 5、steps 20/28/35、DPM++ 2M Karras、clip skip 2。</td>
+        <td class="ok">低。公開docs/config由来で、ネットワーク実行不要。</td>
+      </tr>
+      <tr>
+        <td>P0</td>
+        <td>URLから公開レシピ取り込み</td>
+        <td>Aipictors公開post、PixAI公開artwork detail候補</td>
+        <td>ユーザーがURLを貼った時だけ公開prompt/settingsを抽出し、Yoitomoshi Workspace / Recipe候補へ変換。非公開promptは無視。</td>
+        <td class="warn">中。HTML/GraphQL変更に弱い。必ず手動実行・プレビュー確認。</td>
+      </tr>
+      <tr>
+        <td>P1</td>
+        <td>モデル別LoRA推薦カード</td>
+        <td>PixAI <code>listLoraRecommendationsByModel</code> / Civitai official API</td>
+        <td>PixAIのmodel別推薦LoRAを「参考候補」として表示し、Civitai/local hash/name一致時だけ適用可能にする。PixAIのIDを直接Forgeに渡さない。</td>
+        <td class="warn">中。未公開GraphQLは壊れやすい。Civitai照合を正とする。</td>
+      </tr>
+      <tr>
+        <td>P1</td>
+        <td>外部トレンドスナップショット</td>
+        <td>Aipictors popularTags / rankingWorks、PixAI model list</td>
+        <td>Toolsに「外部トレンド更新」ボタンを置き、取得結果を <code>userdata/external-trends/</code> にキャッシュ。Prompt Libraryへ候補タグとして流す。</td>
+        <td class="warn">中。ランキングは時点依存。保存時刻と出典URLを必ず表示。</td>
+      </tr>
+      <tr>
+        <td>P1</td>
+        <td>ローカルModel Library外部対応候補</td>
+        <td>Aipictors <code>imageModels</code>、PixAI model docs</td>
+        <td>hash/filename/modelNameでローカルモデルと外部搭載モデルを照合。外部でよく使われるモデルならHistoryやRecommendationにbadge表示。</td>
+        <td class="ok">低〜中。照合はローカル側中心で安全。</td>
+      </tr>
+      <tr>
+        <td>P2</td>
+        <td>公開作品から設定分布分析</td>
+        <td>Aipictors ranking public posts、PixAI public artwork detail</td>
+        <td>公開prompt作品だけを対象に steps/sampler/CFG/size/negative の頻度を集計し、モデル別の「よく使われる設定」候補を出す。</td>
+        <td class="warn">中。各サイトの利用規約・負荷・公開範囲に配慮し、少数手動URLから開始。</td>
+      </tr>
+      <tr>
+        <td>P3</td>
+        <td>外部生成APIブリッジ</td>
+        <td>PixAI公式Platform API</td>
+        <td>ユーザーAPIキーを明示入力した場合だけ、別タブでPixAI生成タスクを作成・結果取得。Forge生成とは完全に分離。</td>
+        <td class="bad">高。課金/credit/API key管理が絡むため後回し。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Recommended Implementation Order</h2>
+  <ol>
+    <li><strong>P0: 設定プリセット辞書</strong>をローカル実装する。外部通信なしで、PixAI/Aipictorsの公開設定知識をPrompt HelperとPreflightへ入れる。</li>
+    <li><strong>P0: URL手動取り込み</strong>を追加する。ユーザーが貼ったAipictors公開postだけを解析し、Recipe候補を作る。</li>
+    <li><strong>P1: External Trend Cache</strong>をToolsに追加する。手動更新、出典表示、キャッシュ期限、失敗時の無効化を入れる。</li>
+    <li><strong>P1: PixAI推薦LoRAのCivitai照合</strong>を試す。PixAIの推薦をそのまま使わず、Civitai/localに一致したものだけ適用候補にする。</li>
+    <li><strong>P2以降</strong>で、許可アカウント・redaction方針を確認してから、PixAI/Aipictorsのログイン後flowをcaptureする。</li>
+  </ol>
+
+  <h2>SDK / Client Plan</h2>
+  <table>
+    <thead><tr><th>Client</th><th>Functions</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>externalTrendClient</code></td>
+        <td><code>fetchAipictorsModels()</code>, <code>fetchAipictorsPublicSearchSnapshot()</code>, <code>fetchPixaiModelRecommendations()</code></td>
+        <td>read-only、timeout短め、User-Agent固定、キャッシュ必須。失敗してもUI本体を壊さない。</td>
+      </tr>
+      <tr>
+        <td><code>externalRecipeParser</code></td>
+        <td><code>parseAipictorsPublicPostUrl()</code>, <code>toWorkspaceDraft()</code>, <code>toPromptLibraryCandidate()</code></td>
+        <td>promptAccessType / isGeneration / 公開範囲を確認し、非公開や不完全データは取り込まない。</td>
+      </tr>
+      <tr>
+        <td><code>externalModelMatcher</code></td>
+        <td><code>matchByHash()</code>, <code>matchByModelName()</code>, <code>matchPixaiToCivitaiCandidate()</code></td>
+        <td>hash一致を最優先。名前一致は候補表示だけ。自動downloadや自動適用はしない。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Open Questions Before Deeper Capture</h2>
+  <ul>
+    <li>PixAI / Aipictors のログイン済みflowを調べる場合、どのアカウントを使うか。自分のアカウント・自分の作品・自分の生成履歴だけに限定する必要がある。</li>
+    <li>保存/変更操作を許可するか。生成、投稿、favorite、bookmark、publish、credit消費は明示許可があるまで実行しない。</li>
+    <li>Raw traceを保存してよいか。保存する場合はcookie、authorization、csrf、email、user id、task id、非公開promptをredactする。</li>
+    <li>Yoitomoshiに外部APIキーを保存するか。保存するなら暗号化・portable userdata・削除導線が必要。</li>
+  </ul>
+
+  <h2>References</h2>
+  <ul>
+    <li><a href="https://support.pixai.art/en/articles/11822691-generation">PixAI Help: Generation</a></li>
+    <li><a href="https://blog.pixai.art/en/pixai-advanced-settings/">PixAI Blog: Advanced Settings</a></li>
+    <li><a href="https://blog.pixai.art/en/how-to-use-pixai-guide/">PixAI Beginner Guide 2026</a></li>
+    <li><a href="https://blog.pixai.art/en/model-vs-lora-pixai-foundations/">PixAI Model vs LoRA Foundations</a></li>
+    <li><a href="https://platform.pixai.art/en/docs/quick-start/first-api-call">PixAI Platform: First API Call</a></li>
+    <li><a href="https://platform.pixai.art/en/docs/api-v2/image/createImage">PixAI Platform: Create Image API v2</a></li>
+    <li><a href="https://platform.pixai.art/docs/references/05---models/">PixAI Platform: Models</a></li>
+    <li><a href="https://www.aipictors.com/models">Aipictors Models</a></li>
+    <li><a href="https://www.aipictors.com/generation/about">Aipictors Generation About</a></li>
+    <li><a href="https://legacy.aipictors.com/guideline/">Aipictors Guideline</a></li>
+    <li><a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_foreach">Microsoft Learn: about_Foreach</a></li>
+    <li><a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_pipelines">Microsoft Learn: about_Pipelines</a></li>
+  </ul>
+</main>
+</body>
+</html>

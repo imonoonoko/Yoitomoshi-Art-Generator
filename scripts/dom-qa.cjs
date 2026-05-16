@@ -13,7 +13,12 @@ const COMMANDS = new Set([
   'history-review-persistence',
   'history-review-prompt-bridge',
   'history-review-report-source',
-  'prompt-helper-review-tags'
+  'prompt-helper-review-tags',
+  'prompt-format',
+  'dynamic-prompt',
+  'generation-modes',
+  'adapter-scan-collision',
+  'workspace-preflight'
 ])
 
 async function main() {
@@ -88,6 +93,34 @@ async function main() {
       printResult(result)
       return
     }
+    if (command === 'prompt-format') {
+      const result = await evaluate(cdp, promptFormatExpression())
+      printResult(result)
+      return
+    }
+    if (command === 'dynamic-prompt') {
+      const result = await evaluate(cdp, dynamicPromptExpression())
+      printResult(result)
+      return
+    }
+    if (command === 'generation-modes') {
+      await cdp.send('Page.enable')
+      await cdp.send('Page.reload', { ignoreCache: true })
+      await sleep(2500)
+      const result = await evaluate(cdp, generationModesExpression())
+      printResult(result)
+      return
+    }
+    if (command === 'adapter-scan-collision') {
+      const result = await evaluate(cdp, adapterScanCollisionExpression())
+      printResult(result)
+      return
+    }
+    if (command === 'workspace-preflight') {
+      const result = await evaluate(cdp, workspacePreflightExpression())
+      printResult(result)
+      return
+    }
     const result = await evaluate(cdp, preflightMismatchExpression())
     printResult(result)
   } finally {
@@ -128,6 +161,11 @@ function printUsage() {
   node scripts/dom-qa.cjs history-review-prompt-bridge [--port=9338]
   node scripts/dom-qa.cjs history-review-report-source [--port=9338]
   node scripts/dom-qa.cjs prompt-helper-review-tags [--port=9338]
+  node scripts/dom-qa.cjs prompt-format [--port=9338]
+  node scripts/dom-qa.cjs dynamic-prompt [--port=9338]
+  node scripts/dom-qa.cjs generation-modes [--port=9338]
+  node scripts/dom-qa.cjs adapter-scan-collision [--port=9338]
+  node scripts/dom-qa.cjs workspace-preflight [--port=9338]
 
 Prerequisite:
   Start Electron with --remote-debugging-port=<port> before running this script.
@@ -193,7 +231,10 @@ function printResult(result) {
 }
 
 function selectorsExpression() {
-  return `(() => {
+  return `(async () => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    document.querySelector('[data-testid="main-tab-txt2img"]')?.click()
+    await sleep(100)
     const ids = [
       'main-tab-txt2img',
       'main-tab-tools',
@@ -204,11 +245,17 @@ function selectorsExpression() {
       'generate-button',
       'prompt-positive-section',
       'prompt-negative-section',
+      'prompt-positive-editor',
+      'prompt-negative-editor',
+      'prompt-format-positive',
+      'prompt-format-negative',
+      'prompt-positive-tags',
+      'prompt-negative-tags',
+      'active-feature-summary',
+      'generation-panel-basic',
+      'generation-panel-prompt',
+      'generation-panel-extensions',
       'parameters-panel',
-      'controlnet-builder-panel',
-      'controlnet-panel',
-      'fabric-panel',
-      'adetailer-panel'
     ]
     const selectors = Object.fromEntries(ids.map((id) => [id, Boolean(document.querySelector('[data-testid="' + id + '"]'))]))
     return {
@@ -627,6 +674,286 @@ function promptHelperReviewTagsExpression() {
   })()`
 }
 
+function promptFormatExpression() {
+  return `(async () => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const testId = (id) => document.querySelector('[data-testid="' + id + '"]')
+    const click = (element) => {
+      if (!element) throw new Error('Cannot click missing element')
+      element.scrollIntoView({ block: 'center', inline: 'center' })
+      const rect = element.getBoundingClientRect()
+      for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+        element.dispatchEvent(new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: rect.x + rect.width / 2,
+          clientY: rect.y + rect.height / 2
+        }))
+      }
+    }
+    const setValue = (element, value) => {
+      const descriptor = Object.getOwnPropertyDescriptor(element.constructor.prototype, 'value')
+      descriptor?.set?.call(element, value)
+      element.dispatchEvent(new Event('input', { bubbles: true }))
+      element.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+    const waitUntil = async (predicate, timeoutMs, label) => {
+      const start = Date.now()
+      while (Date.now() - start < timeoutMs) {
+        const value = predicate()
+        if (value) return value
+        await sleep(200)
+      }
+      throw new Error('Timed out waiting for ' + label)
+    }
+
+    click(await waitUntil(() => testId('main-tab-txt2img'), 10000, 'txt2img tab'))
+    const positive = await waitUntil(() => testId('prompt-positive-editor'), 10000, 'positive editor')
+    const negative = await waitUntil(() => testId('prompt-negative-editor'), 10000, 'negative editor')
+    const previousPositive = positive.value
+    const previousNegative = negative.value
+
+    try {
+      setValue(positive, 'masterpiece,, best_quality, masterpiece, <lyco:foo_bar:0.8>, BREAK, score_9')
+      setValue(negative, 'lowres,, bad_anatomy, lowres, <lora:neg_pack:1>')
+      const warning = await waitUntil(() => testId('preflight-item-prompt-format'), 10000, 'prompt format warning')
+      const canFix = warning.getAttribute('data-preflight-can-fix')
+      const legacyLyco = await waitUntil(() => testId('preflight-item-adapter-legacy-lyco'), 10000, 'legacy lyco warning')
+      const complexAdapter = await waitUntil(() => testId('preflight-item-adapter-complex-weight'), 10000, 'complex adapter warning')
+      click(await waitUntil(() => testId('prompt-format-positive'), 10000, 'positive format button'))
+      await waitUntil(() => positive.value === 'masterpiece, best quality, <lyco:foo_bar:0.8>, BREAK, score_9', 10000, 'positive prompt formatted')
+      setValue(positive, 'masterpiece,, best_quality, masterpiece, <lyco:foo_bar:0.8>, BREAK, score_9')
+      await waitUntil(() => testId('preflight-item-prompt-format'), 10000, 'prompt format warning restored')
+      click(await waitUntil(() => testId('preflight-fix-prompt-format'), 10000, 'preflight prompt format quick fix'))
+      await waitUntil(() => positive.value === 'masterpiece, best quality, <lyco:foo_bar:0.8>, BREAK, score_9', 10000, 'positive quick fixed')
+      await waitUntil(() => negative.value === 'lowres, bad anatomy, <lora:neg_pack:1>', 10000, 'negative quick fixed')
+      await waitUntil(() => !testId('preflight-item-prompt-format'), 10000, 'prompt format warning cleared')
+      return {
+        ok: canFix === 'true' &&
+          legacyLyco.getAttribute('data-preflight-severity') === 'warn' &&
+          complexAdapter.getAttribute('data-preflight-severity') === 'warn' &&
+          positive.value.includes('<lyco:foo_bar:0.8>') &&
+          negative.value.includes('<lora:neg_pack:1>') &&
+          !positive.value.includes('best_quality') &&
+          !negative.value.includes('bad_anatomy'),
+        canFix,
+        adapterWarnings: {
+          legacyLyco: legacyLyco.getAttribute('data-preflight-severity'),
+          complexAdapter: complexAdapter.getAttribute('data-preflight-severity')
+        },
+        positive: positive.value,
+        negative: negative.value
+      }
+    } finally {
+      setValue(positive, previousPositive)
+      setValue(negative, previousNegative)
+    }
+  })()`
+}
+
+function dynamicPromptExpression() {
+  return `(async () => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const testId = (id) => document.querySelector('[data-testid="' + id + '"]')
+    const click = (element) => {
+      if (!element) throw new Error('Cannot click missing element')
+      element.scrollIntoView({ block: 'center', inline: 'center' })
+      const rect = element.getBoundingClientRect()
+      for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+        element.dispatchEvent(new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: rect.x + rect.width / 2,
+          clientY: rect.y + rect.height / 2
+        }))
+      }
+    }
+    const setValue = (element, value) => {
+      const descriptor = Object.getOwnPropertyDescriptor(element.constructor.prototype, 'value')
+      descriptor?.set?.call(element, value)
+      element.dispatchEvent(new Event('input', { bubbles: true }))
+      element.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+    const waitUntil = async (predicate, timeoutMs, label) => {
+      const start = Date.now()
+      while (Date.now() - start < timeoutMs) {
+        const value = predicate()
+        if (value) return value
+        await sleep(200)
+      }
+      throw new Error('Timed out waiting for ' + label)
+    }
+
+    click(await waitUntil(() => testId('main-tab-txt2img'), 10000, 'txt2img tab'))
+    const positive = await waitUntil(() => testId('prompt-positive-editor'), 10000, 'positive editor')
+    const negative = await waitUntil(() => testId('prompt-negative-editor'), 10000, 'negative editor')
+    const previousPositive = positive.value
+    const previousNegative = negative.value
+
+    try {
+      setValue(positive, 'qa dynamic {red dress|blue kimono|white hoodie}, looking at viewer')
+      setValue(negative, 'lowres, {bad hands|text}')
+      const lab = await waitUntil(() => testId('dynamic-prompt-lab'), 10000, 'dynamic prompt lab')
+      if (!testId('dynamic-prompt-summary')) click(await waitUntil(() => testId('dynamic-prompt-toggle'), 10000, 'dynamic prompt toggle'))
+      const seed = await waitUntil(() => testId('dynamic-prompt-seed'), 10000, 'dynamic prompt seed')
+      setValue(seed, '1234')
+      const summary = await waitUntil(() => testId('dynamic-prompt-summary'), 10000, 'dynamic prompt summary')
+      await waitUntil(() => {
+        const text = summary.textContent || ''
+        return text.includes('qa dynamic') &&
+          (text.includes('red dress') || text.includes('blue kimono') || text.includes('white hoodie'))
+      }, 10000, 'dynamic prompt preview text')
+      click(await waitUntil(() => testId('dynamic-prompt-apply-preview'), 10000, 'apply first dynamic prompt'))
+      await waitUntil(() =>
+        positive.value.includes('qa dynamic') &&
+        !positive.value.includes('{') &&
+        (positive.value.includes('red dress') || positive.value.includes('blue kimono') || positive.value.includes('white hoodie')),
+        10000,
+        'resolved prompt applied'
+      )
+      const appliedValue = positive.value
+
+      setValue(positive, 'qa missing __yoitomoshi_missing_wildcard__')
+      const issues = await waitUntil(() => testId('dynamic-prompt-issues'), 10000, 'dynamic prompt missing wildcard issue')
+      const issueText = issues.textContent || ''
+      return {
+        ok: lab &&
+          appliedValue.includes('qa dynamic') &&
+          !appliedValue.includes('{') &&
+          issueText.includes('yoitomoshi_missing_wildcard'),
+        appliedValue,
+        issueText
+      }
+    } finally {
+      setValue(positive, previousPositive)
+      setValue(negative, previousNegative)
+    }
+  })()`
+}
+
+function generationModesExpression() {
+  return `(async () => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const testId = (id) => document.querySelector('[data-testid="' + id + '"]')
+    const click = (element) => {
+      if (!element) throw new Error('Cannot click missing element')
+      element.scrollIntoView({ block: 'center', inline: 'center' })
+      const rect = element.getBoundingClientRect()
+      for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+        element.dispatchEvent(new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: rect.x + rect.width / 2,
+          clientY: rect.y + rect.height / 2
+        }))
+      }
+    }
+    const setValue = (element, value) => {
+      const descriptor = Object.getOwnPropertyDescriptor(element.constructor.prototype, 'value')
+      descriptor?.set?.call(element, value)
+      element.dispatchEvent(new Event('input', { bubbles: true }))
+      element.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+    const dragChip = (from, to) => {
+      const data = new DataTransfer()
+      data.effectAllowed = 'move'
+      data.setData('text/plain', String(from))
+      const chips = Array.from(testId('prompt-positive-tags')?.querySelectorAll('[draggable="true"]') || [])
+      const source = chips[from]
+      const target = chips[to]
+      if (!source || !target) throw new Error('Missing prompt tag chip for drag test')
+      source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: data }))
+      target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: data }))
+      target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: data }))
+      source.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer: data }))
+    }
+    const waitUntil = async (predicate, timeoutMs, label) => {
+      const start = Date.now()
+      while (Date.now() - start < timeoutMs) {
+        const value = predicate()
+        if (value) return value
+        await sleep(200)
+      }
+      throw new Error('Timed out waiting for ' + label)
+    }
+
+    click(await waitUntil(() => testId('main-tab-txt2img'), 10000, 'txt2img tab'))
+    await waitUntil(() => testId('generation-panel-basic'), 10000, 'basic settings panel')
+    const obsoleteModeControlsAbsent = !testId('generation-section-navigator') &&
+      !testId('generation-mode-create') &&
+      !testId('generation-mode-refine') &&
+      !testId('generation-mode-advanced')
+    const allPanelsVisible = Boolean(testId('generation-panel-basic')) &&
+      Boolean(testId('generation-panel-prompt')) &&
+      Boolean(testId('generation-panel-extensions')) &&
+      Boolean(testId('generation-panel-basic-content')) &&
+      Boolean(testId('generation-panel-prompt-content')) &&
+      Boolean(testId('generation-panel-extensions-content')) &&
+      Boolean(testId('parameters-panel')) &&
+      Boolean(testId('prompt-helper-panel')) &&
+      Boolean(testId('dynamic-prompt-lab')) &&
+      Boolean(testId('research-workflow-panel')) &&
+      Boolean(testId('controlnet-builder-panel')) &&
+      Boolean(testId('controlnet-panel')) &&
+      Boolean(testId('adetailer-panel')) &&
+      Boolean(testId('fabric-panel')) &&
+      Boolean(testId('freeu-panel'))
+    const panelLayoutOk = ['generation-panel-basic', 'generation-panel-prompt', 'generation-panel-extensions'].every((id) => {
+      const panel = testId(id)
+      if (!panel) return false
+      const rect = panel.getBoundingClientRect()
+      const text = (panel.textContent || '').trim()
+      return rect.width >= 300 && rect.height >= 32 && text.length > 2
+    })
+    const positive = await waitUntil(() => testId('prompt-positive-editor'), 10000, 'positive editor')
+    const previousPositive = positive.value
+    setValue(positive, 'alpha tag, beta tag, gamma tag')
+    await waitUntil(() => (testId('prompt-positive-tags')?.querySelectorAll('[draggable="true"]').length || 0) >= 3, 10000, 'prompt tag chips near editor')
+    dragChip(0, 2)
+    await waitUntil(() => positive.value.startsWith('beta tag, gamma tag, alpha tag'), 10000, 'prompt tag reorder near editor')
+    const tagReorderOk = positive.value.startsWith('beta tag, gamma tag, alpha tag')
+    const refineOk = Boolean(await waitUntil(() => testId('prompt-helper-panel'), 10000, 'prompt helper panel')) &&
+      Boolean(await waitUntil(() => testId('dynamic-prompt-lab'), 10000, 'dynamic prompt lab')) &&
+      Boolean(await waitUntil(() => testId('research-workflow-panel'), 10000, 'research workflow panel')) &&
+      Boolean(await waitUntil(() => testId('prompt-positive-section'), 10000, 'positive prompt section')) &&
+      Boolean(await waitUntil(() => testId('prompt-negative-section'), 10000, 'negative prompt section')) &&
+      Boolean(await waitUntil(() => testId('prompt-positive-tags'), 10000, 'positive tag chips'))
+
+    const advancedOk = Boolean(await waitUntil(() => testId('controlnet-builder-panel'), 10000, 'controlnet builder')) &&
+      Boolean(await waitUntil(() => testId('controlnet-panel'), 10000, 'controlnet panel')) &&
+      Boolean(await waitUntil(() => testId('adetailer-panel'), 10000, 'adetailer panel')) &&
+      Boolean(await waitUntil(() => testId('fabric-panel'), 10000, 'fabric panel')) &&
+      Boolean(await waitUntil(() => testId('freeu-panel'), 10000, 'freeu panel'))
+
+    try {
+      setValue(positive, 'qa {red|blue} dress')
+      await waitUntil(() => testId('active-feature-chip-dynamic-prompt'), 10000, 'dynamic prompt chip')
+      click(testId('active-feature-chip-dynamic-prompt'))
+      await waitUntil(() => Boolean(testId('dynamic-prompt-lab')), 10000, 'dynamic chip keeps prompt lab available')
+
+      const formatButton = await waitUntil(() => testId('preflight-open-dynamic-prompt'), 10000, 'dynamic preflight open')
+      click(formatButton)
+      await waitUntil(() => Boolean(testId('dynamic-prompt-lab')), 10000, 'preflight keeps prompt lab available')
+
+      return {
+        ok: obsoleteModeControlsAbsent && allPanelsVisible && panelLayoutOk && refineOk && advancedOk && tagReorderOk,
+        obsoleteModeControlsAbsent,
+        allPanelsVisible,
+        panelLayoutOk,
+        refineOk,
+        advancedOk,
+        tagReorderOk,
+        dynamicChipVisible: Boolean(testId('active-feature-chip-dynamic-prompt'))
+      }
+    } finally {
+      setValue(positive, previousPositive)
+    }
+  })()`
+}
+
 function p2FixtureExpression() {
   const tinyPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII='
   const tempPrefix = 'QA DOM P2 fixture temporary'
@@ -945,6 +1272,147 @@ function preflightMismatchExpression() {
         warnings: Number(panel?.getAttribute('data-preflight-warnings')),
         summary: summary?.innerText || '',
         items
+      }
+    } finally {
+      await cleanupTempWorkspaces()
+    }
+  })()`
+}
+
+function adapterScanCollisionExpression() {
+  return `(async () => {
+    const fixture = 'yoitomoshi-adapter-collision-qa'
+    const loras = await window.api.forge.listLoras()
+    const matches = loras.filter((item) =>
+      item.tokenName === fixture ||
+      item.alias === fixture ||
+      String(item.name || '').endsWith('/' + fixture)
+    )
+    const roots = matches.map((item) => item.sourceRoot).sort()
+    const names = matches.map((item) => item.name).sort()
+    const ok = matches.length === 2 &&
+      roots.includes('Lora') &&
+      roots.includes('LyCORIS') &&
+      names.includes('Lora/' + fixture) &&
+      names.includes('LyCORIS/' + fixture) &&
+      matches.every((item) => item.tokenName === fixture)
+    return {
+      ok,
+      fixture,
+      matches: matches.map((item) => ({
+        name: item.name,
+        alias: item.alias,
+        tokenName: item.tokenName,
+        sourceRoot: item.sourceRoot,
+        adapterSubtype: item.adapterSubtype
+      }))
+    }
+  })()`
+}
+
+function workspacePreflightExpression() {
+  const tempPrefix = 'Yoitomoshi DOM QA workspace preflight'
+  return `(async () => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const testId = (id) => document.querySelector('[data-testid="' + id + '"]')
+    const click = (element) => {
+      if (!element) throw new Error('Cannot click missing element')
+      element.scrollIntoView({ block: 'center', inline: 'center' })
+      const rect = element.getBoundingClientRect()
+      for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+        element.dispatchEvent(new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: rect.x + rect.width / 2,
+          clientY: rect.y + rect.height / 2
+        }))
+      }
+    }
+    const waitUntil = async (predicate, timeoutMs, label) => {
+      const start = Date.now()
+      while (Date.now() - start < timeoutMs) {
+        const value = predicate()
+        if (value) return value
+        await sleep(200)
+      }
+      throw new Error('Timed out waiting for ' + label)
+    }
+    const cleanupTempWorkspaces = async () => {
+      const workspaces = await window.api.storage.listWorkspaces()
+      for (const workspace of workspaces.filter((item) => item.name.startsWith(${JSON.stringify(tempPrefix)}))) {
+        await window.api.storage.deleteWorkspace(workspace.id)
+      }
+    }
+    const snapshot = {
+      imageSaveMode: 'references',
+      imageReferences: {
+        inputImage: {
+          kind: 'file',
+          path: 'C:\\\\yoitomoshi-missing-workspace-preflight.png',
+          filename: 'yoitomoshi-missing-workspace-preflight.png'
+        }
+      },
+      currentTab: 'txt2img',
+      prompt: 'workspace preflight qa',
+      negativePrompt: '',
+      params: {
+        steps: 20,
+        cfgScale: 7,
+        width: 832,
+        height: 1216,
+        sampler: 'Euler',
+        scheduler: 'Automatic',
+        seed: -1,
+        batchSize: 1,
+        iterations: 1,
+        clipSkip: 2,
+        denoisingStrength: 0.35
+      },
+      selectedModelTitle: 'yoitomoshi-missing-model.safetensors [0000000000]',
+      selectedVae: 'yoitomoshi-missing-vae.safetensors',
+      activeLoras: [
+        {
+          name: 'yoitomoshi-missing-adapter',
+          tokenName: 'yoitomoshi-missing-adapter',
+          sourceRoot: 'Lora',
+          adapterSubtype: 'LoRA',
+          weight: 0.8,
+          triggerWords: []
+        }
+      ],
+      inputImageDataUrl: null,
+      inputImageFilename: null,
+      inpaintMaskImage: null,
+      lastImageDataUrl: null,
+      upscaleInputImageDataUrl: null,
+      upscaleOutputImageDataUrl: null,
+      upscale: {},
+      controlnet: {},
+      adetailer: {},
+      dynThres: {},
+      freeu: {}
+    }
+
+    let saved = null
+    click(await waitUntil(() => testId('main-tab-txt2img'), 10000, 'txt2img tab before workspace setup'))
+    await sleep(300)
+    await cleanupTempWorkspaces()
+    try {
+      saved = await window.api.storage.saveWorkspace({
+        name: ${JSON.stringify(tempPrefix)} + ' ' + Date.now(),
+        snapshot
+      })
+      click(await waitUntil(() => testId('main-tab-tools'), 10000, 'Tools tab'))
+      click(await waitUntil(() => testId('workspace-preflight-run-' + saved.id), 10000, 'workspace preflight button'))
+      const panel = await waitUntil(() => testId('workspace-preflight-' + saved.id), 10000, 'workspace preflight panel')
+      await waitUntil(() => panel.getAttribute('data-workspace-preflight-status') === 'warn', 10000, 'workspace preflight warn status')
+      const issueCount = Number(panel.getAttribute('data-workspace-preflight-issues'))
+      return {
+        ok: issueCount >= 4,
+        workspaceId: saved.id,
+        issueCount,
+        status: panel.getAttribute('data-workspace-preflight-status')
       }
     } finally {
       await cleanupTempWorkspaces()

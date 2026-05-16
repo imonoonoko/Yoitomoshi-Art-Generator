@@ -79,6 +79,7 @@ const api = {
     },
     listModels: (): Promise<SdModel[]> => ipcRenderer.invoke(IPC.forgeListModels),
     refreshModels: (): Promise<void> => ipcRenderer.invoke(IPC.forgeRefreshModels),
+    setCurrentModel: (title: string): Promise<void> => ipcRenderer.invoke(IPC.forgeSetCurrentModel, title),
     listSamplers: (): Promise<SdSampler[]> => ipcRenderer.invoke(IPC.forgeListSamplers),
     listSchedulers: (): Promise<string[]> => ipcRenderer.invoke(IPC.forgeListSchedulers),
     txt2img: (req: Txt2ImgRequest): Promise<Txt2ImgResponse> =>
@@ -246,6 +247,7 @@ const api = {
       prompt: string
       negativePrompt: string
       params: HistoryItem['params']
+      dynamicPrompt?: HistoryItem['dynamicPrompt']
     }): Promise<HistoryItem> => ipcRenderer.invoke(IPC.storageAddHistory, args),
     readHistoryImage: (id: string): Promise<string | null> =>
       ipcRenderer.invoke(IPC.storageReadHistoryImage, id),

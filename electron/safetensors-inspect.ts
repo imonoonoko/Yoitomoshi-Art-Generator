@@ -1,4 +1,5 @@
 import { open } from 'node:fs/promises'
+import type { AdapterSubtype } from '../src/shared/types.js'
 
 export type ModelKind =
   | 'lora'
@@ -12,6 +13,7 @@ export type ModelKind =
 
 export interface InspectedModel {
   kind: ModelKind
+  adapterSubtype?: AdapterSubtype
   /** First 10 tensor keys — useful for diagnostic display when classification fails. */
   sampleKeys: string[]
   metadata: Record<string, string> | null
@@ -50,8 +52,10 @@ export async function inspectSafetensors(filepath: string): Promise<InspectedMod
     const header = JSON.parse(jsonBuf.toString('utf8')) as Record<string, unknown>
     const keys = Object.keys(header).filter((k) => k !== '__metadata__')
     const metadata = (header['__metadata__'] as Record<string, string>) ?? null
+    const kind = classify(keys, metadata)
     return {
-      kind: classify(keys, metadata),
+      kind,
+      adapterSubtype: kind === 'lora' ? inferAdapterSubtype(keys, metadata) : undefined,
       sampleKeys: keys.slice(0, 10),
       metadata
     }
@@ -144,6 +148,26 @@ function classify(
   if (embeddingHits > 0 && total < 20) return 'embedding'
 
   return 'unknown'
+}
+
+export function inferAdapterSubtype(
+  keys: string[],
+  metadata: Record<string, string> | null
+): AdapterSubtype {
+  const network = metadata?.ss_network_module ?? ''
+  const algo = metadata?.ss_network_args ?? ''
+  const metaHaystack = `${network} ${algo}`.toLowerCase()
+  const keyHaystack = keys.slice(0, 2000).join('\n').toLowerCase()
+
+  if (/dora/.test(metaHaystack) || /dora_scale/.test(keyHaystack)) return 'DoRA'
+  if (/glora/.test(metaHaystack) || /glora/.test(keyHaystack)) return 'GLoRA'
+  if (/boft/.test(metaHaystack) || /\bboft\b|\.boft_|_boft_/.test(keyHaystack)) return 'BOFT'
+  if (/lokr/.test(metaHaystack) || /\blokr\b|\.lokr_|_lokr_/.test(keyHaystack)) return 'LoKr'
+  if (/loha/.test(metaHaystack) || /\bhada\b|\.hada_|_hada_/.test(keyHaystack)) return 'LoHa'
+  if (/locon/.test(metaHaystack) || /lora_mid/.test(keyHaystack)) return 'LoCon'
+  if (/lycoris/.test(metaHaystack)) return 'LyCORIS'
+  if (/lora/.test(metaHaystack) || /lora_(unet|te[12]?)/i.test(keyHaystack)) return 'LoRA'
+  return 'Unknown'
 }
 
 /** Japanese label for diagnostic toasts. */

@@ -12,6 +12,7 @@ interface Props {
   tone?: 'positive' | 'negative'
   ariaLabel: string
   onSubmit?(): void
+  testId?: string
 }
 
 interface Suggestion {
@@ -32,7 +33,8 @@ export function PromptEditor({
   rows = 5,
   tone = 'positive',
   ariaLabel,
-  onSubmit
+  onSubmit,
+  testId
 }: Props): JSX.Element {
   const ref = useRef<HTMLTextAreaElement>(null)
   const autocomplete = useStore((s) => s.autocomplete)
@@ -181,6 +183,7 @@ export function PromptEditor({
         placeholder={placeholder}
         aria-label={ariaLabel}
         aria-keyshortcuts="Control+Space"
+        data-testid={testId}
         spellCheck={false}
         className={cn(
           'input resize-none font-mono text-[13px] leading-relaxed',

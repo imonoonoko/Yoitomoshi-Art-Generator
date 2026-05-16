@@ -7,6 +7,8 @@ interface Props {
   title: string
   /** Optional one-line description shown next to the title in muted text. */
   hint?: string
+  /** Optional compact status chips or metadata shown in the header. */
+  summary?: ReactNode
   /**
    * If provided, an "enabled" toggle switch is rendered on the right of the
    * header. The toggle is independent of expansion: a panel can be expanded
@@ -17,7 +19,13 @@ interface Props {
   onEnabledChange?: (v: boolean) => void
   /** Initial expansion state. Defaults to collapsed to keep the panel quiet. */
   defaultOpen?: boolean
+  /** Controlled expansion state. Omit to keep the original internal behavior. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  contentId?: string
   testId?: string
+  buttonTestId?: string
+  bodyTestId?: string
   children: ReactNode
 }
 
@@ -36,30 +44,50 @@ interface Props {
 export function CollapsiblePanel({
   title,
   hint,
+  summary,
   enabled,
   onEnabledChange,
   defaultOpen = false,
+  open,
+  onOpenChange,
+  contentId,
   testId,
+  buttonTestId,
+  bodyTestId,
   children
 }: Props): JSX.Element {
-  const [open, setOpen] = useState(defaultOpen)
+  const [internalOpen, setInternalOpen] = useState(defaultOpen)
+  const expanded = open ?? internalOpen
   const showToggle = onEnabledChange !== undefined
+
+  function setExpanded(nextOpen: boolean): void {
+    if (open === undefined) setInternalOpen(nextOpen)
+    onOpenChange?.(nextOpen)
+  }
 
   return (
     <div className={cn(
-      'card overflow-hidden',
+      'card shrink-0 overflow-hidden',
       enabled === true && 'ring-1 ring-accent/40'
     )} data-testid={testId}>
       <button
         type="button"
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bg-3 transition-colors text-left"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
+        aria-controls={contentId}
+        data-testid={buttonTestId}
       >
-        <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 transition-transform', open && 'rotate-90')} />
-        <span className={cn('text-xs font-medium flex-1 truncate', enabled === true && 'text-accent')}>
+        <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 transition-transform', expanded && 'rotate-90')} />
+        <span className={cn('text-xs font-medium flex-1 truncate text-ink-1', enabled === true && 'text-accent')}>
           {title}
         </span>
-        {hint && !showToggle && (
+        {summary && (
+          <span className="ml-auto flex max-w-[58%] min-w-0 flex-wrap items-center justify-end gap-1">
+            {summary}
+          </span>
+        )}
+        {hint && !showToggle && !summary && (
           <span className="text-[10px] text-ink-3 truncate">{hint}</span>
         )}
         {showToggle && (
@@ -91,8 +119,12 @@ export function CollapsiblePanel({
           </span>
         )}
       </button>
-      {open && (
-        <div className="px-3 pt-1 pb-3 border-t border-line space-y-2 text-xs">
+      {expanded && (
+        <div
+          id={contentId}
+          className="px-3 pt-1 pb-3 border-t border-line space-y-2 text-xs"
+          data-testid={bodyTestId}
+        >
           {hint && showToggle && (
             <p className="text-[10px] text-ink-3 leading-relaxed -mt-0.5">{hint}</p>
           )}

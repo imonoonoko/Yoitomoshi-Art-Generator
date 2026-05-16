@@ -170,6 +170,89 @@ export function dedupePromptTokens(prompt: string): { prompt: string; removed: n
   return { prompt: kept.join(', '), removed }
 }
 
+export interface PromptFormatSummary {
+  changed: boolean
+  removedDuplicates: number
+  removedEmptyTokens: number
+  normalizedUnderscores: number
+  protectedTokens: number
+}
+
+export interface PromptFormatResult {
+  prompt: string
+  summary: PromptFormatSummary
+}
+
+const PROTECTED_PROMPT_TOKEN = /<(?:lora|lyco|hypernet):[^>\n]+>/gi
+const PROTECTED_PLACEHOLDER = /%%YOITOPROTECTED(\d+)%%/
+const PROMPT_CONTROL_TOKENS = new Set(['AND', 'BREAK', 'ADDROW', 'ADDCOL'])
+const PRESERVE_UNDERSCORE_TOKEN = /^(?:score_\d+(?:_up)?|rating_(?:safe|questionable|explicit|sensitive|general)|source_[a-z0-9_]+)$/i
+
+/**
+ * Conservative prompt cleanup for user-authored tag lists. Adapter tokens and
+ * regional-prompt separators are preserved while common comma/space/tag noise
+ * is normalized.
+ */
+export function formatPromptText(prompt: string): PromptFormatResult {
+  const protectedPrompt = protectPromptTokens(prompt)
+  const lines = protectedPrompt.text.replace(/\r\n/g, '\n').split('\n')
+  const formattedLines: string[] = []
+  const summary: PromptFormatSummary = {
+    changed: false,
+    removedDuplicates: 0,
+    removedEmptyTokens: 0,
+    normalizedUnderscores: 0,
+    protectedTokens: protectedPrompt.tokens.length
+  }
+
+  for (const line of lines) {
+    const segments = splitPromptLineSegments(line)
+    const seen = new Set<string>()
+    const kept: string[] = []
+
+    for (const rawSegment of segments) {
+      const rawTrimmed = rawSegment.trim()
+      if (!rawTrimmed) {
+        if (line.trim()) summary.removedEmptyTokens += 1
+        continue
+      }
+
+      const normalized = normalizePromptSegment(rawTrimmed, summary)
+      if (!normalized) {
+        summary.removedEmptyTokens += 1
+        continue
+      }
+
+      if (isProtectedPromptSegment(normalized)) {
+        kept.push(normalized)
+        continue
+      }
+
+      const key = promptFormatDedupeKey(normalized)
+      if (!key) {
+        summary.removedEmptyTokens += 1
+        continue
+      }
+      if (seen.has(key)) {
+        summary.removedDuplicates += 1
+        continue
+      }
+      seen.add(key)
+      kept.push(normalized)
+    }
+
+    if (kept.length > 0) formattedLines.push(kept.join(', '))
+  }
+
+  const restored = restorePromptTokens(formattedLines.join('\n'), protectedPrompt.tokens)
+  summary.changed = restored !== prompt
+  return { prompt: restored, summary }
+}
+
+export function promptNeedsFormatting(prompt: string): boolean {
+  return formatPromptText(prompt).summary.changed
+}
+
 export function reorderPromptToken(prompt: string, fromIndex: number, toIndex: number): string {
   const tokens = splitPromptTokensWithRanges(prompt).map((token) => token.text)
   if (
@@ -184,6 +267,77 @@ export function reorderPromptToken(prompt: string, fromIndex: number, toIndex: n
   const [moved] = tokens.splice(fromIndex, 1)
   tokens.splice(toIndex, 0, moved)
   return tokens.join(', ')
+}
+
+function protectPromptTokens(prompt: string): { text: string; tokens: string[] } {
+  const tokens: string[] = []
+  const text = prompt.replace(PROTECTED_PROMPT_TOKEN, (token) => {
+    const index = tokens.length
+    tokens.push(token.trim())
+    return `%%YOITOPROTECTED${index}%%`
+  })
+  return { text, tokens }
+}
+
+function restorePromptTokens(prompt: string, tokens: string[]): string {
+  let restored = prompt.trim()
+  tokens.forEach((token, index) => {
+    restored = restored.replaceAll(`%%YOITOPROTECTED${index}%%`, token)
+  })
+  return restored
+}
+
+function splitPromptLineSegments(line: string): string[] {
+  const out: string[] = []
+  let start = 0
+  let roundDepth = 0
+  let squareDepth = 0
+  let braceDepth = 0
+  let angleDepth = 0
+
+  for (let i = 0; i <= line.length; i++) {
+    const ch = line[i]
+    if (ch === '(') roundDepth += 1
+    else if (ch === ')') roundDepth = Math.max(0, roundDepth - 1)
+    else if (ch === '[') squareDepth += 1
+    else if (ch === ']') squareDepth = Math.max(0, squareDepth - 1)
+    else if (ch === '{') braceDepth += 1
+    else if (ch === '}') braceDepth = Math.max(0, braceDepth - 1)
+    else if (ch === '<') angleDepth += 1
+    else if (ch === '>') angleDepth = Math.max(0, angleDepth - 1)
+
+    const topLevel = roundDepth === 0 && squareDepth === 0 && braceDepth === 0 && angleDepth === 0
+    if ((ch === ',' && topLevel) || i === line.length) {
+      out.push(line.slice(start, i))
+      start = i + 1
+    }
+  }
+
+  return out
+}
+
+function normalizePromptSegment(segment: string, summary: PromptFormatSummary): string {
+  const controlToken = segment.toUpperCase()
+  if (PROMPT_CONTROL_TOKENS.has(controlToken)) return controlToken
+
+  let normalized = segment.replace(/\s+/g, ' ').trim()
+  if (!isProtectedPromptSegment(normalized) && !PRESERVE_UNDERSCORE_TOKEN.test(normalized)) {
+    summary.normalizedUnderscores += normalized.match(/_/g)?.length ?? 0
+    normalized = normalized.replace(/_/g, ' ')
+  }
+  return normalized.replace(/\s+/g, ' ').trim()
+}
+
+function isProtectedPromptSegment(segment: string): boolean {
+  return PROTECTED_PLACEHOLDER.test(segment)
+}
+
+function promptFormatDedupeKey(segment: string): string {
+  return cleanPromptTokenForMatch(segment)
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .trim()
 }
 
 function tidyPromptCommas(prompt: string): string {

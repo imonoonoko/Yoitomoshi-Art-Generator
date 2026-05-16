@@ -4,13 +4,24 @@ import {
   stripLoraTokens
 } from './lora-suggest'
 import { buildAlwaysOnScripts } from './extension-payload'
+import { normalizeGenerationParams } from './store'
 import type { AppState, GenerationParams, WorkspaceTab } from './store'
+import {
+  buildDynamicPromptContext,
+  hasDynamicPromptSyntax,
+  randomPromptSeed,
+  resolveDynamicPrompt,
+  type DynamicPromptIssue,
+  type DynamicPromptMeta
+} from './dynamic-prompts'
 
 export interface GenerationPlan {
   endpoint: Extract<WorkspaceTab, 'txt2img' | 'img2img'>
   model: string
   strippedPrompt: string
   finalPrompt: string
+  dynamicPrompt: DynamicPromptMeta | null
+  dynamicPromptIssues: DynamicPromptIssue[]
   params: GenerationParams
   baseReq: Txt2ImgRequest
 }
@@ -20,6 +31,9 @@ export function buildGenerationPlan(
   opts?: {
     endpoint?: Extract<WorkspaceTab, 'txt2img' | 'img2img'>
     params?: Partial<GenerationParams>
+    prompt?: string
+    negativePrompt?: string
+    dynamicPromptSeed?: number
   }
 ): GenerationPlan | null {
   const model = state.selectedModelTitle
@@ -28,12 +42,50 @@ export function buildGenerationPlan(
   const endpoint = opts?.endpoint ?? (
     state.currentTab === 'img2img' ? 'img2img' : 'txt2img'
   )
-  const params = { ...state.params, ...opts?.params }
-  const stripped = stripLoraTokens(state.prompt)
+  const params = normalizeGenerationParams({ ...state.params, ...opts?.params }, state.params)
+  const templatePrompt = opts?.prompt ?? state.prompt
+  const templateNegativePrompt = opts?.negativePrompt ?? state.negativePrompt
+  const hasDynamic = hasDynamicPromptSyntax(templatePrompt) || hasDynamicPromptSyntax(templateNegativePrompt)
+  const promptSeed = opts?.dynamicPromptSeed ?? (hasDynamic
+    ? params.seed >= 0 ? params.seed : randomPromptSeed()
+    : 0)
+  const dynamicContext = buildDynamicPromptContext({
+    library: state.library,
+    customLibrary: state.customLibrary,
+    history: state.history,
+    recentTags: state.recentTags,
+    favorites: state.favorites
+  })
+  const resolvedPrompt = hasDynamic
+    ? resolveDynamicPrompt(templatePrompt, dynamicContext, promptSeed)
+    : null
+  const resolvedNegativePrompt = hasDynamic
+    ? resolveDynamicPrompt(templateNegativePrompt, dynamicContext, promptSeed + 1)
+    : null
+  const promptForRequest = resolvedPrompt?.prompt ?? templatePrompt
+  const negativePromptForRequest = resolvedNegativePrompt?.prompt ?? templateNegativePrompt
+  const stripped = stripLoraTokens(promptForRequest)
   const finalPrompt = buildPromptWithLoras(
     stripped.prompt,
-    state.activeLoras.map((a) => ({ name: a.name, weight: a.weight }))
+    state.activeLoras.map((a) => ({ name: a.name, tokenName: a.tokenName, weight: a.weight }))
   )
+  const dynamicPrompt: DynamicPromptMeta | null = hasDynamic
+    ? {
+        templatePrompt,
+        templateNegativePrompt,
+        resolvedPrompt: finalPrompt,
+        resolvedNegativePrompt: negativePromptForRequest,
+        promptSeed,
+        usedWildcards: Array.from(new Set([
+          ...(resolvedPrompt?.usedWildcards ?? []),
+          ...(resolvedNegativePrompt?.usedWildcards ?? [])
+        ])).sort((a, b) => a.localeCompare(b))
+      }
+    : null
+  const dynamicPromptIssues = [
+    ...(resolvedPrompt?.issues ?? []),
+    ...(resolvedNegativePrompt?.issues ?? [])
+  ]
 
   const overrides: Record<string, string | number> = {
     sd_model_checkpoint: model,
@@ -46,7 +98,7 @@ export function buildGenerationPlan(
   const alwayson = buildAlwaysOnScripts(state)
   const baseReq: Txt2ImgRequest = {
     prompt: finalPrompt,
-    negative_prompt: state.negativePrompt,
+    negative_prompt: negativePromptForRequest,
     steps: params.steps,
     cfg_scale: params.cfgScale,
     width: params.width,
@@ -66,6 +118,8 @@ export function buildGenerationPlan(
     model,
     strippedPrompt: stripped.prompt,
     finalPrompt,
+    dynamicPrompt,
+    dynamicPromptIssues,
     params,
     baseReq
   }

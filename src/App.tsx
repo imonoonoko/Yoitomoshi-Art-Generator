@@ -196,10 +196,11 @@ export default function App(): JSX.Element {
         setModels(models)
         setSamplers(samplers)
         setSchedulers(schedulers)
-        // Pre-select first model if none selected
+        // Pre-select first usable model, or recover when a removed/invalid
+        // checkpoint is still stored from an earlier session.
         const current = useStore.getState().selectedModelTitle
-        if (!current && models.length > 0) {
-          handleModelChanged(models[0].title)
+        if (models.length > 0 && (!current || !models.some((model) => model.title === current))) {
+          void handleModelChanged(models[0].title)
         }
 
         // LoRA/VAE catalogs are useful for suggestions and recommendation
@@ -272,9 +273,9 @@ export default function App(): JSX.Element {
       const models = useStore.getState().models
       const m = models.find((x) => x.title === title)
       if (!m) return
-      // Fire model-switch on the API and Civitai lookup in parallel.
+      // Switch Forge's live checkpoint and fetch Civitai metadata in parallel.
       const [, rec] = await Promise.all([
-        api.forge.listModels().then(() => undefined).catch(() => undefined),
+        api.forge.setCurrentModel(title),
         api.civitai.lookup(m).catch(() => null)
       ])
       setRecommendation(rec)
@@ -312,6 +313,11 @@ export default function App(): JSX.Element {
     }
     const plan = buildGenerationPlan(s)
     if (!plan) return
+    const dynamicBlocker = plan.dynamicPromptIssues.find((issue) => issue.severity === 'error')
+    if (dynamicBlocker) {
+      toast.error(tStatic('dynamicPrompt.blocked', { message: dynamicBlocker.message }))
+      return
+    }
 
     setGenerating(true)
     setProgress(null)
@@ -348,7 +354,8 @@ export default function App(): JSX.Element {
           pngBase64: first,
           thumbDataUrl: thumb,
           prompt: plan.finalPrompt,
-          negativePrompt: s.negativePrompt,
+          negativePrompt: plan.baseReq.negative_prompt,
+          dynamicPrompt: plan.dynamicPrompt,
           params: {
             steps: plan.params.steps,
             cfgScale: plan.params.cfgScale,

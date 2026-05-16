@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   ExternalLink, Sparkles, Users, ChevronDown, ChevronUp, Loader2, Minus,
   Download, Check
@@ -13,8 +13,10 @@ import type {
   CivitaiAssetType,
   CivitaiCommunityStats,
   CivitaiQuickRef,
-  Distribution
+  Distribution,
+  SdVae
 } from '@shared/types'
+import type { GenerationParams } from '@/lib/store'
 
 /**
  * Civitai recommendation banner. Shown above the prompt editor when the
@@ -40,10 +42,12 @@ export function RecommendationCard(): JSX.Element | null {
   const prompt = useStore((s) => s.prompt)
   const negative = useStore((s) => s.negativePrompt)
   const vaes = useStore((s) => s.vaes)
+  const setVaes = useStore((s) => s.setVaes)
   const setSelectedVae = useStore((s) => s.setSelectedVae)
   const t = useT()
 
   const [expanded, setExpanded] = useState(false)
+  const vaeDownloadsInFlight = useRef(new Set<string>())
   // Collapse the whole card to a single-line header — useful when the user
   // is already familiar with the model and wants the vertical space back.
   const [cardCollapsed, setCardCollapsed] = useState(false)
@@ -61,14 +65,14 @@ export function RecommendationCard(): JSX.Element | null {
   function applyAll(): void {
     if (!r) return
     const sug = r.suggested
-    patch({
-      steps: sug.steps ?? undefined as number | undefined,
-      cfgScale: sug.cfgScale ?? undefined as number | undefined,
-      width: sug.width ?? undefined as number | undefined,
-      height: sug.height ?? undefined as number | undefined,
-      sampler: sug.sampler ?? undefined as string | undefined,
-      clipSkip: sug.clipSkip ?? undefined as number | undefined
-    } as Parameters<typeof patch>[0])
+    patch(recommendedParamsPatch({
+      steps: sug.steps,
+      cfgScale: sug.cfgScale,
+      width: sug.width,
+      height: sug.height,
+      sampler: sug.sampler,
+      clipSkip: sug.clipSkip
+    }))
 
     if (r.trainedWords.length > 0) {
       const missing = r.trainedWords.filter((w) => !prompt.includes(w))
@@ -80,9 +84,7 @@ export function RecommendationCard(): JSX.Element | null {
 
     if (r.recommendedVae) {
       const recName = r.recommendedVae.name
-      const match = vaes.find(
-        (v) => v.modelName === recName || v.modelName.toLowerCase() === recName.toLowerCase()
-      )
+      const match = findMatchingVae(vaes, recName)
       if (match) {
         setSelectedVae(match.modelName)
       } else {
@@ -108,8 +110,29 @@ export function RecommendationCard(): JSX.Element | null {
     recName: string,
     knownUrl: string | null
   ): Promise<void> {
+    const existing = findMatchingVae(useStore.getState().vaes, recName)
+    if (existing) {
+      setSelectedVae(existing.modelName)
+      return
+    }
+
+    const downloadKey = normalizeDownloadKey(knownUrl ?? recName)
+    if (vaeDownloadsInFlight.current.has(downloadKey)) return
+    vaeDownloadsInFlight.current.add(downloadKey)
+
     const dlId = toast.loading(tStatic('rec.fetchingVae', { name: recName }))
     try {
+      const latestVaes = await api.forge.listVaes().catch(() => null)
+      if (latestVaes) {
+        setVaes(latestVaes)
+        const latestMatch = findMatchingVae(latestVaes, recName)
+        if (latestMatch) {
+          setSelectedVae(latestMatch.modelName)
+          toast.dismiss(dlId)
+          return
+        }
+      }
+
       let url = knownUrl
       let filename = recName
       let expectedSha: string | null = null
@@ -158,17 +181,14 @@ export function RecommendationCard(): JSX.Element | null {
         expectedSha256: expectedSha
       })
       const updated = await api.forge.listVaes()
-      useStore.getState().setVaes(updated)
-      const stem = filename.replace(/\.[^.]+$/, '').toLowerCase()
-      const fresh = updated.find(
-        (v) =>
-          v.modelName.toLowerCase() === filename.toLowerCase() ||
-          v.modelName.replace(/\.[^.]+$/, '').toLowerCase() === stem
-      )
+      setVaes(updated)
+      const fresh = findMatchingVae(updated, filename) ?? findMatchingVae(updated, recName)
       if (fresh) setSelectedVae(fresh.modelName)
       toast.success(tStatic('rec.vaeImported', { filename }), { id: dlId })
     } catch (e) {
       toast.error(tStatic('rec.vaeFailed', { message: (e as Error).message }), { id: dlId })
+    } finally {
+      vaeDownloadsInFlight.current.delete(downloadKey)
     }
   }
 
@@ -182,19 +202,17 @@ export function RecommendationCard(): JSX.Element | null {
     const top = (xs: { name: string; freq: number }[]): string | undefined =>
       xs[0]?.name ?? undefined
     const topSize = stats.topSizes[0]
-    patch({
-      steps: stats.stepsDist.median != null ? Math.round(stats.stepsDist.median) : undefined,
-      cfgScale: stats.cfgDist.median ?? undefined,
-      clipSkip: stats.clipSkipDist.median != null ? Math.round(stats.clipSkipDist.median) : undefined,
-      sampler: top(stats.topSamplers),
-      width: topSize?.width,
-      height: topSize?.height
-    } as Parameters<typeof patch>[0])
+    patch(recommendedParamsPatch({
+      steps: stats.stepsDist.median != null ? Math.round(stats.stepsDist.median) : null,
+      cfgScale: stats.cfgDist.median,
+      clipSkip: stats.clipSkipDist.median != null ? Math.round(stats.clipSkipDist.median) : null,
+      sampler: top(stats.topSamplers) ?? null,
+      width: topSize?.width ?? null,
+      height: topSize?.height ?? null
+    }))
     const topVae = top(stats.topVaes)
     if (topVae) {
-      const match = vaes.find(
-        (v) => v.modelName.toLowerCase() === topVae.toLowerCase()
-      )
+      const match = findMatchingVae(vaes, topVae)
       if (match) setSelectedVae(match.modelName)
     }
     toast.success(tStatic('rec.communityApplied', { count: stats.sampleCount }))
@@ -500,6 +518,57 @@ function DistRow({ label, entries }: DistRowProps): JSX.Element | null {
   )
 }
 
+function recommendedParamsPatch(values: {
+  steps?: number | null
+  cfgScale?: number | null
+  width?: number | null
+  height?: number | null
+  sampler?: string | null
+  clipSkip?: number | null
+}): Partial<GenerationParams> {
+  const patch: Partial<GenerationParams> = {}
+  if (values.steps != null) patch.steps = Math.round(values.steps)
+  if (values.cfgScale != null) patch.cfgScale = values.cfgScale
+  if (values.width != null) patch.width = Math.round(values.width)
+  if (values.height != null) patch.height = Math.round(values.height)
+  if (values.sampler) patch.sampler = values.sampler
+  if (values.clipSkip != null) patch.clipSkip = Math.max(1, Math.round(values.clipSkip))
+  return patch
+}
+
+function findMatchingVae(vaes: SdVae[], targetName: string): SdVae | undefined {
+  const targetKeys = assetNameKeys(targetName)
+  if (targetKeys.size === 0) return undefined
+  return vaes.find((vae) => {
+    const localKeys = new Set([
+      ...assetNameKeys(vae.modelName),
+      ...assetNameKeys(vae.filename)
+    ])
+    for (const key of targetKeys) {
+      if (localKeys.has(key)) return true
+    }
+    return false
+  })
+}
+
+function normalizeDownloadKey(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function assetNameKeys(value: string | null | undefined): Set<string> {
+  const keys = new Set<string>()
+  const raw = value?.trim()
+  if (!raw) return keys
+  const basename = raw.split(/[\\/]/).pop() ?? raw
+  for (const candidate of [raw, basename, basename.replace(/\.[^.]+$/, '')]) {
+    const lower = candidate.toLowerCase()
+    if (lower) keys.add(lower)
+    const loose = lower.replace(/[^a-z0-9]+/g, '')
+    if (loose) keys.add(loose)
+  }
+  return keys
+}
+
 interface DownloadableItem {
   name: string
   pct: number
@@ -553,7 +622,13 @@ function DownloadableRow({
     }
   }
   const isLocal = kind === 'vae'
-    ? vaes.some((v) => candidates.has(v.modelName.toLowerCase()))
+    ? Boolean(
+        findMatchingVae(vaes, item.name) ||
+        (item.civitai && (
+          findMatchingVae(vaes, item.civitai.name) ||
+          item.civitai.filenames.some((filename) => findMatchingVae(vaes, filename))
+        ))
+      )
     : loras.some((l) =>
         candidates.has(l.alias.toLowerCase()) ||
         candidates.has(l.name.toLowerCase())
@@ -571,7 +646,18 @@ function DownloadableRow({
         url: item.civitai.downloadUrl,
         filename,
         assetType,
-        expectedSha256: null
+        expectedSha256: item.civitai.primaryFileSha256 ?? null,
+        source: {
+          provider: 'civitai',
+          name: item.civitai.name,
+          pageUrl: item.civitai.pageUrl,
+          downloadUrl: item.civitai.downloadUrl,
+          thumbnailUrl: item.civitai.thumbnailUrl,
+          expectedSha256: item.civitai.primaryFileSha256 ?? null,
+          modelId: item.civitai.modelId,
+          modelVersionId: item.civitai.modelVersionId,
+          baseModel: item.civitai.baseModel
+        }
       })
       toast.success(tStatic('rec.downloadComplete', { filename }))
       // Refresh the relevant list so the local ✓ indicator updates.

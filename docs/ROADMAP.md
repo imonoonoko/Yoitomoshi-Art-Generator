@@ -16,6 +16,10 @@
 - [`TAGGER_ACCURACY_COMPARISON_2026-05-14.md`](TAGGER_ACCURACY_COMPARISON_2026-05-14.md): PixAI ONNX / WD14 / DeepDanbooru / CLIPのローカル精度比較。
 - [`QA_DOM_GUIDE_2026-05-14.md`](QA_DOM_GUIDE_2026-05-14.md): Electron DOM QAの安定セレクタ、CDP実行手順、Preflight mismatch fixtureの運用手順。
 - [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md): GitHub に載せる範囲、`runtime/`、`userdata/`、Electron profile、将来の model-library/download/workspace 領域の整理ルール。
+- [`FORGE_MODEL_TYPE_ERROR_FIX_2026-05-15.md`](FORGE_MODEL_TYPE_ERROR_FIX_2026-05-15.md): Forge `Failed to recognize model type!` の原因、修正、検証記録。
+- [`LAUNCHER_STARTUP_EXIT_FIX_2026-05-15.md`](LAUNCHER_STARTUP_EXIT_FIX_2026-05-15.md): 既存Electron起動中に `Yoitomoshi.bat` が起動失敗扱いになる問題の修正記録。
+- [`RECOMMENDATION_VAE_CLIP_SKIP_FIX_2026-05-15.md`](RECOMMENDATION_VAE_CLIP_SKIP_FIX_2026-05-15.md): 推奨VAEの重複download抑止とClip Skip undefined生成失敗の修正記録。
+- [`PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html`](PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html): PixAI / Aipictors の公開read-only通信と公式情報から、外部プリセット、公開レシピ取り込み、LoRA推薦、トレンド分析の実装候補を整理した調査レポート。
 - [`../README.md`](../README.md) / `README.{en,ru,pt}.md` / `はじめに.txt`: 利用者向けの起動・運用説明。
 
 ---
@@ -217,6 +221,12 @@
 - DOM QA fixtureを拡張。`qa:dom:tagger-blacklist`、`qa:dom:history-review-persistence`、`qa:dom:history-review-prompt`、`qa:dom:history-review-report-source`、`qa:dom:prompt-helper-review` でblacklist反映、reload後復元、Prompt連携、比較ソース読込、Prompt Helper再利用を確認する。
 - ToolsのModel Library整合性表示に、孤立partial削除ボタンを追加。対象はDownloadJobに紐づかないpartialだけで、IPC側でもForgeモデルフォルダ配下かつ `.partial` を含むファイルに限定する。
 - DOM QA fixtureを拡張。`qa:dom:p2` はGenerate disabled理由、Preflight Open/Quick Fix、Tools Tagger/Model Library API surfaceを確認し、`qa:dom:tagger` はTagger IPCの `ok` / `missing-model` / `missing-runtime` 返却を確認する。`qa:dom:partial-delete` は `yoitomoshi-dom-qa-*` のテストpartialだけを削除して、孤立partial削除IPCを検証する。
+
+2026-05-15 追加進捗:
+
+- Forge `Failed to recognize model type!` の再発防止を追加。`hash` / `sha256` が未解決の `.safetensors` はheaderを検査し、checkpointではない候補をモデル一覧から除外する。保存済み選択が無効化された場合は有効checkpointへ復帰し、Preflightでも選択不整合をblocker表示する。検証は typecheck / build / Forge REST txt2img / renderer IPC txt2img / DOM smoke までPASS。詳細は [`FORGE_MODEL_TYPE_ERROR_FIX_2026-05-15.md`](FORGE_MODEL_TYPE_ERROR_FIX_2026-05-15.md)。
+- Launcherの二重起動判定を修正。既存Electron main processがある時にsingle instance lockで2個目が即終了しても、`Yoitomoshi.bat` が起動失敗扱いにしないよう `scripts/launch-electron.ps1` へ切り出した。詳細は [`LAUNCHER_STARTUP_EXIT_FIX_2026-05-15.md`](LAUNCHER_STARTUP_EXIT_FIX_2026-05-15.md)。
+- 推奨設定適用のVAE/Clip Skip不具合を修正。VAEは正規化名でローカル照合し、既存保存先があるdownloadはIPCで短絡する。`patchParams()` と生成payloadは `clipSkip` を必ず数値へ正規化し、`undefined` でForge生成が失敗しないようにした。詳細は [`RECOMMENDATION_VAE_CLIP_SKIP_FIX_2026-05-15.md`](RECOMMENDATION_VAE_CLIP_SKIP_FIX_2026-05-15.md)。
 
 残タスク更新:
 
@@ -501,6 +511,22 @@ rg -n "[ぁ-んァ-ン一-龯]" src\components src\App.tsx src\lib -g '!i18n.ts'
 - ダウンロード中にアプリを閉じても、次回起動時に未完了ジョブを表示して再開/破棄を選べる。
 - Forge起動引数と環境変数がUIから確認でき、設定の危険変更には明示的な警告が出る。
 - `.yoitoart` を保存して再読込すると、主要な生成フォームとUpscale設定が復元される。
+
+2026-05-16 追加進捗:
+
+- [`FUTURE_FEATURE_ENHANCEMENT_REPORT_2026-05-16.md`](FUTURE_FEATURE_ENHANCEMENT_REPORT_2026-05-16.md) のP0から Prompt Formatter を着手。Prompt/Negative欄の整形ボタンと、Preflightの整形候補警告・Quick Fixを追加する。
+- Formatter は `<lora:...>` / `<lyco:...>` / `BREAK` などを壊さず、余分なカンマ、空白、重複タグ、タグ内アンダースコアを保守的に整理する方針にする。
+- DOM QA は `qa:dom:prompt-format` を追加し、UIボタンとPreflight Quick Fixの両方で同じ整形結果になることを確認対象にする。
+- P0/P1追加: `models/Lora` と `models/LyCORIS` の複数rootスキャン、Adapter subtype推定、LoRAカードbadge、`<lyco:...>` / 複雑weight記法のPreflight警告を追加した。
+- P0追加: Dropped image insight / Community recommendationの不足モデルDLでCivitai primary file SHA-256を渡し、DL後検証できるようにした。
+- P0追加: Civitai通信のHTTP分類を `CivitaiHttpError` に集約し、401/403、429、5xx、network errorを区別する。tags取得は既存cache fallbackを使う。
+- P2/P3整理: browser-api-reconは公式APIで足りないUI filter/favorites/collections等に限定し、今回は認証済みブラウザtraceは取らず安全ゲートを維持する。P3のLoRA抽出/adapter変換/外部生成サービス連携は後回し判断を維持する。
+- Follow-up: `runtime\forge\webui\models\Lora` と `runtime\forge\webui\models\LyCORIS` に同名fixtureを置くDOM QA `qa:dom:adapter-scan` を追加し、`Lora/name` / `LyCORIS/name` の衝突回避と `tokenName` 維持を確認した。
+- Follow-up: LoRAカードにCivitai利用条件badgeを追加。商用利用、クレジット要否、派生モデル可否をmetadataから表示する。
+- Follow-up: ToolsのWorkspace保存カードに Import Preflight を追加。復元前に未導入checkpoint / VAE / adapter / 参照切れ画像を検出し、`qa:dom:workspace-preflight` で確認する。
+- browser-api-recon追加調査: PixAI / Aipictors の公開read-only API / SSRデータを対象に、人気モデル、LoRA推薦、推奨設定、公開作品の生成パラメータを調査し、[`PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html`](PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html) に機能強化案を整理した。認証済みcapture、生成/保存/課金系操作、回避的取得は実施していない。
+- sd-dynamic-prompts調査を実装へ反映。`Dynamic Prompt Lab`、生成直前のprompt展開、History metadata、VariationのPrompt軸、Preflight/DOM QAを追加し、[`DYNAMIC_PROMPT_IMPLEMENTATION_REPORT_2026-05-16.md`](DYNAMIC_PROMPT_IMPLEMENTATION_REPORT_2026-05-16.md) に記録した。
+- 生成画面の複雑化対策として、左カラムを `作る / 整える / 高度` の作業モードへ整理。有効な補助の要約チップ、Preflight誘導、`qa:dom:generation-modes` を追加し、[`GENERATION_GUI_MODE_IMPLEMENTATION_2026-05-16.md`](GENERATION_GUI_MODE_IMPLEMENTATION_2026-05-16.md) に記録した。
 
 ---
 

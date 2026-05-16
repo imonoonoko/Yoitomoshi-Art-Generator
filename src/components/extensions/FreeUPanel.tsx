@@ -24,6 +24,7 @@ export function FreeUPanel(): JSX.Element {
       hint={t('freeu.hint')}
       enabled={f.enabled}
       onEnabledChange={(v) => patch({ enabled: v })}
+      testId="freeu-panel"
     >
       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
         <Slider

@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sd-dynamic-prompts 調査レポート - 2026-05-16</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101218;
+      --panel: #171c24;
+      --panel2: #202733;
+      --line: #333c4c;
+      --ink: #f2f5f8;
+      --muted: #aab3c1;
+      --subtle: #7f8998;
+      --accent: #86a7ff;
+      --accent2: #61c8b6;
+      --ok: #76d48d;
+      --warn: #edc461;
+      --bad: #e77c7c;
+      --code: #0d1017;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.72 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    }
+    a { color: #a6b8ff; }
+    code {
+      padding: 1px 5px;
+      border-radius: 5px;
+      border: 1px solid #2d3542;
+      background: var(--code);
+      color: #e5eaff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #151b26 0%, #101218 100%);
+    }
+    .wrap { max-width: 1240px; margin: 0 auto; padding: 30px; }
+    .eyebrow {
+      margin: 0;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.25; letter-spacing: 0; }
+    h1 { margin-top: 8px; font-size: clamp(28px, 4vw, 43px); }
+    h2 { margin: 34px 0 12px; font-size: 21px; }
+    h3 { margin-bottom: 8px; font-size: 16px; }
+    p { margin: 8px 0 0; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 5px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+    th, td { border: 1px solid var(--line); padding: 10px; vertical-align: top; }
+    th { background: #1c2430; text-align: left; color: #dce6ff; font-size: 12px; }
+    td { background: rgba(255,255,255,.015); }
+    footer { margin-top: 42px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--subtle); }
+    .lead { max-width: 990px; color: var(--muted); font-size: 16px; }
+    .meta, .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill, .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.02);
+      white-space: nowrap;
+      font-weight: 700;
+    }
+    .pill { padding: 4px 10px; color: var(--muted); font-size: 12px; }
+    .tag { padding: 2px 8px; font-size: 11px; }
+    .ok { color: var(--ok); border-color: rgba(118,212,141,.45); }
+    .warn { color: var(--warn); border-color: rgba(237,196,97,.45); }
+    .bad { color: var(--bad); border-color: rgba(231,124,124,.45); }
+    .info { color: var(--accent2); border-color: rgba(97,200,182,.45); }
+    .grid { display: grid; gap: 14px; }
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+    .card.flat { background: var(--panel2); }
+    .callout {
+      border: 1px solid rgba(134,167,255,.35);
+      border-left: 4px solid var(--accent);
+      background: rgba(134,167,255,.07);
+      padding: 14px;
+      border-radius: 8px;
+    }
+    .callout.rec { border-color: rgba(118,212,141,.42); border-left-color: var(--ok); background: rgba(118,212,141,.08); }
+    .callout.risk { border-color: rgba(231,124,124,.42); border-left-color: var(--bad); background: rgba(231,124,124,.08); }
+    .note { color: var(--muted); }
+    .small { color: var(--subtle); font-size: 12px; }
+    .mono {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--code);
+      padding: 12px;
+      color: #dce3f4;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    @media (max-width: 880px) {
+      .wrap { padding: 20px; }
+      .cols-2, .cols-3 { grid-template-columns: 1fr; }
+      table { table-layout: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">Extension Research</p>
+      <h1>sd-dynamic-prompts 調査レポート</h1>
+      <p class="lead">
+        <a href="https://github.com/adieyal/sd-dynamic-prompts">adieyal/sd-dynamic-prompts</a> について、一次情報と二次情報を分けて確認し、
+        Yoitomoshi Art Generator に直接導入するべきか、React/Electron 側の機能として吸収するべきかを整理した。
+      </p>
+      <div class="meta">
+        <span class="pill">作成日: 2026-05-16 JST</span>
+        <span class="pill">対象: A1111 / Forge 系 Dynamic Prompts</span>
+        <span class="pill">前提: Yoitomoshi は Forge API + React UI</span>
+        <span class="pill">判断軸: 探索効率 / 再現性 / 初心者導線 / 安定性</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="callout rec">
+      <h2>結論</h2>
+      <p>
+        拡張機能本体を Forge にそのまま入れるより、<strong>Yoitomoshi 側に「Dynamic Prompt Lab」として取り込む</strong>方が有利。
+        具体的には、<code>{A|B|C}</code>、<code>{2$$A|B|C}</code>、<code>0.5::tag</code>、<code>__wildcard__</code> の主要構文を
+        React/Electron 側でプレビュー・検証・展開し、既存の Variation / History / Prompt Helper / Prompt Library に接続する。
+      </p>
+      <p>
+        直接導入は、Gradio UI 前提、Python ライブラリ版数差、Forge 互換、Magic Prompt の大容量モデル、外部 API 機能が絡む。
+        Yoitomoshi の現在方針である「Gradio UI を埋め込まず、React UI から Forge API を操作する」設計とは相性が弱い。
+      </p>
+    </section>
+
+    <section>
+      <h2>調査範囲</h2>
+      <div class="grid cols-2">
+        <article class="card">
+          <h3>一次情報</h3>
+          <ul>
+            <li><a href="https://github.com/adieyal/sd-dynamic-prompts">GitHub README</a>: 目的、導入、設定、トラブルシュート、Seed挙動。</li>
+            <li><a href="https://github.com/adieyal/sd-dynamic-prompts/blob/main/docs/tutorial.md">公式チュートリアル</a>: variants、wildcards、combinatorial の基本。</li>
+            <li><a href="https://github.com/adieyal/sd-dynamic-prompts/blob/main/docs/SYNTAX.md">公式 SYNTAX</a>: wildcard、glob、YAML/JSON、変数、コメント、sampler。</li>
+            <li><a href="https://github.com/adieyal/sd-dynamic-prompts/blob/main/jinja2.md">Jinja2 guide</a>: 上級テンプレート機能。</li>
+            <li><a href="https://pypi.org/project/dynamicprompts/">PyPI dynamicprompts</a>: コアライブラリ、依存、機能一覧、Python要件。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>二次情報</h3>
+          <ul>
+            <li><a href="https://romptn.com/article/15816">romptn: Dynamic Promptsとは</a>: 日本語初心者向けの使い方。</li>
+            <li><a href="https://romptn.com/article/13486">romptn: ワイルドカード解説</a>: 髪型・服装・背景差分の用途整理。</li>
+            <li><a href="https://www.aiarty.com/stable-diffusion-guide/sd-dynamic-prompts-stable-diffusion.htm">Aiarty tutorial</a>: Wildcard作成、既存Wildcard、ControlNet併用、PNG情報確認。</li>
+            <li><a href="https://www.reddit.com/r/StableDiffusion/comments/1btarn7/stable_diffusion_forge_and_dynamic_prompts_the/">Reddit: Forgeでの失敗例</a>: 互換・parse error の摩擦点。</li>
+            <li><a href="https://deepwiki.com/adieyal/sd-dynamic-prompts">DeepWiki</a>: コード由来の構成理解補助。一次情報ではなく補助資料として扱う。</li>
+          </ul>
+        </article>
+      </div>
+      <p class="small">
+        補足: GitHub API のローカル取得はタイムアウトしたため、リポジトリ統計は GitHub ページ表示を優先した。ページ表示では Star 約2.3k、Fork 299、Issues 189、PR 13。
+      </p>
+    </section>
+
+    <section>
+      <h2>一次情報から分かること</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>確認内容</th>
+            <th>Yoitomoshi への意味</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>基本目的</td>
+            <td>README は、A1111 WebUI 用に「random / combinatorial prompt generation」と深い wildcard directory を提供する拡張と説明している。</td>
+            <td>プロンプト探索・量産・比較のための機能。生成品質を直接上げる拡張ではなく、探索効率を上げる拡張として扱う。</td>
+          </tr>
+          <tr>
+            <td>導入方法</td>
+            <td>WebUI の Extensions tab から導入、または <code>extensions/sd-dynamic-prompts</code> へ clone。Wildcard は拡張フォルダの <code>wildcards</code> 配下。</td>
+            <td>Yoitomoshi では Forge 拡張フォルダへ直接入れると、API専用起動・無効化管理・配布サイズ・環境差が増える。ユーザーデータ領域に独自保存する方が安全。</td>
+          </tr>
+          <tr>
+            <td>主要構文</td>
+            <td><code>{A|B|C}</code>、重み、複数選択、ネスト、<code>__wildcard__</code>、glob、recursive glob、YAML/JSON、変数、template parameter、コメントをサポート。</td>
+            <td>最初から全構文対応は不要。初心者の利便性に直結する subset を UI 化し、上級構文は読み取り専用・後回しにする。</td>
+          </tr>
+          <tr>
+            <td>Combinatorial</td>
+            <td>組み合わせを全列挙できるが、公式 README も Max Generations による制限に触れている。</td>
+            <td>UI では必ず予測件数と上限を表示する。既定は 4 / 8 / 16 枚程度、無制限実行は入れない。</td>
+          </tr>
+          <tr>
+            <td>Seed</td>
+            <td>README は Dynamic Prompts 有効時の random seed、fixed seed、unlink seed from prompt、variation seed の挙動を分けて説明している。</td>
+            <td>画像 seed と prompt 展開 seed を分離して保存する必要がある。比較では「同一画像seedでpromptだけ変える」導線が重要。</td>
+          </tr>
+          <tr>
+            <td>Magic Prompt</td>
+            <td>Prompt 生成モデルを使い、初回に約500MB級モデルをDLする場合がある。低VRAMでは CUDA error の注意もある。</td>
+            <td>現段階の採用対象外。Yoitomoshi の Prompt Helper はローカル辞書・履歴レビュー・Prompt Library を使う軽量路線を維持する。</td>
+          </tr>
+          <tr>
+            <td>I'm feeling lucky</td>
+            <td>Lexica.art API から prompt を取得する機能。</td>
+            <td>外部API依存・再現性・サービス状態の揺れがあるため、ローカルアプリの既定機能にはしない。</td>
+          </tr>
+          <tr>
+            <td>Jinja2</td>
+            <td>公式ガイドでも上級者向け・スクリプトに慣れたユーザー向けとして扱われている。</td>
+            <td>UI主体の初心者導線には不向き。安全なテンプレート subset を先に入れ、Jinja2 は実装しない。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>二次情報から見える実利用</h2>
+      <div class="grid cols-2">
+        <article class="card">
+          <h3>初心者は構文を覚える前に詰まる</h3>
+          <p>
+            romptn は <code>{A|B|C}</code>、重み、複数選択、Wildcard、Prompt Magic を画像例付きで説明している。
+            記事の価値は「何ができるか」を日本語で見せる点にあり、実装では syntax 入力欄より、ボタンとプレビューが必要だと分かる。
+          </p>
+          <p class="note">落とし込み: 「服装だけランダム化」「背景だけランダム化」「表情を重み付きで混ぜる」をテンプレートカード化する。</p>
+        </article>
+        <article class="card">
+          <h3>実用用途は同じ構図の差分探索</h3>
+          <p>
+            romptn のワイルドカード記事は、同じ構図のまま髪型・服装・背景を変える用途を強調している。
+            Aiarty も dress / hair style / hat / topwear のような要素差分を例にしている。
+          </p>
+          <p class="note">落とし込み: Prompt Helper と Prompt Library から「可変にするタグ」を選び、固定タグと可変タグを分ける UI を作る。</p>
+        </article>
+        <article class="card">
+          <h3>ControlNet 併用が重要</h3>
+          <p>
+            Aiarty は、服装だけ変えてポーズや髪型を保ちたい場合に ControlNet を使うと説明している。
+            これは Yoitomoshi の ControlNet Builder と相性がよい。
+          </p>
+          <p class="note">落とし込み: Dynamic Prompt Lab の比較実行に「構図固定: ControlNetを準備」ボタンを置く。</p>
+        </article>
+        <article class="card">
+          <h3>失敗談は互換性とパス解決に集中</h3>
+          <p>
+            Reddit では Forge 環境で parse error が出る例、Wildcard の subfolder 認識、<code>No values found</code>、hires fix と dynamic prompt の整合性などが見える。
+            これらは単発報告なので仕様根拠ではないが、UX上の警告設計には使える。
+          </p>
+          <p class="note">落とし込み: 生成前に missing wildcard、構文エラー、展開件数、hires/upscale時の再展開有無を明示する。</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>導入案の比較</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>案</th>
+            <th>メリット</th>
+            <th>リスク</th>
+            <th>判断</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>A. Forge に拡張本体を直接導入</td>
+            <td>既存実装をほぼそのまま使える。Wildcard Manager や Magic Prompt も揃う。</td>
+            <td>Gradio UI 前提。API専用Forge起動では UI 資産が活かしにくい。dynamicprompts ライブラリ版数差・pyparsing・Magic Prompt依存が増える。</td>
+            <td><span class="tag bad">非推奨</span> 実験環境なら可。本体配布の既定にはしない。</td>
+          </tr>
+          <tr>
+            <td>B. Python <code>dynamicprompts</code> を Electron IPC から呼ぶ</td>
+            <td>公式ライブラリに近い構文互換を得やすい。</td>
+            <td>Forge Python / venv / package更新 / Windows path / subprocess コストが増える。UIプレビューのたびに重い。</td>
+            <td><span class="tag warn">後回し</span> 高度構文互換が必要になった時だけ検討。</td>
+          </tr>
+          <tr>
+            <td>C. TypeScript で安全 subset parser を実装</td>
+            <td>既存 Prompt UI、Variation、History、Workspace と自然に接続できる。プレビュー・検証が高速。配布しやすい。</td>
+            <td>全構文互換ではない。parser とテストを書く必要がある。</td>
+            <td><span class="tag ok">推奨</span> Yoitomoshi ではこの案を採用する。</td>
+          </tr>
+          <tr>
+            <td>D. Prompt Library のみで疑似ランダム化</td>
+            <td>実装が軽い。既存資産を活用できる。</td>
+            <td>ユーザーが外部 wildcard 資産や <code>{A|B|C}</code> を使えない。比較生成の価値が弱い。</td>
+            <td><span class="tag warn">補助</span> C案のデータ源として使う。</td>
+          </tr>
+          <tr>
+            <td>E. Magic Prompt / Lexica API 連携</td>
+            <td>短いpromptから長い候補を出せる。</td>
+            <td>大容量モデル、VRAM、外部API、出典不明語、再現性低下。既存のローカル Prompt Helper 方針とずれる。</td>
+            <td><span class="tag bad">非採用</span> まずはローカル補助に限定する。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>推奨する落とし込み</h2>
+      <div class="grid cols-3">
+        <article class="card">
+          <h3>1. Dynamic Prompt Lab</h3>
+          <p>PromptPanel 内に折りたたみパネルとして追加。トップレベルタブは増やさない。</p>
+          <ul>
+            <li>現在の Prompt から variants を検出</li>
+            <li>構文エラーと missing wildcard を表示</li>
+            <li>展開プレビューを 8 件表示</li>
+            <li>画像 seed と prompt seed を別表示</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>2. Builder UI</h3>
+          <p>ユーザーに構文を直接覚えさせず、チップ編集から variants を作る。</p>
+          <ul>
+            <li>選択タグを「候補グループ化」</li>
+            <li>重みスライダーを <code>0.5::tag</code> に変換</li>
+            <li>「2個選ぶ」stepper を <code>2$$</code> に変換</li>
+            <li>固定タグ / 可変タグを視覚的に分ける</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>3. Wildcard Library</h3>
+          <p>拡張フォルダではなく <code>userdata/dynamic-prompts/</code> に保存する。</p>
+          <ul>
+            <li>Prompt Library サブカテゴリから wildcard 作成</li>
+            <li>History review accepted tags から wildcard 作成</li>
+            <li>txt / yaml / json import</li>
+            <li>重複・空行・危険な path を検証</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>4. Variation 連携</h3>
+          <p>既存 VariationPanel に axis <code>prompt</code> を追加する。</p>
+          <ul>
+            <li>2 / 4 / 8 枚の prompt 展開比較</li>
+            <li>同一画像seedで prompt だけ変える</li>
+            <li>結果に resolved prompt と template を保存</li>
+            <li>良い候補を QuickPreset / Workspace へ保存</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>5. History / Workspace</h3>
+          <p>後から再現できるよう、展開前と展開後の両方を保存する。</p>
+          <ul>
+            <li><code>dynamicTemplate</code></li>
+            <li><code>resolvedPrompt</code></li>
+            <li><code>dynamicSeed</code></li>
+            <li><code>wildcardSources</code></li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>6. Prompt Helper</h3>
+          <p>自然文から「どこをランダム化するか」を提案する。</p>
+          <ul>
+            <li>服装差分</li>
+            <li>髪型差分</li>
+            <li>背景差分</li>
+            <li>表情の重み付き差分</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>実装フェーズ案</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Phase</th>
+            <th>内容</th>
+            <th>検証</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>P0: Parser + Preview</td>
+            <td>
+              <code>src/lib/dynamic-prompts.ts</code> を追加し、<code>{A|B|C}</code>、<code>{2$$A|B|C}</code>、<code>w::tag</code>、<code>__name__</code>、コメント、空白を処理。
+              PromptPanel にプレビューとエラー表示だけを追加。
+            </td>
+            <td>unit test: basic variants、weighted、multi select、missing wildcard、count estimate、seed再現。</td>
+          </tr>
+          <tr>
+            <td>P1: Prompt Axis Variation</td>
+            <td>
+              VariationPanel に prompt axis を追加。固定画像seedで複数 resolved prompt を生成し、履歴へ template / resolved / seed を保存。
+            </td>
+            <td><code>npm.cmd run typecheck</code>、DOM QA selector、2/4/8 件の履歴保存 smoke。</td>
+          </tr>
+          <tr>
+            <td>P2: Wildcard Manager</td>
+            <td>
+              Tools または PromptPanel 内モーダルで user wildcard を管理。Prompt Library / History review / txt import から作成。
+            </td>
+            <td>import parse、path traversal拒否、重複削除、Workspace保存復元。</td>
+          </tr>
+          <tr>
+            <td>P3: UX Shortcuts</td>
+            <td>
+              PromptTagChips の選択タグから variant 作成、重みUI、複数選択UI、Prompt Helper の「ランダム化候補」。
+            </td>
+            <td>Electron DOM QA: tag選択、variant作成、preview、生成前警告。</td>
+          </tr>
+          <tr>
+            <td>P4: Advanced compatibility</td>
+            <td>
+              YAML/JSON hierarchical wildcard、variables、template parameters を必要範囲だけ追加。Jinja2 / Magic Prompt / Lexica API はまだ入れない。
+            </td>
+            <td>fixture ベースの parser test と既存 prompt-utils regression。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>UI イメージ</h2>
+      <div class="mono">Dynamic Prompt Lab
+
+[固定] masterpiece, best quality, 1girl, looking at viewer
+[可変] clothing: {kimono|school uniform|hoodie|maid dress}
+[可変] background: __backgrounds/city_night__
+[重み] expression: {4::smile|2::serious|1::crying}
+
+Preview
+1. masterpiece, best quality, 1girl, looking at viewer, kimono, neon street, smile
+2. masterpiece, best quality, 1girl, looking at viewer, hoodie, rainy alley, serious
+3. masterpiece, best quality, 1girl, looking at viewer, maid dress, night market, smile
+
+Run: [4枚] [8枚] [同じ画像seedで比較] [ControlNetで構図固定]</div>
+    </section>
+
+    <section>
+      <h2>リスクと対策</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>リスク</th>
+            <th>対策</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>組み合わせ爆発で大量生成される</td>
+            <td>常に推定件数を表示し、既定 8、上限 100 未満。無制限は実装しない。</td>
+          </tr>
+          <tr>
+            <td>同じ seed なのに結果が再現できない</td>
+            <td>画像seedとprompt展開seedを別に持つ。履歴とWorkspaceに両方保存する。</td>
+          </tr>
+          <tr>
+            <td>Wildcard file が見つからない</td>
+            <td>生成前 preflight で missing wildcard を止める。候補パスと作成ボタンを出す。</td>
+          </tr>
+          <tr>
+            <td>LoRA / Regional Prompter / BREAK / AND を parser が壊す</td>
+            <td><code>&lt;lora:...&gt;</code>、<code>AND</code>、<code>BREAK</code>、Regional Prompter token は protected token として扱う。</td>
+          </tr>
+          <tr>
+            <td>外部 wildcard pack の品質が低い</td>
+            <td>import 後にタグ数、重複、長すぎる行、NSFW/不要語、空行を表示。既定では Prompt Library 由来を優先。</td>
+          </tr>
+          <tr>
+            <td>Magic Prompt が重い / 外部依存が増える</td>
+            <td>初期実装では採用しない。既存 Prompt Helper のローカル候補生成を強化する。</td>
+          </tr>
+          <tr>
+            <td>YAML/JSON import の安全性</td>
+            <td>構造データとして parse し、path traversal と巨大ファイルを拒否。任意コード実行系テンプレートは扱わない。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>採用優先度</h2>
+      <div class="grid cols-3">
+        <article class="card flat">
+          <h3><span class="tag ok">P0</span> すぐ価値が出る</h3>
+          <ul>
+            <li>variant preview</li>
+            <li>prompt axis comparison</li>
+            <li>same seed prompt comparison</li>
+            <li>template metadata保存</li>
+          </ul>
+        </article>
+        <article class="card flat">
+          <h3><span class="tag warn">P1</span> 使い勝手を上げる</h3>
+          <ul>
+            <li>Wildcard Manager</li>
+            <li>Prompt Library から wildcard 作成</li>
+            <li>History review tags から wildcard 作成</li>
+            <li>タグ選択から variant 化</li>
+          </ul>
+        </article>
+        <article class="card flat">
+          <h3><span class="tag bad">後回し</span> 重い・危険</h3>
+          <ul>
+            <li>Jinja2実行</li>
+            <li>Magic Prompt model DL</li>
+            <li>Lexica API</li>
+            <li>Forge拡張本体の既定同梱</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="callout">
+      <h2>次の具体アクション</h2>
+      <p>
+        最小実装は <code>src/lib/dynamic-prompts.ts</code> と unit test から始める。
+        UI は PromptPanel の <code>PromptHelperPanel</code> と <code>ResearchWorkflowPanel</code> の近くに折りたたみパネルを追加し、
+        まずは「展開プレビュー」と「VariationPanel の prompt axis」までを 1 スライスにするのがよい。
+      </p>
+    </section>
+
+    <section>
+      <h2>参照ソース</h2>
+      <ul>
+        <li><a href="https://github.com/adieyal/sd-dynamic-prompts">adieyal/sd-dynamic-prompts README</a></li>
+        <li><a href="https://github.com/adieyal/sd-dynamic-prompts/blob/main/docs/tutorial.md">sd-dynamic-prompts official tutorial</a></li>
+        <li><a href="https://github.com/adieyal/sd-dynamic-prompts/blob/main/docs/SYNTAX.md">sd-dynamic-prompts SYNTAX.md</a></li>
+        <li><a href="https://github.com/adieyal/sd-dynamic-prompts/blob/main/jinja2.md">sd-dynamic-prompts Jinja2 guide</a></li>
+        <li><a href="https://pypi.org/project/dynamicprompts/">dynamicprompts PyPI</a></li>
+        <li><a href="https://romptn.com/article/15816">romptn Magazine: Dynamic Promptsとは</a></li>
+        <li><a href="https://romptn.com/article/13486">romptn Magazine: ワイルドカード解説</a></li>
+        <li><a href="https://www.aiarty.com/stable-diffusion-guide/sd-dynamic-prompts-stable-diffusion.htm">Aiarty: How to Use Dynamic Prompts</a></li>
+        <li><a href="https://www.reddit.com/r/StableDiffusion/comments/1btarn7/stable_diffusion_forge_and_dynamic_prompts_the/">Reddit: Forge failure example</a></li>
+        <li><a href="https://deepwiki.com/adieyal/sd-dynamic-prompts">DeepWiki: adieyal/sd-dynamic-prompts</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <p>Yoitomoshi Art Generator research note. Generated for local implementation planning; secondary sources are treated as workflow evidence, not authoritative specification.</p>
+  </footer>
+</body>
+</html>
