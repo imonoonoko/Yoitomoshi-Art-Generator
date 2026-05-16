@@ -526,7 +526,7 @@ rg -n "[ぁ-んァ-ン一-龯]" src\components src\App.tsx src\lib -g '!i18n.ts'
 - Follow-up: ToolsのWorkspace保存カードに Import Preflight を追加。復元前に未導入checkpoint / VAE / adapter / 参照切れ画像を検出し、`qa:dom:workspace-preflight` で確認する。
 - browser-api-recon追加調査: PixAI / Aipictors の公開read-only API / SSRデータを対象に、人気モデル、LoRA推薦、推奨設定、公開作品の生成パラメータを調査し、[`PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html`](PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html) に機能強化案を整理した。認証済みcapture、生成/保存/課金系操作、回避的取得は実施していない。
 - sd-dynamic-prompts調査を実装へ反映。`Dynamic Prompt Lab`、生成直前のprompt展開、History metadata、VariationのPrompt軸、Preflight/DOM QAを追加し、[`DYNAMIC_PROMPT_IMPLEMENTATION_REPORT_2026-05-16.md`](DYNAMIC_PROMPT_IMPLEMENTATION_REPORT_2026-05-16.md) に記録した。
-- 生成画面の複雑化対策として、左カラムを `作る / 整える / 高度` の作業モードへ整理。有効な補助の要約チップ、Preflight誘導、`qa:dom:generation-modes` を追加し、[`GENERATION_GUI_MODE_IMPLEMENTATION_2026-05-16.md`](GENERATION_GUI_MODE_IMPLEMENTATION_2026-05-16.md) に記録した。
+- 生成画面の複雑化対策として、いったん左カラムを `作る / 整える / 高度` の作業モードへ整理した。その後、実利用で切替負荷が高かったためモードタブを廃止し、`基本設定` / `Prompt補助` / `拡張設定` を同じ生成画面にまとめて表示する構成へ更新した。記録: [`GENERATION_GUI_MODE_IMPLEMENTATION_2026-05-16.md`](GENERATION_GUI_MODE_IMPLEMENTATION_2026-05-16.md), [`GENERATION_SECTION_UI_UPDATE_2026-05-16.md`](GENERATION_SECTION_UI_UPDATE_2026-05-16.md)。
 
 ---
 

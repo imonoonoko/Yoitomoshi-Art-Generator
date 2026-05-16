@@ -4,7 +4,7 @@
 
 A personal Stable Diffusion frontend built for game development. It runs Stable Diffusion WebUI Forge in the background and exposes generation, asset management, and Civitai integration through a custom React/Electron UI.
 
-> **Quick start**: Read the bundled [`start.en.txt`](start.en.txt) and you can be up and running in 5 minutes. This README is the full reference.
+> **Quick start**: Follow "Launch — 3 steps" below. The detailed setup guide is currently maintained in Japanese at [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
 
 ## Launch — 3 steps
 

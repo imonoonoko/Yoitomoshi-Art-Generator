@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>次の一枚 実装計画書 - 2026-05-16</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1217;
+      --panel: #171c24;
+      --panel2: #202733;
+      --panel3: #111720;
+      --line: #333c4c;
+      --ink: #f2f5f8;
+      --muted: #aab3c1;
+      --subtle: #7f8998;
+      --accent: #86a7ff;
+      --accent2: #61c8b6;
+      --ok: #76d48d;
+      --warn: #edc461;
+      --bad: #e77c7c;
+      --code: #0b0f15;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.76 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    }
+    a { color: #a6b8ff; }
+    code {
+      padding: 1px 5px;
+      border-radius: 5px;
+      border: 1px solid #2d3542;
+      background: var(--code);
+      color: #e5eaff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--code);
+      padding: 12px;
+      color: #dfe4ff;
+      font: 12px/1.7 "Cascadia Code", Consolas, monospace;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #151b26 0%, #0f1217 100%);
+    }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 30px; }
+    .eyebrow {
+      margin: 0;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3, h4 { margin: 0; line-height: 1.25; letter-spacing: 0; }
+    h1 { margin-top: 8px; font-size: clamp(28px, 4vw, 44px); }
+    h2 { margin: 36px 0 12px; font-size: 22px; }
+    h3 { margin-bottom: 8px; font-size: 16px; }
+    h4 { margin: 12px 0 4px; font-size: 13px; color: #d9e2f1; }
+    p { margin: 8px 0 0; }
+    ul, ol { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 5px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+    th, td { border: 1px solid var(--line); padding: 10px; vertical-align: top; }
+    th { background: #1c2430; text-align: left; color: #dce6ff; font-size: 12px; }
+    td { background: rgba(255,255,255,.015); }
+    footer { margin-top: 42px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--subtle); }
+    .lead { max-width: 1030px; color: var(--muted); font-size: 16px; }
+    .meta, .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill, .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.02);
+      white-space: nowrap;
+      font-weight: 700;
+    }
+    .pill { padding: 4px 10px; color: var(--muted); font-size: 12px; }
+    .tag { padding: 2px 8px; font-size: 11px; }
+    .ok { color: var(--ok); border-color: rgba(118,212,141,.45); }
+    .warn { color: var(--warn); border-color: rgba(237,196,97,.45); }
+    .bad { color: var(--bad); border-color: rgba(231,124,124,.45); }
+    .info { color: var(--accent2); border-color: rgba(97,200,182,.45); }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+    .card.soft { background: rgba(255,255,255,.025); }
+    .card.feature { background: linear-gradient(180deg, rgba(134,167,255,.08), rgba(255,255,255,.018)); }
+    .callout {
+      margin-top: 14px;
+      border: 1px solid rgba(134,167,255,.42);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      background: rgba(134,167,255,.08);
+      padding: 14px;
+    }
+    .risk {
+      border-color: rgba(237,196,97,.45);
+      border-left-color: var(--warn);
+      background: rgba(237,196,97,.07);
+    }
+    .stop {
+      border-color: rgba(231,124,124,.45);
+      border-left-color: var(--bad);
+      background: rgba(231,124,124,.07);
+    }
+    .score {
+      display: inline-flex;
+      min-width: 26px;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 1px 7px;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: #222a36;
+      font-weight: 800;
+    }
+    .kpi strong { display: block; font-size: 25px; line-height: 1.1; }
+    .kpi span { color: var(--muted); font-size: 12px; }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+      counter-reset: flow;
+    }
+    .flow .step {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel2);
+      padding: 12px;
+      min-height: 110px;
+    }
+    .flow .step::before {
+      counter-increment: flow;
+      content: counter(flow);
+      display: inline-flex;
+      width: 24px;
+      height: 24px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      margin-bottom: 8px;
+      background: rgba(134,167,255,.16);
+      color: var(--accent);
+      font-weight: 900;
+    }
+    .lane {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel3);
+      overflow: hidden;
+    }
+    .lane-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #1b222d;
+      font-weight: 800;
+      color: #dce6ff;
+    }
+    .lane-body { padding: 12px; }
+    .tiny { color: var(--subtle); font-size: 12px; }
+    .decision { font-size: 18px; color: #f7f9ff; }
+    .nowrap { white-space: nowrap; }
+    .matrix {
+      display: grid;
+      grid-template-columns: repeat(10, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .matrix span {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      border: 1px solid #2a3342;
+      border-radius: 6px;
+      background: rgba(255,255,255,.022);
+      color: var(--muted);
+      padding: 5px;
+      font-size: 10px;
+      line-height: 1.35;
+    }
+    .timeline {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .phase {
+      display: grid;
+      grid-template-columns: 120px 1fr 250px;
+      gap: 12px;
+      align-items: start;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 12px;
+    }
+    .phase-id {
+      display: inline-flex;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: rgba(134,167,255,.14);
+      color: var(--accent);
+      font-weight: 900;
+    }
+    .checklist {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 14px;
+      margin-top: 10px;
+    }
+    .checklist li {
+      margin: 0;
+      list-style: none;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: rgba(255,255,255,.018);
+      padding: 8px 9px;
+    }
+    .source-list li { overflow-wrap: anywhere; }
+    @media (max-width: 1040px) {
+      .grid, .grid2, .grid4, .flow, .phase, .checklist { grid-template-columns: 1fr; }
+      .matrix { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      table { table-layout: auto; }
+    }
+    @media print {
+      body { background: #fff; color: #111; }
+      header, .card, .lane, .phase, .callout, th, td { background: #fff !important; color: #111 !important; }
+      a { color: #0645ad; }
+      .wrap { max-width: none; padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">Master Implementation Plan</p>
+      <h1>次の一枚: 生成の試行錯誤を勝手に整理する制作台</h1>
+      <p class="lead">
+        この計画書は、Romptn横断リサーチ、ローカル生成履歴、既存のPreview/Variation/History/Prompt Helper実装を前提に、
+        「プロンプトをうまく書かせるソフト」ではなく「当たり画像までの試行錯誤を短くするソフト」へ寄せるための実装計画である。
+        100回の設計反復に相当する観点を、実装順・UI仕様・データ設計・検証条件へ圧縮した。
+      </p>
+      <div class="meta">
+        <span class="pill">作成日: 2026-05-16</span>
+        <span class="pill">対象: Yoitomoshi Art Generator</span>
+        <span class="pill">主戦場: Preview / History / Variation</span>
+        <span class="pill">方針: 辞書を見せず、比較を前へ</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <h2>一文で決める</h2>
+      <div class="callout">
+        <p class="decision">
+          <strong>生成結果を見た直後に、ソフトが「次に試すべき一枚」を提示し、似た試行を自動で束ね、比較単位で当たりを探せるようにする。</strong>
+        </p>
+        <p>
+          これはPrompt Helperの拡張ではない。Previewの下に置く「次の一手」機能であり、Historyを比較ボードへ変えるための入口である。
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>根拠</h2>
+      <div class="grid4 kpi">
+        <div class="card soft"><strong>181</strong><span>ローカル履歴件数</span></div>
+        <div class="card soft"><strong>0</strong><span>手動ラベル利用数</span></div>
+        <div class="card soft"><strong>121</strong><span>768x1024の履歴</span></div>
+        <div class="card soft"><strong>120</strong><span>最多モデルの利用回数</span></div>
+      </div>
+      <div class="grid2">
+        <article class="card">
+          <h3>履歴が示す使い方</h3>
+          <ul>
+            <li>同じ方向性のpromptを、seed、steps、cfg、model、LoRA有無で連続的に試している。</li>
+            <li>ラベルは全履歴で未使用。つまり「後で分類する」より「今見て選ぶ」方が自然。</li>
+            <li>縦長キャラクター生成が中心。結果画像と次アクションが主役になる。</li>
+            <li>特定モデルに集中しているため、モデル切替は日常操作ではなく比較アクションとして扱うべき。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>既存実装が示す近道</h3>
+          <ul>
+            <li><code>PreviewPanel</code> には既に Variation、img2img送信、Upscale送信、Recipe保存の出口がある。</li>
+            <li><code>VariationPanel</code> はseed/prompt/cfg/denoise比較生成の土台を持っている。</li>
+            <li><code>PromptHelperPanel</code> はローカル辞書候補をappendする形で安全に動く。</li>
+            <li><code>HistoryGallery</code> はラベル、復元、比較の接続点を持つ。ここを「倉庫」から「比較ボード」へ寄せる。</li>
+          </ul>
+        </article>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>観測</th>
+            <th>解釈</th>
+            <th>設計判断</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ラベル利用0件</td>
+            <td>手動分類は作業の中心ではない。</td>
+            <td>自動グループ化を先に作り、手動ラベルは後から補助にする。</td>
+          </tr>
+          <tr>
+            <td>同一prompt周辺の連続生成が多い</td>
+            <td>ユーザーは比較しながら当たりを探している。</td>
+            <td>比較レーン、seed比較、model/LoRA比較をPreview直下に置く。</td>
+          </tr>
+          <tr>
+            <td>Prompt Libraryの強化案に辛さを感じた</td>
+            <td>分類表を増やす方向は認知負荷が高い。</td>
+            <td>Romptn由来タグは裏側の候補辞書として使い、一覧UIにはしない。</td>
+          </tr>
+          <tr>
+            <td>既存にVariationPanelがある</td>
+            <td>比較生成はゼロから作る必要がない。</td>
+            <td>最初はVariationを「次の一枚」から呼び出せるように再配置する。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>100回反復相当の設計圧縮</h2>
+      <p>
+        実際に100個の別案を実装するのではなく、10の観点で各10回ずつ問い直した前提で、残す判断だけをまとめる。
+        下の100セルは「この計画が満たすべき反復チェック」であり、Phaseごとのレビュー観点にも使う。
+      </p>
+      <div class="matrix">
+        <span>1 操作を減らす</span><span>2 選択肢を絞る</span><span>3 辞書を隠す</span><span>4 結果を主語に</span><span>5 生成直後に出す</span><span>6 比較を標準に</span><span>7 ラベルは任意</span><span>8 既存UIを使う</span><span>9 保存を自動に</span><span>10 検証可能に</span>
+        <span>11 Prompt欄を脇役に</span><span>12 Previewを司令塔に</span><span>13 Historyを束ねる</span><span>14 Variationを再利用</span><span>15 seed差分を前へ</span><span>16 model差分を前へ</span><span>17 LoRA差分を前へ</span><span>18 表情差分を前へ</span><span>19 背景差分を前へ</span><span>20 失敗対策を前へ</span>
+        <span>21 1クリックで下書き</span><span>22 すぐ生成しない</span><span>23 変更内容を見せる</span><span>24 戻せる</span><span>25 余計な保存形式を増やさない</span><span>26 純粋関数化</span><span>27 i18n前提</span><span>28 DOM QA前提</span><span>29 typecheck前提</span><span>30 build前提</span>
+        <span>31 似た履歴を自動検出</span><span>32 seedは無視して束ねる</span><span>33 qualityタグは無視して束ねる</span><span>34 LoRA有無は軸化</span><span>35 model違いは軸化</span><span>36 サイズ違いは軸化</span><span>37 negative違いは補助</span><span>38 dynamic promptを考慮</span><span>39 履歴を壊さない</span><span>40 保存済み画像を動かさない</span>
+        <span>41 Romptnは裏で使う</span><span>42 表情候補は5個まで</span><span>43 構図候補は5個まで</span><span>44 背景候補は5個まで</span><span>45 negative候補は目的別</span><span>46 年齢/肌は慎重に</span><span>47 投稿は後段</span><span>48 NSFW辞書は混ぜない</span><span>49 モデル依存を明示</span><span>50 外部API不要</span>
+        <span>51 使わない拡張は入れない</span><span>52 Gradio UIに寄せない</span><span>53 Forge API主軸</span><span>54 React側で完結</span><span>55 Zustand stateを直接活用</span><span>56 ipc追加は後回し</span><span>57 まず永続化しない</span><span>58 重くしない</span><span>59 起動負荷を増やさない</span><span>60 巨大DOMにしない</span>
+        <span>61 ボタン名は動詞</span><span>62 説明文を短く</span><span>63 アイコン中心</span><span>64 折りたたみ過多にしない</span><span>65 生成中は無効</span><span>66 失敗時toast</span><span>67 変更前プレビュー</span><span>68 変更後toast</span><span>69 data-testidを付ける</span><span>70 言語切替に強く</span>
+        <span>71 最初のPRを小さく</span><span>72 計画と実装を分ける</span><span>73 1仮説1変更</span><span>74 同じ失敗は調査</span><span>75 docs更新</span><span>76 ROADMAP更新</span><span>77 QA記録</span><span>78 既存変更を壊さない</span><span>79 runtimeを触らない</span><span>80 userdataは検証時のみ</span>
+        <span>81 比較結果を横並び</span><span>82 当たりを採用しやすく</span><span>83 採用からUpscaleへ</span><span>84 採用からimg2imgへ</span><span>85 採用からWorkspaceへ</span><span>86 履歴に戻れる</span><span>87 候補を学習しすぎない</span><span>88 好みは統計で補助</span><span>89 手動分類を要求しない</span><span>90 使わなくても邪魔しない</span>
+        <span>91 Phaseごとに価値</span><span>92 rollback容易</span><span>93 型を狭く</span><span>94 関数をテスト可能に</span><span>95 UIを狭く始める</span><span>96 Historyは後段</span><span>97 Queueはさらに後段</span><span>98 投稿は最後</span><span>99 成功条件を数える</span><span>100 使いたくなる名前</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>完成体験</h2>
+      <div class="flow">
+        <div class="step">
+          <h3>生成を見る</h3>
+          <p>Previewに最新画像が出る。ユーザーはPrompt欄ではなく画像を見る。</p>
+        </div>
+        <div class="step">
+          <h3>次の一枚を選ぶ</h3>
+          <p>画像下に短いアクションが出る。例: この方向、表情、構図、背景、失敗減らす。</p>
+        </div>
+        <div class="step">
+          <h3>差分を確認</h3>
+          <p>即生成ではなく、何が変わるかを短く表示。必要なら適用を取り消せる。</p>
+        </div>
+        <div class="step">
+          <h3>比較する</h3>
+          <p>seed、model、LoRA、表情などの軸で横並び候補を作る。</p>
+        </div>
+        <div class="step">
+          <h3>当たりを採用</h3>
+          <p>採用候補をimg2img、Upscale、Workspace保存、History束ねへ送る。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>機能仕様</h2>
+      <div class="grid2">
+        <article class="lane">
+          <div class="lane-head">次の一枚パネル</div>
+          <div class="lane-body">
+            <p>Preview下部に出る主UI。生成結果がない時は非表示。生成中は読み取り専用または無効。</p>
+            <ul>
+              <li><code>この方向で続ける</code>: seedだけ変えて継続。</li>
+              <li><code>seed 4枚</code>: 既存Variationのseed軸を4候補で実行。</li>
+              <li><code>表情だけ</code>: 表情/視線タグのみ差し替え候補を提示。</li>
+              <li><code>構図だけ</code>: shot/angle/pose系タグだけ差し替え候補を提示。</li>
+              <li><code>背景だけ</code>: location/time/weather/light系タグだけ差し替え候補を提示。</li>
+              <li><code>失敗を減らす</code>: negativeに目的別の短いセットを追加。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="lane">
+          <div class="lane-head">比較レーン</div>
+          <div class="lane-body">
+            <p>VariationPanelを「実験候補」表示として再利用する。最初は新しい生成キューを作らない。</p>
+            <ul>
+              <li>seed比較: 既存実装をそのまま利用。</li>
+              <li>prompt比較: dynamic promptまたは候補差し替えを使う。</li>
+              <li>model比較: 後段。選択済みモデル周辺から2候補だけ。</li>
+              <li>LoRA比較: 後段。現在のLoRAあり/なし、weight 2段階。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="lane">
+          <div class="lane-head">履歴の自動まとまり</div>
+          <div class="lane-body">
+            <p>Historyを「倉庫」から「同じ実験の比較ボード」へ変える。永続化は安定後。</p>
+            <ul>
+              <li>prompt fingerprintで似た履歴を束ねる。</li>
+              <li>seed、qualityタグ、weight表記、LoRA tokenはfingerprintから除外。</li>
+              <li>model、LoRA有無、サイズは差分軸として見せる。</li>
+              <li>手動ラベルは残すが、最初に要求しない。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="lane">
+          <div class="lane-head">Romptnの扱い</div>
+          <div class="lane-body">
+            <p>Romptn記事のタグ群は辞書画面に大量表示しない。小さなaction presetへ圧縮する。</p>
+            <ul>
+              <li>表情: smile / grin / serious / displeased / blush など短いセット。</li>
+              <li>視線: looking at viewer / looking away / looking back。</li>
+              <li>構図: full body / cowboy shot / from below / from behind。</li>
+              <li>背景: outdoors / indoors / night / city street / sky。</li>
+              <li>negative: 手、顔、ぼけ、文字、余計な四肢を目的別に。</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>実装アーキテクチャ</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 26%">ファイル</th>
+            <th style="width: 22%">責務</th>
+            <th>実装内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>src/lib/next-image-actions.ts</code></td>
+            <td>差分生成ロジック</td>
+            <td>現在stateから表示可能なactionを作り、prompt/negative/paramsのpatchを返す。UIに依存しない純粋関数にする。</td>
+          </tr>
+          <tr>
+            <td><code>src/components/NextImagePanel.tsx</code></td>
+            <td>Preview直下の操作UI</td>
+            <td>アクションボタン、変更プレビュー、適用、Variation起動導線を持つ。生成結果がない時は出さない。</td>
+          </tr>
+          <tr>
+            <td><code>src/components/PreviewPanel.tsx</code></td>
+            <td>既存Preview接続</td>
+            <td><code>MetadataInfoPanel</code> と <code>VariationPanel</code> の近くに <code>NextImagePanel</code> を差し込む。</td>
+          </tr>
+          <tr>
+            <td><code>src/lib/history-fingerprint.ts</code></td>
+            <td>履歴グループ化</td>
+            <td>promptを正規化し、似た履歴を同じ実験として束ねる。まずは保存せず表示時に計算。</td>
+          </tr>
+          <tr>
+            <td><code>src/components/HistoryGallery.tsx</code></td>
+            <td>比較ボード化</td>
+            <td>後段で「同じ実験」表示を追加。既存ラベルや復元機能は保持。</td>
+          </tr>
+          <tr>
+            <td><code>src/lib/i18n.ts</code></td>
+            <td>表示文言</td>
+            <td><code>nextImage.*</code> のキーを追加。DOM QAは文言ではなく <code>data-testid</code> を使う。</td>
+          </tr>
+          <tr>
+            <td><code>scripts/dom-qa.cjs</code></td>
+            <td>実機DOM確認</td>
+            <td>後段で <code>qa:dom:next-image</code> を追加し、ボタンとstate変化を確認する。</td>
+          </tr>
+          <tr>
+            <td><code>docs/ROADMAP.md</code></td>
+            <td>方針記録</td>
+            <td>実装後に「次の一枚」方針、検証結果、残課題を短く追記する。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>型の最小案</h3>
+      <pre>export type NextImageActionId =
+  | 'continue-seed'
+  | 'seed-compare'
+  | 'expression-variant'
+  | 'composition-variant'
+  | 'background-variant'
+  | 'reduce-failure'
+
+export interface NextImageAction {
+  id: NextImageActionId
+  labelKey: string
+  summaryKey: string
+  icon: 'shuffle' | 'sparkles' | 'camera' | 'image' | 'shield'
+  kind: 'patch' | 'variation'
+  patch?: {
+    prompt?: string
+    negativePrompt?: string
+    params?: Partial&lt;GenerationParams&gt;
+  }
+  preview: {
+    addedPositive: string[]
+    removedPositive: string[]
+    addedNegative: string[]
+    paramChanges: string[]
+  }
+}</pre>
+
+      <h3>fingerprintの最小案</h3>
+      <pre>normalizePromptForFingerprint(prompt):
+  remove adapter tokens: &lt;lora:...&gt;, &lt;lyco:...&gt;
+  remove weights: (tag:1.2) -> tag
+  remove common quality tags: masterpiece, best quality, high quality
+  remove seed-only/dynamic noise when detectable
+  normalize spaces, underscores, duplicate commas
+  keep subject, outfit, composition, background, key style tags
+  sort stable low-impact tags, preserve strong subject tokens
+  return hash(normalized tokens)</pre>
+    </section>
+
+    <section>
+      <h2>実装フェーズ</h2>
+      <div class="timeline">
+        <article class="phase">
+          <div><span class="phase-id">P0</span></div>
+          <div>
+            <h3>計画固定と安全境界</h3>
+            <p>このHTML計画書を基準に、最初の実装範囲をPhase 1だけへ固定する。</p>
+            <ul>
+              <li>Preview直下に出す。PromptPanel主導にしない。</li>
+              <li>永続化、生成キュー、History再設計は入れない。</li>
+              <li>既存変更が多い作業ツリーなので、差分は小さく保つ。</li>
+            </ul>
+          </div>
+          <div class="tiny">完了条件: HTML計画書、実装対象ファイル、禁止事項が明確。</div>
+        </article>
+
+        <article class="phase">
+          <div><span class="phase-id">P1</span></div>
+          <div>
+            <h3>次の一枚パネル MVP</h3>
+            <p>生成結果の下に、6つのアクションを表示し、押すと変更案を適用できる状態にする。</p>
+            <ul>
+              <li><code>next-image-actions.ts</code> を追加。</li>
+              <li><code>NextImagePanel.tsx</code> を追加。</li>
+              <li><code>PreviewPanel.tsx</code> へ接続。</li>
+              <li>変更前に追加/削除/params変更を表示。</li>
+              <li>seed比較は既存VariationPanelのseed軸へ誘導。</li>
+            </ul>
+          </div>
+          <div class="tiny">完了条件: 生成後だけ表示、各ボタンでprompt/negative/paramsが期待通り変化。</div>
+        </article>
+
+        <article class="phase">
+          <div><span class="phase-id">P2</span></div>
+          <div>
+            <h3>候補の質を上げる</h3>
+            <p>Romptn由来の候補を、大量辞書ではなくaction presetへ圧縮する。</p>
+            <ul>
+              <li>表情、視線、構図、背景、照明、negativeの短いセットを追加。</li>
+              <li>既存promptに同系統タグがある場合は、追加ではなく差し替え候補にする。</li>
+              <li>モデル依存の候補には注意文を出す。</li>
+              <li>ユーザーがよく使う履歴トークンを候補順位に軽く反映する。</li>
+            </ul>
+          </div>
+          <div class="tiny">完了条件: 候補が3〜6個に収まり、タグ一覧UIにならない。</div>
+        </article>
+
+        <article class="phase">
+          <div><span class="phase-id">P3</span></div>
+          <div>
+            <h3>Historyを同じ実験で束ねる</h3>
+            <p>表示時fingerprintで似た履歴をグループ化し、同じprompt周辺を横並びで見せる。</p>
+            <ul>
+              <li><code>history-fingerprint.ts</code> を追加。</li>
+              <li>HistoryGalleryに「同じ実験」フィルタまたはセクションを追加。</li>
+              <li>seed違い、model違い、LoRA違いをバッジで表示。</li>
+              <li>手動ラベルは既存のまま残す。</li>
+            </ul>
+          </div>
+          <div class="tiny">完了条件: 181件履歴で重くならず、同じ実験が自動でまとまる。</div>
+        </article>
+
+        <article class="phase">
+          <div><span class="phase-id">P4</span></div>
+          <div>
+            <h3>ワンクリック比較生成</h3>
+            <p>既存VariationPanelを発展させ、比較軸をユーザーの作業に近い言葉へ変える。</p>
+            <ul>
+              <li><code>seed 4枚</code> を最初の標準比較にする。</li>
+              <li><code>表情3種</code>、<code>構図3種</code>、<code>背景3種</code> を追加。</li>
+              <li><code>LoRAあり/なし</code> はactiveLorasがある時だけ表示。</li>
+              <li><code>モデルA/B</code> はモデル候補の安全な選択仕様を固めてから。</li>
+            </ul>
+          </div>
+          <div class="tiny">完了条件: 比較候補がHistoryへ残り、採用画像をimg2img/Upscaleへ送れる。</div>
+        </article>
+
+        <article class="phase">
+          <div><span class="phase-id">P5</span></div>
+          <div>
+            <h3>採用判断の流れを作る</h3>
+            <p>当たり候補を選んだ後の行き先を短くする。ここで初めてラベルやWorkspaceを自然に使わせる。</p>
+            <ul>
+              <li>比較候補から「採用」「もう一回」「Upscale」「img2img」「Recipe保存」を出す。</li>
+              <li>採用時だけHistory labelのcandidate/favoriteを自動付与する案を検討。</li>
+              <li>Workspace保存は明示操作のまま。勝手に巨大ファイルを作らない。</li>
+            </ul>
+          </div>
+          <div class="tiny">完了条件: 当たり画像から次工程へ迷わず進める。</div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>P1の詳細タスク</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 10%">順</th>
+            <th style="width: 26%">タスク</th>
+            <th>実装メモ</th>
+            <th style="width: 20%">検証</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>action定義を作る</td>
+            <td><code>NextImageActionId</code> とaction presetを作る。最初は固定候補でよい。</td>
+            <td>typecheck</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>prompt差し替え関数</td>
+            <td>表情/構図/背景のtag familyを定義し、同系統タグを最大1個だけ差し替える。</td>
+            <td>関数単位の簡易fixture</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>negative追加関数</td>
+            <td>重複を避けて、手/顔/低品質/文字系の短いnegativeを追加する。</td>
+            <td>重複なし確認</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>NextImagePanel UI</td>
+            <td>6ボタン、変更プレビュー、適用ボタン。ボタンは小さく、説明は短く。</td>
+            <td>DOM表示確認</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>PreviewPanel接続</td>
+            <td><code>lastImage</code> がある時だけ表示。生成中はdisabled。</td>
+            <td>生成なし/あり/生成中</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>i18nキー追加</td>
+            <td>日本語を先に自然に書く。英語/ru/ptは短いfallbackでも崩れないように。</td>
+            <td>言語切替DOM</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td>ROADMAP追記</td>
+            <td>計画とP1実装結果、検証コマンド、残Phaseを記録。</td>
+            <td>diff check</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>UI仕様</h2>
+      <div class="grid2">
+        <article class="card feature">
+          <h3>配置</h3>
+          <p><code>PreviewPanel</code> の画像下、既存アクションバーの上またはVariationPanelの近くに置く。Prompt欄の中へ入れない。</p>
+          <pre>[Preview Image]
+[次の一枚: この方向 / seed4 / 表情 / 構図 / 背景 / 失敗減らす]
+[変更プレビュー: +smile -serious +bad hands]
+[Variation / img2img / Upscale / Recipe / Download]</pre>
+        </article>
+        <article class="card feature">
+          <h3>表示ルール</h3>
+          <ul>
+            <li><code>lastImage === null</code>: 非表示。</li>
+            <li><code>isGenerating === true</code>: 表示してもdisabled。</li>
+            <li>activeLorasなし: LoRA比較は出さない。</li>
+            <li>img2img入力なし: denoise比較は出さない。</li>
+            <li>promptが空: 表情/構図/背景は「候補追加」だけにする。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>ボタン文言</h3>
+          <table>
+            <tbody>
+              <tr><td><code>この方向</code></td><td>seedを変えて近い方向をもう一枚。</td></tr>
+              <tr><td><code>seed 4枚</code></td><td>同条件で4候補を見る。</td></tr>
+              <tr><td><code>表情</code></td><td>表情・視線だけを小さく変える。</td></tr>
+              <tr><td><code>構図</code></td><td>距離・角度・向きだけを変える。</td></tr>
+              <tr><td><code>背景</code></td><td>場所・時間帯・光だけを変える。</td></tr>
+              <tr><td><code>失敗減らす</code></td><td>negativeを補強する。</td></tr>
+            </tbody>
+          </table>
+        </article>
+        <article class="card">
+          <h3>ユーザーに見せないもの</h3>
+          <ul>
+            <li>Romptn記事名やタグ一覧。</li>
+            <li>prompt fingerprintの内部値。</li>
+            <li>難しい分類カテゴリ。</li>
+            <li>モデル依存の断定表現。</li>
+            <li>外部API連携や投稿サイト連携。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>採用しない案</h2>
+      <div class="grid2">
+        <article class="callout stop">
+          <h3>巨大Prompt Library化</h3>
+          <p>候補が多いほどよい、という設計にはしない。今回の価値は一覧ではなく、今の画像に対して次に試す候補を絞ること。</p>
+        </article>
+        <article class="callout stop">
+          <h3>Prompt All in One直接導入</h3>
+          <p>API専用Forge起動ではGradio UI依存が邪魔になりやすい。既存方針通り、発想だけReact側に取り込む。</p>
+        </article>
+        <article class="callout stop">
+          <h3>最初から自動生成キュー</h3>
+          <p>便利だが失敗時の責務が大きい。P1ではstate patchと既存Variationの呼び出しに留める。</p>
+        </article>
+        <article class="callout stop">
+          <h3>履歴グループの即時永続化</h3>
+          <p>fingerprint仕様が固まる前に保存形式を増やすと後戻りが重い。まず表示時計算にする。</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>検証計画</h2>
+      <ul class="checklist">
+        <li><strong>typecheck:</strong> <code>npm.cmd run typecheck</code></li>
+        <li><strong>build:</strong> <code>npm.cmd run build</code></li>
+        <li><strong>diff:</strong> docsや辞書変更時は <code>git diff --check</code></li>
+        <li><strong>DOM smoke:</strong> Electron remote debugging + <code>data-testid</code> で確認。</li>
+        <li><strong>表示条件:</strong> 生成結果なしでは非表示、生成結果ありで表示、生成中はdisabled。</li>
+        <li><strong>action:</strong> 各ボタンがprompt/negative/paramsの狙った場所だけ変える。</li>
+        <li><strong>重複:</strong> 同じnegativeや同じ表情タグを増やし続けない。</li>
+        <li><strong>既存機能:</strong> Variation、img2img送信、Upscale送信、Recipe保存が壊れない。</li>
+        <li><strong>多言語:</strong> 日本語/英語/ロシア語/ポルトガル語でセレクタが文言依存しない。</li>
+        <li><strong>履歴:</strong> P3時点では181件程度の履歴で表示が重くならない。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>リスクと対策</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 24%">リスク</th>
+            <th>対策</th>
+            <th style="width: 22%">検出方法</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>候補が多すぎて辛くなる</td>
+            <td>各actionは最大3〜6候補。詳細辞書への導線は置かない。</td>
+            <td>UI目視、DOM要素数</td>
+          </tr>
+          <tr>
+            <td>promptを壊す</td>
+            <td>正本はtextarea。変更前プレビューを出し、既存 <code>prompt-utils</code> を使う。</td>
+            <td>before/after fixture</td>
+          </tr>
+          <tr>
+            <td>タグ差し替えが雑</td>
+            <td>familyごとに狭く定義。判断できない場合は追加ではなく候補表示に留める。</td>
+            <td>手動fixture</td>
+          </tr>
+          <tr>
+            <td>履歴グループが誤る</td>
+            <td>最初は保存せず、折りたたみ可能な参考表示にする。</td>
+            <td>実履歴181件確認</td>
+          </tr>
+          <tr>
+            <td>生成キューが失敗時に複雑化</td>
+            <td>P1/P2ではキューを作らない。既存VariationPanelの範囲で比較する。</td>
+            <td>実装レビュー</td>
+          </tr>
+          <tr>
+            <td>同じエラーへの場当たり対応</td>
+            <td>同じ失敗2回でAGENTS.mdの原因調査プロトコルへ移る。</td>
+            <td>検証ログ</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>最初の実装PRのスコープ</h2>
+      <div class="callout">
+        <h3>PR 1: 次の一枚 MVP</h3>
+        <p>最初のPRでは、History自動まとまりとワンクリック比較生成キューは入れない。Previewに表示される小さなパネルと、差分適用ロジックだけを完成させる。</p>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>含める</th>
+            <th>含めない</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <ul>
+                <li><code>next-image-actions.ts</code></li>
+                <li><code>NextImagePanel.tsx</code></li>
+                <li><code>PreviewPanel.tsx</code> 接続</li>
+                <li><code>nextImage.*</code> i18nキー</li>
+                <li>ROADMAP追記</li>
+                <li>typecheck / build / DOM smoke</li>
+              </ul>
+            </td>
+            <td>
+              <ul>
+                <li>新しい保存形式</li>
+                <li>履歴グループ永続化</li>
+                <li>自動生成キュー</li>
+                <li>投稿サイト連携</li>
+                <li>外部AI/API依存</li>
+                <li>巨大Prompt Library追加</li>
+              </ul>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>成功条件</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>ユーザー体験</h3>
+          <p>生成後、Prompt Libraryを開かずに「もう一枚」「表情」「構図」「背景」「失敗対策」へ進める。</p>
+        </article>
+        <article class="card">
+          <h3>実装品質</h3>
+          <p>変更はPreview周辺と純粋関数に閉じ、既存のGeneration/History/Workspace契約を壊さない。</p>
+        </article>
+        <article class="card">
+          <h3>検証</h3>
+          <p>typecheck/build/DOM smokeが通り、少なくとも6actionのstate変化を確認できる。</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>参照</h2>
+      <ul class="source-list">
+        <li><code>docs/ROMPTN_PROMPT_RESEARCH_REPORT_2026-05-16.html</code>: Romptn記事群を裏側の候補辞書として使う判断。</li>
+        <li><code>src/components/PreviewPanel.tsx</code>: 生成結果、Variation、img2img、Upscale、Recipe保存の既存接続点。</li>
+        <li><code>src/components/VariationPanel.tsx</code>: seed/prompt/cfg/denoise比較生成の既存土台。</li>
+        <li><code>src/components/PromptHelperPanel.tsx</code>: ローカル候補をappendする安全な既存パターン。</li>
+        <li><code>src/components/HistoryGallery.tsx</code>: 履歴ラベル、復元、比較導線の拡張先。</li>
+        <li><code>userdata/history/index.json</code>: 今回の履歴傾向分析元。編集対象ではない。</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <p>作成: Codex / 2026-05-16。これは実装前の計画書であり、runtime、userdata、生成画像には変更を加えていない。</p>
+  </footer>
+</body>
+</html>

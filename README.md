@@ -4,36 +4,18 @@
 
 個人ゲーム開発用の Stable Diffusion フロントエンド。Stable Diffusion WebUI Forge を裏で起動して、独自の React/Electron UI から生成・素材管理・Civitai 連携をまとめて行う。
 
-> **クイックスタート派の方へ**: 同梱の [`はじめに.txt`](はじめに.txt) を読めば 5 分で起動できます。本 README は詳細仕様を網羅したものです。
+> **クイックスタート派の方へ**: 同梱の [`はじめに.txt`](はじめに.txt) を読めば最短手順だけ確認できます。詰まった時は [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) を見てください。
 
-## 関連ドキュメント
+## 初めて読む順番
 
-- [全体精査レポート 2026-05-12](docs/PROJECT_REVIEW_2026-05-12.html)
-- [次作業優先度レポート 2026-05-12](docs/NEXT_ACTION_REPORT_2026-05-12.html)
-- [全体機能・シナジー精査レポート 2026-05-13](docs/FULL_FEATURE_SYNERGY_REPORT_2026-05-13.html)
-- [ブラッシュアップ実装レポート 2026-05-13](docs/FULL_FEATURE_BRUSHUP_REPORT_2026-05-13.html)
-- [AIキャラ追加ワークフロー実装レポート 2026-05-13](docs/CHARACTER_COMPOSITE_WORKFLOW_REPORT_2026-05-13.html)
-- [AIキャラ追加 強化レポート 2026-05-13](docs/CHARACTER_COMPOSITE_ADVANCED_REPORT_2026-05-13.html)
-- [AIキャラ追加 連携診断レポート 2026-05-13](docs/CHARACTER_COMPOSITE_INTEGRATION_STATUS_REPORT_2026-05-13.html)
-- [未検証項目 棚卸し・検証レポート 2026-05-13](docs/PROJECT_UNVERIFIED_VALIDATION_REPORT_2026-05-13.html)
-- [必要モデル・実素材リサーチ 2026-05-13](docs/MODEL_AND_ASSET_RESEARCH_REPORT_2026-05-13.html)
-- [ControlNet追加モデル導入レポート 2026-05-13](docs/CONTROLNET_MODEL_INSTALLATION_REPORT_2026-05-13.html)
-- [Goal 1-5 実行レポート 2026-05-13](docs/GOAL_1_5_EXECUTION_REPORT_2026-05-13.html)
-- [AIアート制作ナレッジ総合レポート 2026-05-14](docs/AI_ART_CREATOR_WORKFLOW_RESEARCH_REPORT_2026-05-14.html)
-- [AIアート制作 二次情報リサーチ補足レポート 2026-05-14](docs/AI_ART_SECONDARY_SOURCE_RESEARCH_REPORT_2026-05-14.html)
-- [AIアート調査 実装ステータス 2026-05-14](docs/AI_ART_RESEARCH_IMPLEMENTATION_STATUS_2026-05-14.md)
-- [未検証項目 徹底検証・修正レポート 2026-05-14](docs/UNVERIFIED_DEEP_VALIDATION_REPORT_2026-05-14.html)
-- [ロードマップ](docs/ROADMAP.md)
-- [ファイル / フォルダ構造](docs/PROJECT_STRUCTURE.md)
-- QA証跡:
-  [ControlNet API](docs/QA_CONTROLNET_2026-05-12.md) /
-  [ControlNet UI](docs/QA_CONTROLNET_UI_2026-05-12.md) /
-  [Workspace復元](docs/QA_WORKSPACE_RESTORE_2026-05-12.md) /
-  [Model Library復旧](docs/QA_MODEL_LIBRARY_RECOVERY_2026-05-12.md) /
-  [Upscale比較](docs/QA_UPSCALE_COMPARISON_2026-05-12.md) /
-  [制作ナレッジP2](docs/QA_CREATOR_WORKFLOW_P2_2026-05-14.md) /
-  [未検証徹底検証](docs/QA_UNVERIFIED_DEEP_VALIDATION_2026-05-14.md) /
-  [DOM自動QA](docs/QA_DOM_GUIDE_2026-05-14.md)
+| 目的 | 読むもの |
+|---|---|
+| すぐ起動したい | [`はじめに.txt`](はじめに.txt) |
+| 初回セットアップを丁寧に確認したい | [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) |
+| どのドキュメントを見ればよいか知りたい | [`docs/DOCS_INDEX.md`](docs/DOCS_INDEX.md) |
+| フォルダ構造とGitHubに載せない範囲を確認したい | [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md) |
+| 現在の優先順位と実装履歴を確認したい | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
+| DOM QAや検証コマンドを確認したい | [`docs/QA_DOM_GUIDE_2026-05-14.md`](docs/QA_DOM_GUIDE_2026-05-14.md) |
 
 ## 起動 — 3 ステップ
 
@@ -75,6 +57,22 @@ Yoitomoshi.bat  をエクスプローラから ダブルクリック
 | **Civitai API キー** | 任意。設定すると NSFW モデル取得 / レート制限緩和。[Civitai → Account](https://civitai.com/user/account) の「API Keys」タブから取得 |
 
 設定保存後、タイトルバー左の電源ボタンを押すと Forge が裏で起動します(初回は依存解決で 1〜2 分)。
+
+---
+
+## 生成画面の見方
+
+生成画面は `txt2img / img2img / Upscale / Tools` の上部タブを維持し、日常生成で触る項目は左カラムにまとめて表示する構成です。
+
+| 左カラムの領域 | 役割 |
+|---|---|
+| **Recommendation / 生成前チェック** | モデル推奨、VAE / Clip Skip / LoRA / ControlNet などの注意点を生成前に確認する |
+| **Prompt / Negative** | Prompt editor、Negative editor、タグ並び替え、整形、Generate button |
+| **基本設定** | 入力画像、LoRA提案、Sampler / Steps / CFG / Size / Seed など主要パラメータ |
+| **Prompt補助** | タグチップ編集、Prompt Helper、Dynamic Prompt Lab、Research Workflow |
+| **拡張設定** | Regional Prompter、FABRIC、ControlNet、ADetailer、Dynamic Thresholding、FreeU |
+
+`作る / 整える / 高度` の排他的な切替タブは廃止済みです。隠れている設定が生成payloadに入ったまま分からなくなる問題を避けるため、現在は全体を同じ生成画面内で見渡せるようにしています。
 
 ---
 
