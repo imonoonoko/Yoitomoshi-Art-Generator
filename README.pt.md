@@ -6,9 +6,22 @@ Frontend pessoal para Stable Diffusion, criado para desenvolvimento de jogos. Ro
 
 > **Início rápido**: siga a seção "Inicialização — 3 passos" abaixo. O guia detalhado de setup é mantido em japonês em [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
 
-## Inicialização — 3 passos
+## Inicialização pelo GitHub — 4 passos
 
-### 1. Pré-requisitos
+### 1. Obter o repositório
+
+Com Git:
+
+```powershell
+git clone https://github.com/imonoonoko/Yoitomoshi-Art-Generator.git
+cd Yoitomoshi-Art-Generator
+```
+
+Sem Git, use `Code` → `Download ZIP` no GitHub e extraia a pasta.
+
+`runtime/`, `userdata/`, `node_modules/` e outputs de build não são incluídos. Prepare o Forge e os modelos localmente.
+
+### 2. Pré-requisitos
 
 | Necessário | Função |
 |---|---|
@@ -19,7 +32,7 @@ Frontend pessoal para Stable Diffusion, criado para desenvolvimento de jogos. Ro
 
 São necessários cerca de 5 GB livres de disco (node_modules + histórico de imagens geradas).
 
-### 2. Iniciar com clique duplo
+### 3. Iniciar com clique duplo
 
 ```
 Clique duplo em  Yoitomoshi.bat  no Explorer
@@ -34,7 +47,7 @@ Quando termina, a janela do Electron abre. Inicializações seguintes levam segu
 
 > **Atalho na área de trabalho**: clique direito em [`create-desktop-shortcut.ps1`](create-desktop-shortcut.ps1) → "Executar com PowerShell" e um atalho aparecerá na área de trabalho.
 
-### 3. Configuração inicial — apontar para o Forge
+### 4. Configuração inicial — apontar para o Forge
 
 Clique no ícone ⚙ no canto superior direito da barra de título para abrir o modal de configurações:
 

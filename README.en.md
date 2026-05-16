@@ -6,9 +6,22 @@ A personal Stable Diffusion frontend built for game development. It runs Stable 
 
 > **Quick start**: Follow "Launch — 3 steps" below. The detailed setup guide is currently maintained in Japanese at [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md).
 
-## Launch — 3 steps
+## Launch from GitHub — 4 steps
 
-### 1. Prerequisites
+### 1. Get the repository
+
+With Git:
+
+```powershell
+git clone https://github.com/imonoonoko/Yoitomoshi-Art-Generator.git
+cd Yoitomoshi-Art-Generator
+```
+
+Without Git, use `Code` → `Download ZIP` on GitHub and extract the folder.
+
+`runtime/`, `userdata/`, `node_modules/`, and build outputs are not included. Prepare Forge and models locally.
+
+### 2. Prerequisites
 
 | Required | Purpose |
 |---|---|
@@ -19,7 +32,7 @@ A personal Stable Diffusion frontend built for game development. It runs Stable 
 
 About 5 GB of free disk space is required (node_modules + generated image history).
 
-### 2. Launch via double-click
+### 3. Launch via double-click
 
 ```
 Double-click  Yoitomoshi.bat  in Explorer
@@ -34,7 +47,7 @@ The Electron window opens when build finishes. Subsequent launches start in seco
 
 > **Desktop icon**: right-click [`create-desktop-shortcut.ps1`](create-desktop-shortcut.ps1) → "Run with PowerShell" to drop a shortcut on your desktop.
 
-### 3. First-time setup — point at Forge
+### 4. First-time setup — point at Forge
 
 Click the ⚙ icon in the upper-right of the title bar to open the settings modal:
 

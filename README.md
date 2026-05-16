@@ -17,9 +17,22 @@
 | 現在の優先順位と実装履歴を確認したい | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 | DOM QAや検証コマンドを確認したい | [`docs/QA_DOM_GUIDE_2026-05-14.md`](docs/QA_DOM_GUIDE_2026-05-14.md) |
 
-## 起動 — 3 ステップ
+## GitHubから起動 — 4 ステップ
 
-### 1. 必要環境を用意する
+### 1. このリポジトリを取得する
+
+Gitが入っている場合:
+
+```powershell
+git clone https://github.com/imonoonoko/Yoitomoshi-Art-Generator.git
+cd Yoitomoshi-Art-Generator
+```
+
+Gitを使わない場合は、GitHubの `Code` → `Download ZIP` から取得して展開してください。
+
+> `runtime/`、`userdata/`、`node_modules/`、`out/` はGitHubに含めません。初回起動時に必要なものだけ作られます。Forge本体とモデルは利用者側で用意します。
+
+### 2. 必要環境を用意する
 
 | 必須 | 用途 |
 |---|---|
@@ -30,7 +43,7 @@
 
 ストレージは ~5GB の空きが必要(node_modules + 生成画像履歴)。
 
-### 2. ダブルクリックで起動
+### 3. ダブルクリックで起動
 
 ```
 Yoitomoshi.bat  をエクスプローラから ダブルクリック
@@ -45,7 +58,7 @@ Yoitomoshi.bat  をエクスプローラから ダブルクリック
 
 > **デスクトップアイコン**: [`create-desktop-shortcut.ps1`](create-desktop-shortcut.ps1) を右クリック →「PowerShell で実行」でデスクトップにショートカットを生成。
 
-### 3. 初回設定 — Forge パスを指定
+### 4. 初回設定 — Forge パスを指定
 
 タイトルバー右上の ⚙ アイコンを押すと設定モーダルが開きます:
 
