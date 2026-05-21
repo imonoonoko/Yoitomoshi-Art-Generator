@@ -8,14 +8,14 @@
 
 | 領域 | セレクタ |
 |---|---|
-| 上部タブ | `main-tab-txt2img`, `main-tab-img2img`, `main-tab-upscale`, `main-tab-tools` |
+| 上部タブ | `main-tab-txt2img`, `main-tab-img2img`, `main-tab-video`, `main-tab-upscale`, `main-tab-models`, `main-tab-tools` |
 | サイドタブ | `side-tab-library`, `side-tab-lora`, `side-tab-history`, `side-tab-presets` |
 | サイド内容 | `side-content-library`, `side-content-lora`, `side-content-history`, `side-content-presets` |
 | Prompt / Generate | `prompt-positive-section`, `prompt-negative-section`, `generate-button` |
 | 拡張パネル | `parameters-panel`, `regional-prompter-panel`, `fabric-panel`, `controlnet-builder-panel`, `controlnet-panel`, `adetailer-panel` |
 | Preflight | `preflight-panel`, `preflight-summary`, `preflight-item-{key}`, `preflight-open-{key}`, `preflight-fix-{key}` |
 | Workspace | `workspace-row-{id}`, `workspace-restore-{id}`, `workspace-delete-{id}` |
-| Tools | `tagger-catalog`, `tagger-run-current-image`, `tagger-run-result`, `tool-section-library-toggle`, `model-library-card`, `library-delete-partial-{index}` |
+| Tools / Models | `tagger-catalog`, `tagger-run-current-image`, `tagger-run-result`, `main-tab-models`, `model-library-workspace`, `model-library-card`, `library-delete-partial-{index}` |
 | History review | `history-tag-review-panel`, `history-review-open`, `history-review-accepted`, `history-review-rejected`, `history-review-save`, `history-review-accept-all`, `history-review-reject-all`, `history-review-append-prompt`, `history-review-append-negative` |
 | Prompt Helper | `prompt-helper-reviewed-tags`, `prompt-helper-apply-review-accepted`, `prompt-helper-apply-review-rejected` |
 
@@ -53,6 +53,31 @@ API surface smoke:
 
 ```powershell
 npm.cmd run qa:dom:api -- --port=9338
+```
+
+Forge既存経路のcore smoke:
+
+```powershell
+npm.cmd run qa:dom:forge-core -- --port=9338
+npm.cmd run qa:dom:forge-controlnet -- --port=9338
+```
+
+`qa:dom:forge-core` はForgeを一時起動し、txt2img / img2img / Extras Upscale / ControlNet preprocessor detectをIPC経由で確認する。ControlNet alwayson生成は、Forge側payload/model互換の追加調査が必要なため、このcore smokeでは実行しない。
+
+`qa:dom:forge-controlnet` はSDXL checkpoint + Tile / Lineart ControlNetの代表payloadを比較し、Forge ControlNet alwayson生成そのものが通るかを確認する。2026-05-19時点では `novaAnimeXL_ilV190.safetensors` と `xinsir-controlnet-tile-sdxl-1.0` / `mistoline-lineart-rank256` の組み合わせでPASSしている。
+
+Packaged / installer smoke:
+
+```powershell
+# packaged app: dist\win-unpacked\Yoitomoshi Art Generator.exe を remote debugging 付きで起動してから実行
+npm.cmd run qa:dom -- selectors --port=9338
+
+# installer smokeは既存インストール有無を先に確認する。
+# 2026-05-19は Yoitomoshi-Art-Generator-Setup-0.1.0.exe を /S --currentuser --no-desktop-shortcut でinstallし、
+# installed exeの selector smoke 後に QuietUninstallString (/currentuser /S) でuninstallした。
+# latest.yml の path と setup exe実名が一致し、古いsetupがdistに残っていないことも確認する。
+# icon設定後はdistログに default Electron icon warning が出ないことと、
+# Get-AuthenticodeSignature が NotSigned のままなら署名ゲート未完了として扱う。
 ```
 
 Tagger IPC smoke:
@@ -96,8 +121,9 @@ npm.cmd run qa:dom:partial-delete -- --port=9338
 
 - 以前の `QA DOM preflight mismatch temporary` Workspaceを削除。
 - LoRAタブを開き、`Hands v2.1` のCivitai metadataが表示されるまで待つ。
+- Forge実測モデル一覧からSDXL系checkpointを選ぶ。`novaAnimeXL_ilV190.safetensors` がある場合はそれを優先する。
 - 一時Workspaceを保存し、ToolsのWorkspace復元UIから復元する。
-- `preflight-item-lora-base`, `preflight-item-lora-trigger`, `preflight-item-sdxl-size`, `preflight-item-cn-base-0` をDOMで確認する。
+- `preflight-item-lora-base`, `preflight-item-lora-trigger`, `preflight-item-sdxl-size`, `preflight-item-cn-base-0` をDOMで確認する。`cn-base-0` は `data-preflight-severity="block"` であることを確認する。
 - 一時Workspaceを削除する。
 
 `p2-fixture` は以下も確認する。
@@ -106,7 +132,7 @@ npm.cmd run qa:dom:partial-delete -- --port=9338
 - `preflight-open-lora-trigger` から該当Prompt領域へ移動できる。
 - `preflight-fix-lora-trigger` でLoRA triggerをPromptへ追記できる。
 - `preflight-fix-sdxl-size` でSDXL小解像度警告を解消できる。
-- ToolsのTagger Catalog、Model Library、`runTagger` / `deletePartialFile` / `checkLibraryIntegrity` IPCが露出している。
+- ToolsのTagger Catalog、ModelsタブのModel Library、`runTagger` / `deletePartialFile` / `checkLibraryIntegrity` IPCが露出している。
 
 `tagger-smoke` はローカルTagger未配置でも `missing-model` として安全に返ることを確認する。モデル配置後は `ok` または依存不足時の `missing-runtime` を許容する。
 

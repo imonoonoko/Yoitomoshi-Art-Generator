@@ -184,6 +184,7 @@ interface CivitaiVersion {
   id: number
   modelId: number
   name: string
+  description?: string | null
   baseModel: string
   trainedWords: string[]
   images: CivitaiImage[]
@@ -192,12 +193,26 @@ interface CivitaiVersion {
     name: string
     type: string
     nsfw: boolean
+    description?: string | null
+    creator?: { username?: string }
     tags?: string[]
     allowNoCredit?: boolean
     allowCommercialUse?: string
     allowDerivatives?: boolean
     allowDifferentLicense?: boolean
   }
+}
+
+interface CivitaiModelDetail {
+  id: number
+  name: string
+  description?: string | null
+  tags?: string[]
+  creator?: { username?: string }
+  allowNoCredit?: boolean
+  allowCommercialUse?: string
+  allowDerivatives?: boolean
+  allowDifferentLicense?: boolean
 }
 
 /**
@@ -224,6 +239,9 @@ export async function fetchByHash(
     modelVersionId: v.id,
     modelId: v.modelId,
     baseModel: v.baseModel,
+    creator: v.model.creator?.username ?? null,
+    description: stripModelAndVersionDescription(v, 1200),
+    tags: v.model.tags ?? [],
     trainedWords: v.trainedWords ?? [],
     suggested: deriveSuggestedSettings(v.images ?? []),
     recommendedLoras: extractRecommendedLoras(v.images ?? []),
@@ -282,6 +300,22 @@ export async function fetchLoraByHash(
   )
   if (!v) return null
   const primaryFile = pickPrimaryModelFile(v.files ?? [])
+  const preliminaryDescription = stripModelAndVersionDescription(v, 2000)
+  let description = preliminaryDescription
+  let recommendedPrompts = extractLoraRecommendedPrompts(description, v.trainedWords ?? [])
+  let modelDetail: CivitaiModelDetail | null = null
+  if (!v.model.description && recommendedPrompts.length === 0) {
+    modelDetail = await fetchModelDetail(v.modelId, apiKey).catch(() => null)
+    if (modelDetail?.description) {
+      description = stripModelAndVersionDescription(v, 2000, modelDetail.description)
+      recommendedPrompts = extractLoraRecommendedPrompts(description, v.trainedWords ?? [])
+    }
+  }
+  const descriptionSource = modelDetail?.description || v.model.description
+    ? 'model'
+    : v.description
+      ? 'version'
+      : 'none'
 
   return {
     modelId: v.modelId,
@@ -290,7 +324,10 @@ export async function fetchLoraByHash(
     versionName: v.name,
     baseModel: v.baseModel,
     trainedWords: v.trainedWords ?? [],
-    tags: v.model.tags ?? [],
+    description,
+    descriptionSource,
+    recommendedPrompts,
+    tags: modelDetail?.tags ?? v.model.tags ?? [],
     files: normalizeCivitaiFiles(v.files ?? []),
     availability: {
       primaryFileSha256: primaryFile?.hashes?.SHA256 ?? null,
@@ -300,15 +337,166 @@ export async function fetchLoraByHash(
       virusScanResult: primaryFile?.virusScanResult ?? null
     },
     usage: {
-      allowNoCredit: typeof v.model.allowNoCredit === 'boolean' ? v.model.allowNoCredit : null,
-      allowCommercialUse: v.model.allowCommercialUse ?? null,
-      allowDerivatives: typeof v.model.allowDerivatives === 'boolean' ? v.model.allowDerivatives : null,
-      allowDifferentLicense: typeof v.model.allowDifferentLicense === 'boolean' ? v.model.allowDifferentLicense : null
+      allowNoCredit: booleanOrNull(modelDetail?.allowNoCredit ?? v.model.allowNoCredit),
+      allowCommercialUse: modelDetail?.allowCommercialUse ?? v.model.allowCommercialUse ?? null,
+      allowDerivatives: booleanOrNull(modelDetail?.allowDerivatives ?? v.model.allowDerivatives),
+      allowDifferentLicense: booleanOrNull(modelDetail?.allowDifferentLicense ?? v.model.allowDifferentLicense)
     },
     thumbnailUrl: pickThumbnail(v.images ?? []),
     civitaiUrl: `https://civitai.com/models/${v.modelId}?modelVersionId=${v.id}`,
     fetchedAt: Date.now()
   }
+}
+
+function extractLoraRecommendedPrompts(
+  description: string | null,
+  trainedWords: string[]
+): string[] {
+  if (!description) return []
+  const lines = description
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map(normalizeDescriptionLine)
+
+  const candidates: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (!line) continue
+
+    const inline = promptTextAfterDescriptionLabel(line)
+    if (inline) {
+      candidates.push(inline)
+      continue
+    }
+
+    if (!isPromptDescriptionHeading(line)) continue
+    for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
+      const next = lines[j]
+      if (!next) {
+        if (j > i + 1) break
+        continue
+      }
+      if (isNegativePromptDescriptionLine(next)) break
+      if (isDescriptionSectionBoundary(next)) break
+      candidates.push(promptTextAfterDescriptionLabel(next) ?? next)
+    }
+  }
+
+  const seen = new Set(trainedWords.map(promptHintKey).filter(Boolean))
+  const out: string[] = []
+  for (const candidate of candidates) {
+    for (const token of splitPromptHintTokens(candidate)) {
+      const normalized = normalizePromptHintToken(token)
+      const key = promptHintKey(normalized)
+      if (!normalized || !key || seen.has(key)) continue
+      seen.add(key)
+      out.push(normalized)
+      if (out.length >= 16) return out
+    }
+  }
+  return out
+}
+
+async function fetchModelDetail(modelId: number, apiKey: string | null): Promise<CivitaiModelDetail | null> {
+  return civitaiJson<CivitaiModelDetail>(
+    `/models/${modelId}`,
+    apiKey,
+    'Civitai model detail lookup'
+  )
+}
+
+function booleanOrNull(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null
+}
+
+function normalizeDescriptionLine(line: string): string {
+  return line
+    .replace(/^[\s>*•・-]+/, '')
+    .replace(/^\d+[.)]\s+/, '')
+    .replace(/\*\*/g, '')
+    .trim()
+}
+
+function promptTextAfterDescriptionLabel(line: string): string | null {
+  const patterns = [
+    /^(?:(?:recommended|suggested|example|sample|positive)\s+)?prompts?\s*[:：-]\s*(.+)$/i,
+    /^(?:prompt\s+(?:example|sample)|positive\s+prompt)\s*[:：-]\s*(.+)$/i,
+    /^(?:positive|positive\s+tags?|prompt\s+tags?)\s*[:：-]\s*(.+)$/i,
+    /^(?:(?:recommended|suggested)\s+)?(?:tags?|words?)\s+to\s+use\s*[:：-]\s*(.+)$/i,
+    /^(?:recommended|suggested)\s+(?:tags?|words?)\s*[:：-]\s*(.+)$/i,
+    /^tags?(?:\s*\((?![^)]*(?:negative|neg))[^)]*\))?\s*[:：-]\s*(.+)$/i,
+    /^(?:推奨|おすすめ|推奨される|おすすめの)?\s*(?:プロンプト|タグ)\s*[:：-]\s*(.+)$/i,
+    /^(?:プロンプト例|使用プロンプト|ポジティブプロンプト|追加タグ)\s*[:：-]\s*(.+)$/i
+  ]
+  for (const pattern of patterns) {
+    const match = line.match(pattern)
+    if (match?.[1]) return match[1]
+  }
+  const include = line.match(/^(?:include|add|use)\s+(.+?)(?:\s+(?:explicitly|for best|to help)\b.*)?$/i)
+  if (include?.[1] && include[1].includes(',')) return include[1]
+  return null
+}
+
+function isPromptDescriptionHeading(line: string): boolean {
+  return [
+    /^(?:(?:recommended|suggested|example|sample|positive)\s+)?prompts?\s*[:：]?$/i,
+    /^(?:prompt\s+(?:example|sample)|positive\s+prompt)\s*[:：]?$/i,
+    /^(?:positive|positive\s+tags?|prompt\s+tags?|quick[- ]start(?:\s+template)?)\s*[:：]?$/i,
+    /^(?:recommended|suggested)\s+(?:tags?|words?)\s*[:：]?$/i,
+    /^tags?(?:\s*\((?![^)]*(?:negative|neg))[^)]*\))?\s*[:：]?$/i,
+    /^(?:推奨|おすすめ|推奨される|おすすめの)?\s*(?:プロンプト|タグ)\s*[:：]?$/i,
+    /^(?:プロンプト例|使用プロンプト|ポジティブプロンプト|追加タグ)\s*[:：]?$/i
+  ].some((pattern) => pattern.test(line))
+}
+
+function isNegativePromptDescriptionLine(line: string): boolean {
+  return /^(?:negative|neg\.?|undesired)\b.*[:：]/i.test(line) ||
+    /^tags?\s*\([^)]*(?:negative|neg)[^)]*\)\s*[:：]/i.test(line) ||
+    /^(?:ネガティブ|除外)\s*[:：]/i.test(line)
+}
+
+function isDescriptionSectionBoundary(line: string): boolean {
+  if (promptTextAfterDescriptionLabel(line) || isPromptDescriptionHeading(line)) return true
+  if (isNegativePromptDescriptionLine(line)) return true
+  return /^(?:settings?|parameters?|steps?|sampler|cfg|seed|size|model|vae|clip skip|license|download|changelog|version|notes?)\b.*[:：]/i.test(line) ||
+    /^(?:ネガティブ|設定|推奨設定|手順|サンプラー|シード|サイズ|モデル|トリガー|学習ワード|ライセンス|商用|更新|注意)\s*[:：]/i.test(line)
+}
+
+function splitPromptHintTokens(text: string): string[] {
+  const clean = text
+    .replace(/<(?:lora|lyco|hypernet):[^>]+>/gi, ' ')
+    .replace(/\b(?:negative prompt|negative|settings?|parameters?|steps?|sampler|cfg scale|cfg|seed|size|model hash|model|vae|clip skip)\b[\s\S]*$/i, '')
+    .replace(/https?:\/\/\S+/gi, ' ')
+  const out: string[] = []
+  let depth = 0
+  let start = 0
+  for (let i = 0; i <= clean.length; i++) {
+    const ch = clean[i]
+    if (ch === '(' || ch === '[' || ch === '{') depth++
+    else if (ch === ')' || ch === ']' || ch === '}') depth = Math.max(0, depth - 1)
+    if ((i === clean.length || ((ch === ',' || ch === '、' || ch === '\n') && depth === 0))) {
+      out.push(clean.slice(start, i))
+      start = i + 1
+    }
+  }
+  return out
+}
+
+function normalizePromptHintToken(token: string): string {
+  const cleaned = token
+    .replace(/^[\s"'`*_~]+|[\s"'`*_~]+$/g, '')
+    .replace(/[。.!]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (cleaned.length < 2 || cleaned.length > 120) return ''
+  if (/^(?:none|n\/a|null|-)$|^(?:steps?|sampler|cfg|seed|size|model|vae|clip skip|negative|trigger|trained words?|weight|strength|recommended weight|lora strength)\b/i.test(cleaned)) return ''
+  if (/^(?:設定|推奨設定|シード|サイズ|モデル|ネガティブ|トリガー)\b/i.test(cleaned)) return ''
+  if (/\b(?:download|license|commercial use|credit required|discord|patreon|instagram|twitter|civitai)\b/i.test(cleaned)) return ''
+  return cleaned
+}
+
+function promptHintKey(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
 /**
@@ -352,6 +540,20 @@ function extractRecommendedLoras(
 function pickThumbnail(images: CivitaiImage[]): string | null {
   const safe = images.find((i) => isSafe(i.nsfw)) ?? images[0]
   return safe?.url ?? null
+}
+
+function stripModelAndVersionDescription(
+  version: CivitaiVersion,
+  maxChars: number,
+  modelDescription = version.model.description
+): string | null {
+  const html = [
+    modelDescription,
+    version.description
+  ]
+    .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+    .join('<br><br>')
+  return stripHtmlExcerpt(html || null, maxChars)
 }
 
 function isSafe(nsfw: boolean | string): boolean {

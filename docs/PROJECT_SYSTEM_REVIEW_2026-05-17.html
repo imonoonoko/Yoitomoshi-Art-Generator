@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yoitomoshi Art Generator 全体レビュー 2026-05-17</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172026;
+      --muted: #5a6670;
+      --subtle: #edf1f4;
+      --line: #d7dde2;
+      --panel: #ffffff;
+      --panel-2: #f7f9fb;
+      --accent: #2f6f73;
+      --accent-2: #765235;
+      --good: #1f7a4d;
+      --warn: #a85c00;
+      --bad: #b03b3b;
+      --info: #2f5f9a;
+      --shadow: 0 10px 28px rgba(25, 32, 38, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Yu Gothic", "Meiryo", "Segoe UI", system-ui, sans-serif;
+      line-height: 1.72;
+      color: var(--ink);
+      background: #f3f5f7;
+    }
+
+    a {
+      color: #255f9c;
+    }
+
+    header {
+      background:
+        linear-gradient(rgba(19, 29, 35, 0.72), rgba(19, 29, 35, 0.74)),
+        url("https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1800&q=80");
+      background-size: cover;
+      background-position: center;
+      color: #fff;
+      padding: 52px 32px 46px;
+    }
+
+    header .inner,
+    main {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 4vw, 3.45rem);
+      line-height: 1.13;
+      letter-spacing: 0;
+      max-width: 940px;
+    }
+
+    h2 {
+      margin: 38px 0 16px;
+      font-size: 1.55rem;
+      border-left: 5px solid var(--accent);
+      padding-left: 12px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 24px 0 10px;
+      font-size: 1.1rem;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 13px;
+    }
+
+    .lead {
+      max-width: 920px;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 1.03rem;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .meta {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 12px 14px;
+      min-height: 86px;
+    }
+
+    .meta b {
+      display: block;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.75);
+      margin-bottom: 4px;
+    }
+
+    main {
+      padding: 34px 0 64px;
+    }
+
+    section,
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      margin-bottom: 22px;
+    }
+
+    section {
+      border-radius: 8px;
+    }
+
+    .panel {
+      border-radius: 6px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .score {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 12px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .score:first-child {
+      border-top: 0;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 80px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.78rem;
+      line-height: 1.5;
+      white-space: nowrap;
+    }
+
+    .pill.good {
+      color: #0f5a38;
+      background: #dff2e8;
+    }
+
+    .pill.warn {
+      color: #824700;
+      background: #fff0d8;
+    }
+
+    .pill.bad {
+      color: #8e2f2f;
+      background: #ffe3e1;
+    }
+
+    .pill.info {
+      color: #244f8b;
+      background: #e5effb;
+    }
+
+    .finding {
+      border-left: 4px solid var(--warn);
+      padding: 12px 14px;
+      background: var(--panel-2);
+      margin: 12px 0;
+    }
+
+    .finding.high {
+      border-left-color: var(--bad);
+    }
+
+    .finding.low {
+      border-left-color: var(--info);
+    }
+
+    .finding .rank {
+      font-weight: 800;
+      color: var(--accent-2);
+      margin-right: 6px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 8px;
+      font-size: 0.94rem;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #eef3f4;
+    }
+
+    code,
+    .mono {
+      font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+      font-size: 0.92em;
+      background: #edf1f4;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    ul,
+    ol {
+      margin: 8px 0 0 1.25rem;
+      padding: 0;
+    }
+
+    li {
+      margin: 5px 0;
+    }
+
+    .callout {
+      border: 1px solid #c9d8da;
+      background: #f2f8f8;
+      padding: 14px 16px;
+      border-radius: 6px;
+      margin: 12px 0;
+    }
+
+    .warning {
+      border-color: #f0c88d;
+      background: #fff7ec;
+    }
+
+    .danger {
+      border-color: #efb1ad;
+      background: #fff1f0;
+    }
+
+    .ok {
+      border-color: #b5dac6;
+      background: #f0fbf5;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 145px 1fr;
+      gap: 14px;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+
+    .step:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .source-list {
+      columns: 2;
+      column-gap: 28px;
+    }
+
+    .source-list li {
+      break-inside: avoid;
+      margin-bottom: 7px;
+    }
+
+    footer {
+      color: var(--muted);
+      font-size: 0.86rem;
+      padding-top: 18px;
+    }
+
+    @media (max-width: 860px) {
+      header {
+        padding: 38px 20px 34px;
+      }
+
+      header .inner,
+      main {
+        width: min(100% - 24px, 1180px);
+      }
+
+      .meta-grid,
+      .grid-2,
+      .grid-3 {
+        grid-template-columns: 1fr;
+      }
+
+      .score,
+      .step {
+        grid-template-columns: 1fr;
+      }
+
+      .source-list {
+        columns: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="inner">
+      <h1>Yoitomoshi Art Generator 全体レビュー</h1>
+      <p class="lead">
+        2026-05-17時点のローカル実装、ドキュメント、検証結果、外部エコシステム情報を合わせて、
+        現状の強み・リスク・次に投資すべき改善案を整理したHTMLレポート。
+      </p>
+      <div class="meta-grid" aria-label="report metadata">
+        <div class="meta"><b>対象</b>C:\宵灯工房アート\Yoitomoshi-Art-Generator</div>
+        <div class="meta"><b>観点</b>システム / コード / 機能 / 利便性 / 外部動向</div>
+        <div class="meta"><b>検証</b>typecheck / build / audit / DOM smoke / diff check</div>
+        <div class="meta"><b>出典</b>GitHub, 公式Docs, Civitai, Reddit, 既存プロジェクトDocs</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>結論</h2>
+      <div class="callout ok">
+        <p>
+          現状のYoitomoshi Art Generatorは、単なるStable Diffusionランチャーではなく、
+          ローカルForgeを中核にした「制作ワークフロー統合アプリ」に近い段階まで進んでいる。
+          txt2img / img2img / Upscale / Toolsに加え、履歴レビュー、Prompt Helper、Civitai連携、モデル管理、
+          ControlNet系補助、ADetailer、動画生成の入口まで揃い、個人制作で反復生成を回すにはかなり実用的な構成である。
+        </p>
+        <p>
+          一方で、機能追加の速度に対してコードとナビゲーションの整理が追いつき始めている。
+          特に、プロジェクト方針ではトップレベルタブを <span class="mono">txt2img / img2img / Video / Upscale / Tools</span>
+          に保つとされているが、現在の実装では <span class="mono">models</span> がトップレベルタブとして増えている。
+          このまま進めるなら設計方針を更新し、そうでないならTools内に戻す判断が必要である。
+        </p>
+      </div>
+
+      <div class="grid-3">
+        <div class="panel">
+          <h3>現在の評価</h3>
+          <p><span class="pill good">強い</span> ローカルForge制作環境としての統合度、履歴・モデル・プロンプト補助の接続。</p>
+          <p><span class="pill warn">注意</span> 主要ファイルが大型化しており、変更レビューと回帰調査の負荷が上がっている。</p>
+          <p><span class="pill bad">要対応</span> ナビゲーション方針と実装のずれ、未コミット差分の肥大化。</p>
+        </div>
+        <div class="panel">
+          <h3>外部動向からの判断</h3>
+          <p>
+            Forge/A1111互換の利便性は現在も有効だが、動画・高度ワークフロー・新モデル対応はComfyUI側の更新速度が目立つ。
+            Yoitomoshiは全面置換よりも、Forgeを主軸にしつつComfyUI/FramePackを制御された外部バックエンドとして扱う方が現実的である。
+          </p>
+        </div>
+        <div class="panel">
+          <h3>次の最優先</h3>
+          <p>
+            まず現在の大きな作業差分を整理し、タブ方針を決める。
+            その後、IPC・i18n・Tools周辺を分割し、ユーザー向けには「現在の制作状態がひと目で分かるダッシュボード」を作るのが最も効果が高い。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>確認したローカル状態</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>確認結果</th>
+            <th>意味</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Git状態</td>
+            <td>このレポート作成前に、21個の変更済みファイルと8個の未追跡ファイルを確認。</td>
+            <td>動画、モデルライブラリ、次画像導線などの進行中作業が広範囲にある。追加実装前に作業単位を切った方がよい。</td>
+          </tr>
+          <tr>
+            <td>主要検証</td>
+            <td><span class="mono">npm.cmd run typecheck</span> PASS、<span class="mono">npm.cmd run build</span> PASS。</td>
+            <td>少なくともTypeScript境界とElectron/Viteビルドは現状破綻していない。</td>
+          </tr>
+          <tr>
+            <td>依存監査</td>
+            <td><span class="mono">npm.cmd audit --json</span> で0 vulnerabilities。</td>
+            <td>npm依存の既知脆弱性は検出されていない。ただしローカルForge拡張や外部ツールは別枠で管理が必要。</td>
+          </tr>
+          <tr>
+            <td>依存更新</td>
+            <td><span class="mono">npm.cmd outdated --json</span> でVite、TypeScript、Tailwind、lucide-react等に新しい版があることを確認。</td>
+            <td>現状はbuild/typecheckが通るため、無差別更新ではなく専用ブランチで段階的に上げるのが安全。</td>
+          </tr>
+          <tr>
+            <td>DOM smoke</td>
+            <td><span class="mono">npm.cmd run qa:dom -- selectors --port=9338</span> PASS。</td>
+            <td>主要セレクタ、Video関連セレクタ、Model関連セレクタはElectron上で確認済み。</td>
+          </tr>
+          <tr>
+            <td>差分品質</td>
+            <td><span class="mono">git diff --check</span> PASS。</td>
+            <td>既存差分に空白エラーは検出されていない。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="warning callout">
+        <p>
+          未実施の確認: 実際の画像生成・動画生成・GPU負荷下での長時間操作・手動の視覚確認。
+          今回は全体レビューとHTMLレポート作成が目的のため、実生成の品質評価までは含めていない。
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>システム構成レビュー</h2>
+      <div class="grid-2">
+        <div class="panel">
+          <h3>現在の構成</h3>
+          <ul>
+            <li>Renderer: React 19 + Vite + Electron renderer。</li>
+            <li>状態管理: Zustand中心。生成状態、履歴、モデル、動画、ツール状態が集まる。</li>
+            <li>Preload/IPC: <span class="mono">electron/preload.ts</span> と共有IPC型でrenderer-main境界を管理。</li>
+            <li>Main process: Forge API、Civitai API、Hugging Face、safetensors解析、保存、モデル操作、外部バックエンド起動を担当。</li>
+            <li>Runtime: 同梱Forgeを <span class="mono">runtime\forge</span> に持ち、ユーザーデータは <span class="mono">userdata</span> に分離。</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>構成上の強み</h3>
+          <ul>
+            <li>Webサービス依存ではなく、ローカルWindows環境で制作を完結できる。</li>
+            <li>Forge APIの上にReact UIを置くため、Gradio UIに直接依存しない制作導線を作れる。</li>
+            <li>SafeStorage、URL/パス検証、IPCバリデーションが入り、Electronアプリとしての最低限の防御線がある。</li>
+            <li>履歴、モデル、プロンプト、レビュー結果が連携し始めており、単発生成ではなく反復制作に向いている。</li>
+          </ul>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>コード指標</th>
+            <th>値</th>
+            <th>レビューコメント</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>対象ソース規模</td>
+            <td>約92ファイル、約45,600行。</td>
+            <td>個人制作ツールとしては十分に大きい。今後は機能追加より分割と回帰テストの価値が上がる。</td>
+          </tr>
+          <tr>
+            <td><span class="mono">src/lib/i18n.ts</span></td>
+            <td>5,132行。</td>
+            <td>翻訳キーの衝突・欠落・レビュー漏れが起きやすい。locale/namespace分割とキー整合チェックが必要。</td>
+          </tr>
+          <tr>
+            <td><span class="mono">electron/ipc-handlers.ts</span></td>
+            <td>4,075行。</td>
+            <td>Forge、Storage、Model、Video、外部API、検証ロジックが集中。安全性を落とさずドメイン分割したい。</td>
+          </tr>
+          <tr>
+            <td><span class="mono">src/components/ToolsWorkspace.tsx</span></td>
+            <td>2,458行。</td>
+            <td>Toolsが機能置き場として肥大化している。Model LibraryやAuto Organizerなどを小さな領域に分離すべき。</td>
+          </tr>
+          <tr>
+            <td>renderer初期chunk</td>
+            <td>約1.54MB。</td>
+            <td>lazy chunkはあるが、i18nや共有依存の読み込みが重い可能性がある。起動体感改善の調査余地あり。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>機能レビュー</h2>
+      <div class="score">
+        <div><span class="pill good">高評価</span></div>
+        <div>
+          <h3>生成ワークフロー</h3>
+          <p>
+            txt2img/img2imgを中心に、Prompt Helper、LoRA、ControlNet Builder、ADetailer、Dynamic Thresholding、
+            FreeU、Regional Prompter、UpscaleなどがReact UIから扱える。Forgeの拡張機構をGradio埋め込みではなく
+            API payloadとして扱う方向は、アプリ固有UXを作る上で正しい。
+          </p>
+          <p>
+            改善余地は、設定項目の多さを「目的別プリセット」に変換すること。
+            例: キャラ立ち絵、表情差分、背景、素材化、動画用キーフレームなど、ユーザーが結果目的から入れる導線を増やす。
+          </p>
+        </div>
+      </div>
+
+      <div class="score">
+        <div><span class="pill good">高評価</span></div>
+        <div>
+          <h3>履歴・レビュー・次画像導線</h3>
+          <p>
+            History labels、tagReview、Prompt Helper連携、Preview action bar、Variations、Next Image系の流れは、
+            「生成して終わり」ではなく、採用候補を育てる制作アプリとして重要な差別化になっている。
+          </p>
+          <p>
+            次は、単一履歴リストから「実験ボード」へ進めると効果が大きい。
+            seed、model、LoRA、ControlNet、adetailer、prompt差分を1枚の比較面で見せると、ユーザーの判断コストが下がる。
+          </p>
+        </div>
+      </div>
+
+      <div class="score">
+        <div><span class="pill warn">要整理</span></div>
+        <div>
+          <h3>モデル管理</h3>
+          <p>
+            Civitai連携、SHA-256、safetensors metadata、ダウンロード、ローカル索引、プレビュー、ノート、更新確認は強い。
+            Stability Matrixが広く評価される理由も、パッケージ/モデル/メタデータ/インポートをまとめて扱える点にあるため、
+            この方向性は外部動向とも合っている。
+          </p>
+          <p>
+            ただし現在は <span class="mono">models</span> がトップレベルタブ化しており、既存方針とずれている。
+            本当に独立作業面にするならAGENTS/ROADMAP/READMEの方針更新が必要。
+            そうでないならTools内のModel Libraryとして戻す方が一貫する。
+          </p>
+        </div>
+      </div>
+
+      <div class="score">
+        <div><span class="pill info">成長領域</span></div>
+        <div>
+          <h3>動画生成</h3>
+          <p>
+            Videoタブ、AnimateDiff、FramePack、ComfyUI接続診断の方向は妥当。
+            現時点ではForge + AnimateDiffを標準導線にし、FramePackとComfyUI/Wan系は実験バックエンドとして扱うのが安全である。
+          </p>
+          <p>
+            動画分野はモデル・必要VRAM・依存関係・ライセンス・UIパターンの変化が速い。
+            「何でも読み込めるComfyUIノード管理」ではなく、Yoitomoshi側で確認した固定ワークフローだけを呼び出す設計が向いている。
+          </p>
+        </div>
+      </div>
+
+      <div class="score">
+        <div><span class="pill good">堅実</span></div>
+        <div>
+          <h3>セキュリティとローカル保護</h3>
+          <p>
+            contextIsolation有効、nodeIntegration無効、safeStorage、IPCのURL/パス検証、partial削除対象の制限など、
+            Electronとして危険になりやすい箇所に防御が入っている。
+          </p>
+          <p>
+            次のリスクは外部バックエンドと拡張管理である。
+            ComfyUI custom nodeや外部起動ツールは依存追加と任意コード実行の境界に近い。
+            公式情報とセキュリティ調査でも、custom node管理には入力検証・依存隔離・信頼できる配布元の制御が重要になる。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>重要所見</h2>
+      <div class="finding high">
+        <p><span class="rank">P1</span><strong>トップレベルタブ方針と実装がずれている。</strong></p>
+        <p>
+          プロジェクト指示ではトップレベルタブを <span class="mono">txt2img / img2img / Video / Upscale / Tools</span> に維持する。
+          しかし現状では <span class="mono">src/lib/store.ts</span> のWorkspaceTabと
+          <span class="mono">src/components/MainTabs.tsx</span> に <span class="mono">models</span> が入り、
+          DOM QAでも <span class="mono">main-tab-models</span> が確認されている。
+        </p>
+        <p>
+          改善案: まずプロダクト判断として「Modelsを独立面にするか」を決める。
+          独立させるなら方針ドキュメントを更新し、戻すならTools内のModel Libraryに集約する。
+        </p>
+      </div>
+
+      <div class="finding high">
+        <p><span class="rank">P1</span><strong>IPCと大型UIファイルの肥大化が、今後の変更速度を落とす。</strong></p>
+        <p>
+          <span class="mono">electron/ipc-handlers.ts</span>、<span class="mono">src/lib/i18n.ts</span>、
+          <span class="mono">src/components/ToolsWorkspace.tsx</span> が大きく、責務が広い。
+          ここに動画、モデル管理、外部バックエンドがさらに乗ると、バグ調査時に影響範囲が読みづらくなる。
+        </p>
+        <p>
+          改善案: バリデーション方針は維持しつつ、IPCを <span class="mono">forge</span>、
+          <span class="mono">storage</span>、<span class="mono">models</span>、<span class="mono">video</span>、
+          <span class="mono">security</span> のように分ける。i18nはlocale/namespace分割とキー整合チェックを追加する。
+        </p>
+      </div>
+
+      <div class="finding">
+        <p><span class="rank">P2</span><strong>未コミット差分が大きく、レビュー・ロールバック単位が曖昧になっている。</strong></p>
+        <p>
+          変更済み21ファイル、未追跡8ファイルがある。これは動画、モデルライブラリ、履歴、IPC、i18n、ドキュメントが同時に進んでいる状態で、
+          ひとつの失敗時に原因を切り分けにくい。
+        </p>
+        <p>
+          改善案: 先に「Video」「Model Library」「History/Next Image」「docs/QA」の単位で差分を整理し、
+          それぞれtypecheck/build/DOM QAと結びつける。
+        </p>
+      </div>
+
+      <div class="finding">
+        <p><span class="rank">P2</span><strong>動画/ComfyUI連携は、便利さと同じくらい依存・安全性リスクが大きい。</strong></p>
+        <p>
+          RedditやComfyUI関連情報では、custom nodeの依存衝突や環境破壊が継続的な痛点として語られている。
+          セキュリティ調査でも、custom node manager系の入力検証不足が危険になった事例がある。
+        </p>
+        <p>
+          改善案: 任意ノードを自由インストールする方向ではなく、Yoitomoshiで検証済みの固定ワークフロー、許可済みURL、
+          分離されたPython環境、明示的な実行ログに限定する。
+        </p>
+      </div>
+
+      <div class="finding low">
+        <p><span class="rank">P3</span><strong>ドキュメントは豊富だが、現在地を一目で見る入口が必要。</strong></p>
+        <p>
+          Roadmap、QA、Video Guide、Extension Research、App Mapなどの蓄積は強い。
+          反面、次に読むべきファイルが分からないと、新しい作業者や将来の自分にとって探索コストが上がる。
+        </p>
+        <p>
+          改善案: <span class="mono">docs/DOCS_INDEX.md</span> を「今見るべき3件」「機能別」「検証別」「過去調査」に再整理し、
+          アプリ内にも簡易Health/Docsリンクを置く。
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>外部エコシステムから見た改善方向</h2>
+      <h3>GitHub公開メタデータの観察</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>リポジトリ</th>
+            <th>Stars / Open Issues</th>
+            <th>直近push</th>
+            <th>読み取り</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><a href="https://github.com/lllyasviel/stable-diffusion-webui-forge">lllyasviel/stable-diffusion-webui-forge</a></td>
+            <td>12,572 / 1,144</td>
+            <td>2025-07-31 UTC</td>
+            <td>Forge主軸は有効だが、周辺互換をYoitomoshi側で守るテストが必要。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui">AUTOMATIC1111/stable-diffusion-webui</a></td>
+            <td>163,085 / 2,486</td>
+            <td>2026-03-02 UTC</td>
+            <td>互換APIと拡張文化の基準点。UXをそのまま模倣する対象ではない。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/Comfy-Org/ComfyUI">Comfy-Org/ComfyUI</a></td>
+            <td>113,177 / 4,008</td>
+            <td>2026-05-16 UTC</td>
+            <td>動画・新モデル・ノード型workflowの外部バックエンド候補として重要。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/LykosAI/StabilityMatrix">LykosAI/StabilityMatrix</a></td>
+            <td>8,181 / 175</td>
+            <td>2026-05-03 UTC</td>
+            <td>モデル/パッケージ管理UXの比較対象。YoitomoshiのModel Library改善に使える。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/invoke-ai/InvokeAI">invoke-ai/InvokeAI</a></td>
+            <td>27,207 / 435</td>
+            <td>2026-05-16 UTC</td>
+            <td>制作向けUI、キャンバス、ワークフロー整理の比較対象。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/civitai/civitai">civitai/civitai</a></td>
+            <td>7,108 / 104</td>
+            <td>2026-05-15 UTC</td>
+            <td>hash、version、downloadUrl、作例/統計の連携元として継続利用価値が高い。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>外部情報からの設計示唆</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>外部情報</th>
+            <th>観察</th>
+            <th>Yoitomoshiへの示唆</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Forge</td>
+            <td>Automatic1111互換を保ちながら、Forge backendと拡張互換を重視する立ち位置。拡張を活かすローカルUIには向く。</td>
+            <td>現行主軸として妥当。script argsやalwayson payloadの互換性を壊さないテストを厚くする。</td>
+          </tr>
+          <tr>
+            <td>Automatic1111</td>
+            <td>巨大なユーザー/拡張エコシステムを持つ基準点。APIや拡張の互換設計を見る上でまだ重要。</td>
+            <td>UXの目標ではなく互換性の参照先として扱う。Gradio UIの複雑さをそのまま持ち込まない。</td>
+          </tr>
+          <tr>
+            <td>ComfyUI</td>
+            <td>ノード/グラフ型で動画・新モデル対応が速い。HunyuanVideo、Mochi、LTX-Videoなども対象に含む。</td>
+            <td>高度/動画バックエンドとして接続価値が高い。ただしユーザーにグラフ編集を強制せず、固定workflowをアプリが扱う。</td>
+          </tr>
+          <tr>
+            <td>Stability Matrix</td>
+            <td>パッケージのワンクリック導入、モデル管理、Civitai/Hugging Face連携、ローカル推論UIをまとめる方向。</td>
+            <td>Model Library/Downloaderのベンチマークになる。インポート、重複検出、更新確認、保存先整理を強化する。</td>
+          </tr>
+          <tr>
+            <td>Civitai API</td>
+            <td>モデル、バージョン、hash、downloadUrl、統計、メタデータをAPIで扱える。</td>
+            <td>SHA-256照合、バージョン追跡、素材向けタグ/作例マイニングはYoitomoshiの差別化に直結する。</td>
+          </tr>
+          <tr>
+            <td>Reddit / Stable Diffusion利用者の声</td>
+            <td>ComfyUIは自由度と速度が評価される一方、学習コスト、custom node依存、環境の壊れやすさがよく話題になる。</td>
+            <td>Yoitomoshiは「強力だが難しい」方向ではなく、「制御された簡単な制作手順」に変換するのが合っている。</td>
+          </tr>
+          <tr>
+            <td>FramePack / Wan / LTX Video系</td>
+            <td>低VRAMや長尺化の工夫が進むが、導入手順、モデルサイズ、依存関係、品質特性はまだ動きが大きい。</td>
+            <td>標準化は急がず、まず短尺スモーク、プリセット、ログ、失敗時の復旧導線を整備する。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>改善ロードマップ</h2>
+      <div class="timeline">
+        <div class="step">
+          <div><span class="pill bad">最優先</span></div>
+          <div>
+            <h3>1. 現在の差分を安定化し、ナビゲーション方針を確定する</h3>
+            <ul>
+              <li><span class="mono">models</span> トップレベルタブを維持するか、Tools内に戻すか決める。</li>
+              <li>維持する場合はAGENTS/ROADMAP/READMEに理由と適用範囲を書く。</li>
+              <li>戻す場合は <span class="mono">MainTabs</span>、<span class="mono">WorkspaceTab</span>、DOM QA期待値を整理する。</li>
+              <li>変更をVideo、Model Library、History/Next Image、docs/QAの単位に分ける。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step">
+          <div><span class="pill warn">短期</span></div>
+          <div>
+            <h3>2. アプリ内「制作状態ダッシュボード」を作る</h3>
+            <ul>
+              <li>Forge起動状態、API到達、モデル数、最近の生成、ダウンロード中、Video準備状況を一画面で表示する。</li>
+              <li>エラー時に「次に押すボタン」ではなく「原因候補と復旧操作」を出す。</li>
+              <li>初心者向けには、設定項目ではなく目的別スタートを置く。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step">
+          <div><span class="pill warn">短期</span></div>
+          <div>
+            <h3>3. IPCとi18nの分割を始める</h3>
+            <ul>
+              <li>IPC handlerをドメイン別ファイルへ分ける。ただしURL/パス検証などの安全ロジックは共通化して重複させない。</li>
+              <li>i18nはlocale別、機能namespace別に分け、全localeでキーが揃うかをNode scriptで検証する。</li>
+              <li>既存QAに「IPC channel registry」「i18n missing key」チェックを追加する。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step">
+          <div><span class="pill info">中期</span></div>
+          <div>
+            <h3>4. Model Libraryを制作資産管理へ引き上げる</h3>
+            <ul>
+              <li>Civitai/Hugging Face/ローカルのソースを明示し、モデルのhash、license、trigger words、推奨設定、サンプル画像を並べる。</li>
+              <li>重複候補、古いバージョン、未使用モデル、大容量モデルを可視化する。</li>
+              <li>「このモデルで生成」「このLoRAをPrompt Helperへ送る」「採用候補の作例だけ見る」を増やす。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step">
+          <div><span class="pill info">中期</span></div>
+          <div>
+            <h3>5. 実験ボードと比較ビューを作る</h3>
+            <ul>
+              <li>履歴を単なる一覧ではなく、prompt差分、seed差分、model差分、ControlNet差分で比較できるようにする。</li>
+              <li>採用候補/没/素材化済み/要再生成を視覚的に切り替える。</li>
+              <li>次の一枚ボタンは、選択画像の弱点に応じた改善候補を出す。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step">
+          <div><span class="pill info">中期</span></div>
+          <div>
+            <h3>6. 動画生成を固定ワークフローとして安全に育てる</h3>
+            <ul>
+              <li>標準: Forge + AnimateDiff短尺GIF/MP4。</li>
+              <li>実験: FramePack、ComfyUI Wan 5B、LTX系を外部バックエンドとして登録。</li>
+              <li>任意custom node導入ではなく、検証済みworkflow、許可済みモデル、専用ログ、依存チェックに限定する。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step">
+          <div><span class="pill good">継続</span></div>
+          <div>
+            <h3>7. QAを「機能ごとの合格証」にする</h3>
+            <ul>
+              <li>typecheck/build/DOM selectorsに加えて、Model Library、Video、History review、Prompt Helperの小さな合格表をDocsに出す。</li>
+              <li>実生成が必要なテストは、短尺・低解像度・固定seedで手動/半自動の手順を残す。</li>
+              <li>失敗時はエラー再発プロトコルに従い、2回目で公式/一次情報調査に切り替える。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>優先順位つきアクション</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>優先</th>
+            <th>作業</th>
+            <th>成果物</th>
+            <th>検証</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>P0</td>
+            <td>Modelsタブ方針の決定と差分整理。</td>
+            <td>修正済みナビゲーション、または更新済み方針ドキュメント。</td>
+            <td>typecheck、build、DOM selectors。</td>
+          </tr>
+          <tr>
+            <td>P1</td>
+            <td>IPC handlerのドメイン分割。</td>
+            <td><span class="mono">electron/ipc/*</span> などの小さなhandler群。</td>
+            <td>既存DOM QA、IPC単位のNode check、build。</td>
+          </tr>
+          <tr>
+            <td>P1</td>
+            <td>i18n分割とキー整合チェック。</td>
+            <td>locale/namespace別翻訳ファイル、検証script。</td>
+            <td>全locale key coverage、typecheck。</td>
+          </tr>
+          <tr>
+            <td>P1</td>
+            <td>制作状態ダッシュボード。</td>
+            <td>Forge/Models/History/Video/Downloadsの状態面。</td>
+            <td>Electron DOM smoke、手動表示確認。</td>
+          </tr>
+          <tr>
+            <td>P2</td>
+            <td>Model Libraryを制作資産管理へ拡張。</td>
+            <td>重複検出、source/license表示、trigger word送信。</td>
+            <td>fixtureモデルでhash/metadata/IPC確認。</td>
+          </tr>
+          <tr>
+            <td>P2</td>
+            <td>Video backend contract。</td>
+            <td>AnimateDiff標準、FramePack/ComfyUIの固定workflow登録。</td>
+            <td>短尺GIF smoke、API readiness、ログ確認。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>外部ソース</h2>
+      <p>
+        このレポートでは、公式リポジトリ・公式ドキュメント・GitHub APIで得た公開メタデータ・コミュニティ投稿を、
+        現在のローカル実装判断に結びつけて使用した。数値や外部状況は2026-05-17 JST時点の調査結果であり、今後変わる可能性がある。
+      </p>
+      <ul class="source-list">
+        <li><a href="https://github.com/lllyasviel/stable-diffusion-webui-forge">Stable Diffusion WebUI Forge</a></li>
+        <li><a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui">AUTOMATIC1111 Stable Diffusion WebUI</a></li>
+        <li><a href="https://github.com/Comfy-Org/ComfyUI">ComfyUI GitHub</a></li>
+        <li><a href="https://github.com/Comfy-Org/ComfyUI/blob/master/README.md">ComfyUI README</a></li>
+        <li><a href="https://github.com/LykosAI/StabilityMatrix">Stability Matrix</a></li>
+        <li><a href="https://github.com/invoke-ai/InvokeAI">InvokeAI</a></li>
+        <li><a href="https://github.com/lllyasviel/Fooocus">Fooocus</a></li>
+        <li><a href="https://github.com/Mikubill/sd-webui-controlnet">sd-webui-controlnet</a></li>
+        <li><a href="https://github.com/Bing-su/adetailer">ADetailer</a></li>
+        <li><a href="https://github.com/continue-revolution/sd-webui-animatediff">sd-webui-animatediff</a></li>
+        <li><a href="https://github.com/continue-revolution/sd-forge-animatediff">sd-forge-animatediff</a></li>
+        <li><a href="https://github.com/lllyasviel/FramePack">FramePack</a></li>
+        <li><a href="https://github.com/civitai/civitai/wiki/REST-API-Reference">Civitai REST API Reference</a></li>
+        <li><a href="https://huggingface.co/docs/hub/api">Hugging Face Hub API Docs</a></li>
+        <li><a href="https://docs.comfy.org/development/core-concepts/custom-nodes">ComfyUI Custom Nodes Docs</a></li>
+        <li><a href="https://docs.comfy.org/tutorials/video/wan/wan2_2">ComfyUI Wan2.2 Docs</a></li>
+        <li><a href="https://docs.comfy.org/tutorials/video/ltx/ltx-2-3">ComfyUI LTX Video Docs</a></li>
+        <li><a href="https://blog.doyensec.com/2024/07/09/comfyui.html">Doyensec: ComfyUI Manager Security Research</a></li>
+        <li><a href="https://www.reddit.com/r/StableDiffusion/comments/134foy9/whats_the_benefit_of_comfyui_vs_automatic1111/">Reddit: ComfyUI vs Automatic1111 discussion</a></li>
+        <li><a href="https://www.reddit.com/r/comfyui/comments/1c5t8b0/the_only_thing_about_comfyui_that_bugs_me_is_the/">Reddit: ComfyUI custom node dependency discussion</a></li>
+        <li><a href="https://www.reddit.com/r/comfyui/comments/1lwiti8/comfyui_custom_node_dependency_pain_points_we/">Reddit: Custom node dependency pain points</a></li>
+      </ul>
+    </section>
+
+    <footer>
+      <p>
+        作成: Codex。対象リポジトリの既存未コミット変更は保持し、このレポートは新規HTMLファイルとして追加した。
+      </p>
+    </footer>
+  </main>
+</body>
+</html>

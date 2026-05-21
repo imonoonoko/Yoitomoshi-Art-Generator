@@ -15,21 +15,34 @@ import type {
   DroppedImageInsight,
   ModelUpdateInfo,
   ForgeStatus,
+  ForgeVideoSupportInfo,
+  FramePackSupportInfo,
+  VideoRuntimeDiagnostics,
   GenerationProgress,
+  GeneratedVideoSaveRequest,
+  GeneratedVideoSaveResult,
   HistoryItem,
   HistoryTagReview,
   HuggingFaceSearchOptions,
   HuggingFaceSearchResult,
   Img2ImgRequest,
   Img2ImgResponse,
+  ImportedExternalVideoResult,
   InterrogateResult,
   CharacterCompositeIntegrationStatus,
   LibraryIntegrityReport,
+  CheckpointPromptProfile,
   LoraCivitaiMetadata,
+  LoraPromptOverride,
   LoraUsageRecord,
   ModelFormatConversionResult,
+  ModelAutoOrganizePlan,
+  ModelAutoOrganizeResult,
   ModelHashResult,
   ModelImportResult,
+  ModelLibraryCivitaiBatchRequest,
+  ModelLibraryCivitaiBatchResult,
+  ModelLibraryEntry,
   ModelLibrarySummary,
   ModelLibraryRecoveryResult,
   ModelMergerEstimate,
@@ -86,12 +99,17 @@ const api = {
       ipcRenderer.invoke(IPC.forgeTxt2Img, req),
     img2img: (req: Img2ImgRequest): Promise<Img2ImgResponse> =>
       ipcRenderer.invoke(IPC.forgeImg2Img, req),
+    inspectVideoSupport: (): Promise<ForgeVideoSupportInfo> =>
+      ipcRenderer.invoke(IPC.forgeInspectVideoSupport),
+    inspectVideoRuntime: (): Promise<VideoRuntimeDiagnostics> =>
+      ipcRenderer.invoke(IPC.forgeInspectVideoRuntime),
     interrogate: (image: string, model?: 'clip' | 'deepdanbooru'): Promise<InterrogateResult> =>
       ipcRenderer.invoke(IPC.forgeInterrogate, { image, model }),
     interrupt: (): Promise<void> => ipcRenderer.invoke(IPC.forgeInterrupt),
     importModels: (opts: { mode: 'copy' | 'move' }): Promise<ModelImportResult | null> =>
       ipcRenderer.invoke(IPC.forgeImportModels, opts),
     openModelsFolder: (): Promise<void> => ipcRenderer.invoke(IPC.forgeOpenModelsFolder),
+    openVideoModelFolder: (): Promise<void> => ipcRenderer.invoke(IPC.forgeOpenVideoModelFolder),
     disableExtension: (name: string): Promise<{ renamedFrom: string; renamedTo: string }> =>
       ipcRenderer.invoke(IPC.forgeDisableExtension, name),
     listLoras: (): Promise<SdLora[]> => ipcRenderer.invoke(IPC.forgeListLoras),
@@ -122,6 +140,17 @@ const api = {
       ipcRenderer.on(IPC.forgeProgressUpdate, handler)
       return () => ipcRenderer.removeListener(IPC.forgeProgressUpdate, handler)
     }
+  },
+
+  videoBackends: {
+    inspectFramePack: (): Promise<FramePackSupportInfo> =>
+      ipcRenderer.invoke(IPC.framePackInspect),
+    startFramePack: (): Promise<FramePackSupportInfo> =>
+      ipcRenderer.invoke(IPC.framePackStart),
+    openFramePackFolder: (): Promise<void> =>
+      ipcRenderer.invoke(IPC.framePackOpenFolder),
+    importLatestFramePackOutput: (): Promise<ImportedExternalVideoResult> =>
+      ipcRenderer.invoke(IPC.framePackImportLatest)
   },
 
   tools: {
@@ -171,10 +200,20 @@ const api = {
       ipcRenderer.invoke(IPC.toolsDeletePartialFile, path),
     hashModelLibraryEntry: (id: string): Promise<ModelHashResult> =>
       ipcRenderer.invoke(IPC.toolsHashModelLibraryEntry, id),
+    updateModelLibraryEntry: (id: string, patch: { favorite?: boolean; notes?: string }): Promise<ModelLibraryEntry> =>
+      ipcRenderer.invoke(IPC.toolsUpdateModelLibraryEntry, id, patch),
+    refreshModelLibraryCivitai: (id: string): Promise<ModelLibraryEntry> =>
+      ipcRenderer.invoke(IPC.toolsRefreshModelLibraryCivitai, id),
+    refreshModelLibraryCivitaiBatch: (req: ModelLibraryCivitaiBatchRequest): Promise<ModelLibraryCivitaiBatchResult> =>
+      ipcRenderer.invoke(IPC.toolsRefreshModelLibraryCivitaiBatch, req),
     runTagger: (req: TaggerRunRequest): Promise<TaggerRunResult> =>
       ipcRenderer.invoke(IPC.toolsRunTagger, req),
     recoverModelLibrary: (): Promise<ModelLibraryRecoveryResult> =>
       ipcRenderer.invoke(IPC.toolsRecoverModelLibrary),
+    planModelAutoOrganize: (): Promise<ModelAutoOrganizePlan> =>
+      ipcRenderer.invoke(IPC.toolsPlanModelAutoOrganize),
+    applyModelAutoOrganize: (): Promise<ModelAutoOrganizeResult> =>
+      ipcRenderer.invoke(IPC.toolsApplyModelAutoOrganize),
     convertModelFormat: (): Promise<ModelFormatConversionResult | null> =>
       ipcRenderer.invoke(IPC.toolsConvertModelFormat),
     inspectMergerSupport: (): Promise<ModelMergerSupportReport> =>
@@ -284,6 +323,18 @@ const api = {
       ipcRenderer.invoke(IPC.storageGetLoraFavorites),
     setLoraFavorites: (names: string[]): Promise<void> =>
       ipcRenderer.invoke(IPC.storageSetLoraFavorites, names),
+    listLoraPromptOverrides: (): Promise<LoraPromptOverride[]> =>
+      ipcRenderer.invoke(IPC.storageListLoraPromptOverrides),
+    saveLoraPromptOverride: (input: LoraPromptOverride): Promise<LoraPromptOverride> =>
+      ipcRenderer.invoke(IPC.storageSaveLoraPromptOverride, input),
+    deleteLoraPromptOverride: (id: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.storageDeleteLoraPromptOverride, id),
+    listCheckpointPromptProfiles: (): Promise<CheckpointPromptProfile[]> =>
+      ipcRenderer.invoke(IPC.storageListCheckpointPromptProfiles),
+    saveCheckpointPromptProfile: (input: CheckpointPromptProfile): Promise<CheckpointPromptProfile> =>
+      ipcRenderer.invoke(IPC.storageSaveCheckpointPromptProfile, input),
+    deleteCheckpointPromptProfile: (id: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.storageDeleteCheckpointPromptProfile, id),
     recordLoraUsage: (rec: LoraUsageRecord): Promise<void> =>
       ipcRenderer.invoke(IPC.storageRecordLoraUsage, rec),
     listLoraUsage: (): Promise<LoraUsageRecord[]> =>
@@ -307,7 +358,9 @@ const api = {
     saveCharacterComposite: (input: CharacterCompositeSaveRequest): Promise<CharacterCompositeSaveResult> =>
       ipcRenderer.invoke(IPC.storageSaveCharacterComposite, input),
     saveFabricFeedbackImage: (imageDataUrl: string): Promise<FabricFeedbackImageSaveResult> =>
-      ipcRenderer.invoke(IPC.storageSaveFabricFeedbackImage, imageDataUrl)
+      ipcRenderer.invoke(IPC.storageSaveFabricFeedbackImage, imageDataUrl),
+    saveGeneratedVideo: (input: GeneratedVideoSaveRequest): Promise<GeneratedVideoSaveResult> =>
+      ipcRenderer.invoke(IPC.storageSaveGeneratedVideo, input)
   },
 
   // Library

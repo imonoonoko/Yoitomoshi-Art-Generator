@@ -9,10 +9,16 @@ import type {
   CivitaiRecommended,
   DownloadJob,
   DownloadJobStatus,
+  GeneratedVideoSaveRequest,
+  GeneratedVideoSaveResult,
   HistoryItem,
   HistoryTagReview,
   HistoryLabel,
+  CheckpointPromptFamily,
+  CheckpointPromptProfile,
+  CheckpointPromptProfileMode,
   LoraCivitaiMetadata,
+  LoraPromptOverride,
   LoraUsageRecord,
   ModelLibraryEntry,
   ModelSourceMetadata,
@@ -40,6 +46,11 @@ const DOWNLOAD_JOB_STATUSES = new Set<DownloadJobStatus>([
 const HISTORY_LABELS = new Set<HistoryLabel>(['favorite', 'candidate', 'rejected', 'asset'])
 const MAX_HISTORY_REVIEW_TAGS = 120
 const MAX_HISTORY_REVIEW_TAG_LENGTH = 80
+const MAX_LORA_PROMPT_OVERRIDES = 1000
+const MAX_LORA_OVERRIDE_PROMPT_CHARS = 4000
+const MAX_CHECKPOINT_PROMPT_PROFILES = 1000
+const MAX_CHECKPOINT_PROFILE_TAGS = 80
+const MAX_CHECKPOINT_PROFILE_TAG_CHARS = 160
 
 /**
  * Filesystem-backed JSON storage. Phase 1 stays JSON-only — when history grows past
@@ -70,6 +81,7 @@ export class Storage {
     mkdirSync(join(this.root, 'workspaces'), { recursive: true })
     mkdirSync(join(this.root, 'upscale-comparisons'), { recursive: true })
     mkdirSync(join(this.root, 'character-composites'), { recursive: true })
+    mkdirSync(join(this.root, 'videos'), { recursive: true })
   }
 
   getDataRoot(): string {
@@ -202,6 +214,46 @@ export class Storage {
     const manifestPath = join(dir, 'comparison.json')
     writeFileSync(manifestPath, JSON.stringify(manifest, null, 2))
     return { id, dir, manifestPath }
+  }
+
+  saveGeneratedVideo(input: GeneratedVideoSaveRequest): GeneratedVideoSaveResult {
+    const id = randomUUID()
+    const createdAt = Date.now()
+    const dir = join(this.root, 'videos', id)
+    mkdirSync(dir, { recursive: true })
+
+    const ext = input.format.toLowerCase()
+    const filePath = join(dir, `video.${ext}`)
+    const bytes = Buffer.from(input.base64.replace(/^data:[^;]+;base64,/i, '').replace(/\s/g, ''), 'base64')
+    writeFileSync(filePath, bytes)
+
+    const manifest = {
+      id,
+      createdAt,
+      format: input.format,
+      filePath,
+      sizeBytes: bytes.length,
+      prompt: input.prompt,
+      negativePrompt: input.negativePrompt,
+      model: input.model,
+      motionModule: input.motionModule,
+      width: input.width,
+      height: input.height,
+      frames: input.frames,
+      fps: input.fps,
+      seed: input.seed
+    }
+    const manifestPath = join(dir, 'video.json')
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2))
+
+    return {
+      id,
+      createdAt,
+      filePath,
+      manifestPath,
+      format: input.format,
+      sizeBytes: bytes.length
+    }
   }
 
   saveCharacterComposite(input: CharacterCompositeSaveRequest): CharacterCompositeSaveResult {
@@ -411,10 +463,11 @@ export class Storage {
   }
 
   setSettings(s: AppSettings): void {
-    this.setSecret('civitaiApiKey', s.civitaiApiKey)
+    const settings = normalizeSettings({ ...defaultSettings(this.projectRoot), ...s }, this.projectRoot)
+    this.setSecret('civitaiApiKey', settings.civitaiApiKey)
     writeFileSync(
       join(this.root, 'settings.json'),
-      JSON.stringify({ ...s, civitaiApiKey: null }, null, 2)
+      JSON.stringify({ ...settings, civitaiApiKey: null }, null, 2)
     )
   }
 
@@ -787,6 +840,84 @@ export class Storage {
     writeFileSync(this.loraFavoritesPath(), JSON.stringify(dedup, null, 2))
   }
 
+  private loraPromptOverridesPath(): string {
+    return join(this.root, 'lora-prompt-overrides.json')
+  }
+
+  listLoraPromptOverrides(): LoraPromptOverride[] {
+    if (!existsSync(this.loraPromptOverridesPath())) return []
+    try {
+      const raw = JSON.parse(readFileSync(this.loraPromptOverridesPath(), 'utf8'))
+      if (!Array.isArray(raw)) return []
+      return raw
+        .map((item) => normalizeLoraPromptOverride(item))
+        .filter((item): item is LoraPromptOverride => Boolean(item))
+        .slice(0, MAX_LORA_PROMPT_OVERRIDES)
+    } catch {
+      return []
+    }
+  }
+
+  saveLoraPromptOverride(input: LoraPromptOverride): LoraPromptOverride {
+    const normalized = normalizeLoraPromptOverride(input)
+    if (!normalized) throw new Error('Invalid LoRA prompt override')
+    const all = this.listLoraPromptOverrides()
+    const idx = all.findIndex((item) => item.id === normalized.id)
+    if (idx >= 0) all[idx] = normalized
+    else all.unshift(normalized)
+    writeFileSync(
+      this.loraPromptOverridesPath(),
+      JSON.stringify(all.slice(0, MAX_LORA_PROMPT_OVERRIDES), null, 2)
+    )
+    return normalized
+  }
+
+  deleteLoraPromptOverride(id: string): void {
+    if (typeof id !== 'string' || id.length === 0 || id.length > 300) return
+    const all = this.listLoraPromptOverrides()
+    const filtered = all.filter((item) => item.id !== id)
+    writeFileSync(this.loraPromptOverridesPath(), JSON.stringify(filtered, null, 2))
+  }
+
+  private checkpointPromptProfilesPath(): string {
+    return join(this.root, 'checkpoint-prompt-profiles.json')
+  }
+
+  listCheckpointPromptProfiles(): CheckpointPromptProfile[] {
+    if (!existsSync(this.checkpointPromptProfilesPath())) return []
+    try {
+      const raw = JSON.parse(readFileSync(this.checkpointPromptProfilesPath(), 'utf8'))
+      if (!Array.isArray(raw)) return []
+      return raw
+        .map((item) => normalizeCheckpointPromptProfile(item))
+        .filter((item): item is CheckpointPromptProfile => Boolean(item))
+        .slice(0, MAX_CHECKPOINT_PROMPT_PROFILES)
+    } catch {
+      return []
+    }
+  }
+
+  saveCheckpointPromptProfile(input: CheckpointPromptProfile): CheckpointPromptProfile {
+    const normalized = normalizeCheckpointPromptProfile(input)
+    if (!normalized) throw new Error('Invalid checkpoint prompt profile')
+    const all = this.listCheckpointPromptProfiles()
+    const idx = all.findIndex((item) => item.id === normalized.id)
+    if (idx >= 0) all[idx] = normalized
+    else all.unshift(normalized)
+    writeFileSync(
+      this.checkpointPromptProfilesPath(),
+      JSON.stringify(all.slice(0, MAX_CHECKPOINT_PROMPT_PROFILES), null, 2)
+    )
+    return normalized
+  }
+
+  deleteCheckpointPromptProfile(id: string): void {
+    if (typeof id !== 'string' || id.length === 0 || id.length > 300) return
+    const all = this.listCheckpointPromptProfiles()
+    const filtered = all.filter((item) => item.id !== id)
+    writeFileSync(this.checkpointPromptProfilesPath(), JSON.stringify(filtered, null, 2))
+  }
+
   private loraUsagePath(): string {
     return join(this.root, 'lora-usage.json')
   }
@@ -986,9 +1117,15 @@ function normalizeSourceMetadata(raw: unknown): ModelSourceMetadata | undefined 
   const provider = obj.provider
   if (provider !== 'civitai' && provider !== 'huggingface' && provider !== 'local') return undefined
   const out: ModelSourceMetadata = { provider }
-  for (const key of ['name', 'creator', 'pageUrl', 'downloadUrl', 'versionName', 'baseModel', 'repoId', 'filePath'] as const) {
+  for (const key of ['name', 'creator', 'pageUrl', 'downloadUrl', 'versionName', 'baseModel', 'repoId', 'filePath', 'description'] as const) {
     const value = obj[key]
-    if (typeof value === 'string' && value.length <= 2048) out[key] = value
+    if (typeof value === 'string' && value.length <= (key === 'description' ? 4000 : 2048)) out[key] = value
+    else if (key === 'description' && value === null) out.description = null
+  }
+  if (Array.isArray(obj.tags)) {
+    out.tags = obj.tags
+      .filter((item): item is string => typeof item === 'string' && item.length > 0 && item.length <= 80)
+      .slice(0, 40)
   }
   const thumbnailUrl = obj.thumbnailUrl
   if (typeof thumbnailUrl === 'string' && thumbnailUrl.length <= 2048) out.thumbnailUrl = thumbnailUrl
@@ -1135,6 +1272,8 @@ function normalizeModelLibraryEntry(raw: unknown): ModelLibraryEntry | null {
     lastModifiedAt: typeof obj.lastModifiedAt === 'number' && Number.isFinite(obj.lastModifiedAt) ? obj.lastModifiedAt : null,
     sourceMeta,
     previewPath: typeof obj.previewPath === 'string' ? obj.previewPath : sourceMeta?.previewPath ?? null,
+    favorite: obj.favorite === true,
+    notes: typeof obj.notes === 'string' && obj.notes.length <= 4000 ? obj.notes : '',
     civitai: oldCivitai
       ? {
           url: typeof oldCivitai.url === 'string' ? oldCivitai.url : undefined,
@@ -1209,6 +1348,109 @@ function normalizeWorkspaceFile(raw: unknown): WorkspaceFile | null {
   }
 }
 
+function normalizeLoraPromptOverride(raw: unknown): LoraPromptOverride | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const obj = raw as Record<string, unknown>
+  const id = cleanStorageString(obj.id, 300)
+  const loraName = cleanStorageString(obj.loraName, 500)
+  if (!id || !loraName) return null
+  const weight = safeNumber(obj.weight)
+  return {
+    id,
+    loraName,
+    loraAlias: cleanStorageString(obj.loraAlias, 500) ?? undefined,
+    loraPath: cleanStorageString(obj.loraPath, 2000) ?? undefined,
+    loraSha256: cleanSha256(obj.loraSha256),
+    positivePrompt: cleanStorageString(obj.positivePrompt, MAX_LORA_OVERRIDE_PROMPT_CHARS, true) ?? '',
+    negativePrompt: cleanStorageString(obj.negativePrompt, MAX_LORA_OVERRIDE_PROMPT_CHARS, true) ?? '',
+    weight: weight === null ? null : Math.max(-1, Math.min(2, Math.round(weight * 100) / 100)),
+    sampler: cleanStorageString(obj.sampler, 120) ?? undefined,
+    steps: normalizeOptionalNumber(obj.steps, 1, 150, true),
+    cfgScale: normalizeOptionalNumber(obj.cfgScale, 1, 30, false),
+    clipSkip: normalizeOptionalNumber(obj.clipSkip, 1, 12, true),
+    autoApply: obj.autoApply !== false,
+    updatedAt: safeNumber(obj.updatedAt) ?? Date.now()
+  }
+}
+
+function normalizeOptionalNumber(value: unknown, min: number, max: number, integer: boolean): number | null {
+  const number = safeNumber(value)
+  if (number === null) return null
+  const rounded = integer ? Math.round(number) : Math.round(number * 100) / 100
+  return Math.max(min, Math.min(max, rounded))
+}
+
+function normalizeCheckpointPromptProfile(raw: unknown): CheckpointPromptProfile | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const obj = raw as Record<string, unknown>
+  const id = cleanStorageString(obj.id, 300)
+  const checkpointTitle = cleanStorageString(obj.checkpointTitle, 500)
+  if (!id || !checkpointTitle) return null
+  return {
+    id,
+    checkpointTitle,
+    checkpointName: cleanStorageString(obj.checkpointName, 500) ?? undefined,
+    checkpointPath: cleanStorageString(obj.checkpointPath, 2000) ?? undefined,
+    checkpointSha256: cleanSha256(obj.checkpointSha256),
+    family: normalizeCheckpointPromptFamily(obj.family),
+    positivePrefix: normalizePromptTagList(obj.positivePrefix),
+    positiveAppend: normalizePromptTagList(obj.positiveAppend),
+    negativeAppend: normalizePromptTagList(obj.negativeAppend),
+    mode: normalizeCheckpointPromptMode(obj.mode),
+    updatedAt: safeNumber(obj.updatedAt) ?? Date.now()
+  }
+}
+
+function normalizeCheckpointPromptFamily(value: unknown): CheckpointPromptFamily {
+  return value === 'pony' ||
+    value === 'illustrious' ||
+    value === 'noobai' ||
+    value === 'animagine' ||
+    value === 'sdxl' ||
+    value === 'sd15' ||
+    value === 'flux' ||
+    value === 'custom'
+    ? value
+    : 'custom'
+}
+
+function normalizeCheckpointPromptMode(value: unknown): CheckpointPromptProfileMode {
+  return value === 'manual' || value === 'auto' || value === 'suggest' ? value : 'suggest'
+}
+
+function normalizePromptTagList(value: unknown): string[] {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/[,\n]/)
+      : []
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    const tag = cleanStorageString(item, MAX_CHECKPOINT_PROFILE_TAG_CHARS)
+    if (!tag) continue
+    const key = tag.toLowerCase().replace(/\s+/g, ' ')
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(tag)
+    if (out.length >= MAX_CHECKPOINT_PROFILE_TAGS) break
+  }
+  return out
+}
+
+function cleanStorageString(value: unknown, maxChars: number, allowNewlines = false): string | null {
+  if (typeof value !== 'string') return null
+  const control = allowNewlines ? /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g : /[\u0000-\u001f\u007f]/g
+  const cleaned = value.replace(control, '').trim()
+  return cleaned.slice(0, maxChars)
+}
+
+function cleanSha256(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim().toLowerCase()
+  return /^[a-f0-9]{64}$/.test(trimmed) ? trimmed : null
+}
+
 function elapsedMs(startedAt: number, value: number | null): number | null {
   if (value === null || !Number.isFinite(value)) return null
   return Math.max(0, Math.round(value - startedAt))
@@ -1268,7 +1510,8 @@ function defaultSettings(projectRoot: string): AppSettings {
     outputDir: '',
     civitaiApiKey: null,
     uiLanguage: 'ja',
-    forgeExtraArgs: ''
+    forgeExtraArgs: '',
+    framePackPath: ''
   }
 }
 
@@ -1281,16 +1524,36 @@ function legacySiblingForgePath(projectRoot: string): string {
 }
 
 function normalizeSettings(settings: AppSettings, projectRoot: string): AppSettings {
+  const defaults = defaultSettings(projectRoot)
   const integrated = defaultForgePath(projectRoot)
   const legacy = legacySiblingForgePath(projectRoot)
-  const configured = resolve(settings.forgePath)
+  let forgePath = typeof settings.forgePath === 'string' && settings.forgePath
+    ? settings.forgePath
+    : defaults.forgePath
+  const configured = resolve(forgePath)
 
   if (
     existsSync(integrated) &&
     (configured.toLowerCase() === legacy.toLowerCase() || !existsSync(configured))
   ) {
-    return { ...settings, forgePath: integrated }
+    forgePath = integrated
   }
 
-  return settings
+  const uiLanguage = settings.uiLanguage === 'en' ||
+    settings.uiLanguage === 'ru' ||
+    settings.uiLanguage === 'pt' ||
+    settings.uiLanguage === 'ja'
+    ? settings.uiLanguage
+    : defaults.uiLanguage
+
+  return {
+    forgePath,
+    forgePort: Number.isInteger(settings.forgePort) ? settings.forgePort : defaults.forgePort,
+    autoStartForge: typeof settings.autoStartForge === 'boolean' ? settings.autoStartForge : defaults.autoStartForge,
+    outputDir: typeof settings.outputDir === 'string' ? settings.outputDir : defaults.outputDir,
+    civitaiApiKey: typeof settings.civitaiApiKey === 'string' ? settings.civitaiApiKey : null,
+    uiLanguage,
+    forgeExtraArgs: typeof settings.forgeExtraArgs === 'string' ? settings.forgeExtraArgs : defaults.forgeExtraArgs,
+    framePackPath: typeof settings.framePackPath === 'string' ? settings.framePackPath : defaults.framePackPath
+  }
 }

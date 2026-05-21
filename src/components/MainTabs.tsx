@@ -1,13 +1,12 @@
 import { useStore, type WorkspaceTab } from '@/lib/store'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { Type, Image as ImageIcon, Maximize2, Wrench } from 'lucide-react'
+import { Clapperboard, Database, Tags, Type, Image as ImageIcon, Maximize2, Wrench } from 'lucide-react'
 
 /**
  * Top-level workspace tab strip. Sits between the title bar and the main
- * content area. We deliberately keep the tab list short (4 entries) — new
- * features should be folded into existing tabs as collapsible panels rather
- * than expanding this strip.
+ * content area. Each tab can own a distinct layout, so workspace-scale
+ * workflows belong here while smaller helpers stay inside collapsible panels.
  *
  * Why hand-rolled instead of `@radix-ui/react-tabs`: Radix couples the tab
  * trigger to its `Tabs.Content` siblings, and our content for each tab is
@@ -15,17 +14,23 @@ import { Type, Image as ImageIcon, Maximize2, Wrench } from 'lucide-react'
  * different content node. A simple controlled button strip backed by the
  * store gives us full layout control in App.tsx without contortion.
  */
-const TABS: { id: WorkspaceTab; iconKey: 'txt' | 'img' | 'up' | 'tool' }[] = [
+const TABS: { id: WorkspaceTab; iconKey: 'txt' | 'img' | 'tags' | 'video' | 'up' | 'models' | 'tool' }[] = [
   { id: 'txt2img', iconKey: 'txt' },
   { id: 'img2img', iconKey: 'img' },
+  { id: 'tags', iconKey: 'tags' },
+  { id: 'video', iconKey: 'video' },
   { id: 'upscale', iconKey: 'up' },
+  { id: 'models',  iconKey: 'models' },
   { id: 'tools',   iconKey: 'tool' }
 ]
 
 const ICON_BY_KEY = {
   txt:  Type,
   img:  ImageIcon,
+  tags: Tags,
+  video: Clapperboard,
   up:   Maximize2,
+  models: Database,
   tool: Wrench
 }
 

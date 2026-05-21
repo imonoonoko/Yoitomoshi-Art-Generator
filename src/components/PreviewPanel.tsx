@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { buildWorkspaceSnapshot } from '@/lib/workspace-snapshot'
 import { MetadataInfoPanel } from './MetadataInfoPanel'
 import { VariationPanel } from './VariationPanel'
+import { NextImagePanel } from './NextImagePanel'
 
 export function PreviewPanel(): JSX.Element {
   const isGenerating = useStore((s) => s.isGenerating)
@@ -28,7 +29,7 @@ export function PreviewPanel(): JSX.Element {
   const setCurrentTab = useStore((s) => s.setCurrentTab)
 
   const liveImage = progress?.current_image
-    ? `data:image/png;base64,${progress.current_image}`
+    ? `data:${progress.current_image_mime || 'image/png'};base64,${progress.current_image}`
     : null
   const display = liveImage ?? lastImage
 
@@ -205,12 +206,21 @@ export function PreviewPanel(): JSX.Element {
       )}
 
       <MetadataInfoPanel />
+      <NextImagePanel onOpenVariation={() => setVariationOpen(true)} />
       {variationOpen && <VariationPanel />}
 
       <div className="border-t border-line bg-bg-1 px-3 py-2 flex items-center gap-3 shrink-0">
         <div className="flex-1 min-w-0">
           {isGenerating ? (
-            <div className="space-y-1">
+            <div
+              className="space-y-1"
+              data-testid="preview-progress"
+              data-progress-active="true"
+              data-progress-pct={progressPct().toFixed(0)}
+              data-progress-job={progress?.state.job ?? ''}
+              data-preview-mime={progress?.current_image_mime ?? ''}
+              data-preview-node={progress?.current_image_node_id ?? ''}
+            >
               <div className="flex items-baseline justify-between text-xs">
                 <span className="text-ink-1">
                   {progress?.state.job || t('preview.generating')}

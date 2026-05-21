@@ -296,7 +296,7 @@ export function InputImagePanel(): JSX.Element {
 
 function InpaintMaskEditor({
   inputImage,
-  maskImage: _maskImage,
+  maskImage,
   onMaskChange
 }: {
   inputImage: string
@@ -322,15 +322,27 @@ function InpaintMaskEditor({
       const ctx = canvas.getContext('2d')
       if (!ctx) return
       ctx.clearRect(0, 0, canvas.width, canvas.height)
-      setHasMask(false)
-      onMaskChange(null)
+      if (!maskImage) {
+        setHasMask(false)
+        return
+      }
+      const mask = new Image()
+      mask.onload = () => {
+        if (cancelled) return
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        ctx.drawImage(mask, 0, 0, canvas.width, canvas.height)
+        setHasMask(true)
+      }
+      mask.onerror = () => {
+        if (!cancelled) setHasMask(false)
+      }
+      mask.src = maskImage
     }
     img.src = inputImage
     return () => { cancelled = true }
-    // Reset the mask when the base image changes. The store also clears it,
-    // but the canvas needs to clear its drawn strokes too.
+    // Redraw a restored mask after workspace restore or Character Compose setup.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputImage])
+  }, [inputImage, maskImage])
 
   function pointFromEvent(e: React.PointerEvent<HTMLCanvasElement>): { x: number; y: number } {
     const canvas = e.currentTarget
@@ -383,7 +395,7 @@ function InpaintMaskEditor({
   }
 
   return (
-    <div className="border-t border-line pt-2 space-y-2">
+    <div className="border-t border-line pt-2 space-y-2" data-testid="inpaint-mask-editor" data-has-mask={hasMask ? 'true' : 'false'}>
       <div className="flex items-center gap-2">
         <Paintbrush className="h-3.5 w-3.5 text-accent" />
         <span className="text-[11px] font-medium text-ink-1">{t('inputImage.maskTitle')}</span>

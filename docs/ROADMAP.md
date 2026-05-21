@@ -1,6 +1,6 @@
 # Yoitomoshi Art Generator — ロードマップ
 
-最終更新: 2026-05-14
+最終更新: 2026-05-19
 
 現在の作業フォルダ: `C:\宵灯工房アート\Yoitomoshi-Art-Generator`
 
@@ -20,13 +20,15 @@
 - [`LAUNCHER_STARTUP_EXIT_FIX_2026-05-15.md`](LAUNCHER_STARTUP_EXIT_FIX_2026-05-15.md): 既存Electron起動中に `Yoitomoshi.bat` が起動失敗扱いになる問題の修正記録。
 - [`RECOMMENDATION_VAE_CLIP_SKIP_FIX_2026-05-15.md`](RECOMMENDATION_VAE_CLIP_SKIP_FIX_2026-05-15.md): 推奨VAEの重複download抑止とClip Skip undefined生成失敗の修正記録。
 - [`PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html`](PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html): PixAI / Aipictors の公開read-only通信と公式情報から、外部プリセット、公開レシピ取り込み、LoRA推薦、トレンド分析の実装候補を整理した調査レポート。
+- [`VIDEO_GENERATION_GUIDE_2026-05-17.html`](VIDEO_GENERATION_GUIDE_2026-05-17.html): Videoタブで使うmotion moduleのダウンロード、配置、短尺GIF生成、トラブル確認手順。
 - [`../README.md`](../README.md) / `README.{en,ru,pt}.md` / `はじめに.txt`: 利用者向けの起動・運用説明。
 
 ---
 
 ## 現在の判断基準
 
-- トップレベルタブは `txt2img / img2img / Upscale / Tools` の 4 つを維持する。新機能は既存タブ内の折りたたみパネルやモーダルで増やす。
+- 2026-05-21時点では、このリポジトリをForge版として整理する。Forge代表経路、package / dist、実インストール/アンインストール、active interruptは確認済み。コード署名、公開先に合わせた更新メタデータ、正式アイコン承認は外部配布フェーズへ送る。
+- トップレベルタブは `txt2img / img2img / Video / Upscale / Models / Tools` を維持する。小さい補助機能は既存タブ内の折りたたみパネルやモーダルで増やし、動画・モデル管理のように作業面が独立する機能だけトップレベルタブに置く。
 - Forge 拡張は Gradio UI を埋め込まず、Forge 側に拡張を入れて `alwayson_scripts` または `script_name/script_args` を React UI から操作する。
 - `C:\宵灯工房アート` 直下の sibling 構成は解消し、Forge は `Yoitomoshi-Art-Generator\runtime\forge` に統合する。Electron 利用では Gradio UI を開かず、Forge は `--nowebui` API 専用起動を既定にする。ただし Forge/ControlNet 内部が `gradio` Python パッケージを import するため、依存ファイルの物理削除は検証済みの不要物だけに限定する。
 - Stability Matrix は `LykosAI/StabilityMatrix` を機能調査ソースとして扱う。採用するのは「モデル管理 / ダウンロード管理 / package launcher / workspace保存」の考え方で、AGPL-3.0 のソースコードやUI資産はコピーしない。
@@ -275,7 +277,6 @@
    - 2026-05-12追補: 未完了ジョブ整理、metadata/preview保存、Hugging Face検索、復旧処理まで実装済み。自動再開選択は今後のUX改善候補。
    - Package / Launcher 管理: Forge の起動引数プリセット、環境変数、依存修復、拡張 enable/disable/update を Tools 内に集約する。
    - Workspace 保存: Stability Matrix の `.smproj` に相当する独自 `.yoitoart` を作り、prompt / params / LoRA / ControlNet / input image 参照 / upscale 設定を保存・復元する。
-   - まずは Forge 1系統に限定する。ComfyUI / InvokeAI 等の複数 package 管理は後続で、現時点では採用しない。
 
 以下の完了済み項目は履歴として残す。
 
@@ -347,7 +348,7 @@ rg -n "[ぁ-んァ-ン一-龯]" src\components src\App.tsx src\lib -g '!i18n.ts'
 完了確認:
 
 - 上記コマンドのヒットが、コメント・ユーザー生成値・言語非依存記号だけになる。
-- ja/en/ru/pt に切替えて、txt2img / img2img / Upscale / Tools の主要導線に日本語混入がない。
+- ja/en/ru/pt に切替えて、txt2img / img2img / Video / Upscale / Tools の主要導線に日本語混入がない。
 - `npm run typecheck` が通る(2026-05-11 確認済み)。
 
 ### 完了 — Phase 9A: Tile ControlNet 統合
@@ -430,7 +431,6 @@ rg -n "[ぁ-んァ-ン一-龯]" src\components src\App.tsx src\lib -g '!i18n.ts'
 - ドロップ画像の checkpoint がローカルにある場合、「このモデルに切替」を提案する。
 - 複数 PNG / フォルダドロップでローカル参考サンプルを集計する。
 - Civitai community images の集計を RecommendationCard だけでなく QuickPreset にも反映する。
-- ComfyUI workflow JSON の最低限パースを追加する。
 
 完了条件:
 
@@ -486,7 +486,6 @@ rg -n "[ぁ-んァ-ン一-龯]" src\components src\App.tsx src\lib -g '!i18n.ts'
 3. **Shared Model Library**
    - Forge の実体フォルダは維持しつつ、アプリ側で `model-library-index.json` を持つ。
    - 各モデルに source(Civitai/HF/local), type, sha256, preview, metadata, installedPath, lastUsedAt, favorite を記録する。
-   - 将来 ComfyUI 等を入れる場合に備え、物理コピーではなくハードリンク/シンボリックリンク/追加モデルパスのどれを使うかを設計できるようにする。
 
 4. **Package / Launcher 管理**
    - まず Forge 1 package のみを対象にする。
@@ -501,7 +500,6 @@ rg -n "[ぁ-んァ-ン一-龯]" src\components src\App.tsx src\lib -g '!i18n.ts'
 
 採用しない/後回し:
 
-- 複数 package の一括 install/update(ComfyUI, InvokeAI, SD.Next 等)は、Forge 運用が十分安定してから。
 - Stability Matrix の dockable/floating panel UI をそのまま再現しない。現行の4タブ + 折りたたみパネル方針を維持する。
 - Gradio UI iframe 埋め込みは引き続き見送り。
 
@@ -527,6 +525,13 @@ rg -n "[ぁ-んァ-ン一-龯]" src\components src\App.tsx src\lib -g '!i18n.ts'
 - browser-api-recon追加調査: PixAI / Aipictors の公開read-only API / SSRデータを対象に、人気モデル、LoRA推薦、推奨設定、公開作品の生成パラメータを調査し、[`PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html`](PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html) に機能強化案を整理した。認証済みcapture、生成/保存/課金系操作、回避的取得は実施していない。
 - sd-dynamic-prompts調査を実装へ反映。`Dynamic Prompt Lab`、生成直前のprompt展開、History metadata、VariationのPrompt軸、Preflight/DOM QAを追加し、[`DYNAMIC_PROMPT_IMPLEMENTATION_REPORT_2026-05-16.md`](DYNAMIC_PROMPT_IMPLEMENTATION_REPORT_2026-05-16.md) に記録した。
 - 生成画面の複雑化対策として、いったん左カラムを `作る / 整える / 高度` の作業モードへ整理した。その後、実利用で切替負荷が高かったためモードタブを廃止し、`基本設定` / `Prompt補助` / `拡張設定` を同じ生成画面にまとめて表示する構成へ更新した。記録: [`GENERATION_GUI_MODE_IMPLEMENTATION_2026-05-16.md`](GENERATION_GUI_MODE_IMPLEMENTATION_2026-05-16.md), [`GENERATION_SECTION_UI_UPDATE_2026-05-16.md`](GENERATION_SECTION_UI_UPDATE_2026-05-16.md)。
+- Romptn調査と利用履歴分析から、「Prompt Library拡大」ではなく「生成の試行錯誤を短くする制作台」へ寄せる実装を追加。生成結果下に `次の一枚` パネルを出し、この方向で続ける / seed比較 / 表情 / 構図 / 背景 / 失敗低減 / LoRAなし / モデル違いをワンクリック差分として適用できる。Historyには prompt fingerprint による `同じ実験` 自動まとまりを追加し、近い履歴を横並びで復元・比較できる。計画書: [`NEXT_IMAGE_MASTER_IMPLEMENTATION_PLAN_2026-05-16.html`](NEXT_IMAGE_MASTER_IMPLEMENTATION_PLAN_2026-05-16.html)。実装前状態は `.codex-rollback\next-image-final-20260516-212827` に退避済み。
+- 2026-05-17: 動画生成の初期縦切りを追加。`Video` トップレベルタブを追加し、動画専用ワークスペース内で prompt / negative / txt2vid-img2vid 切替 / 入力画像 / 動画ベースcheckpoint / AnimateDiff 設定 / 結果プレビューを扱う。Forge拡張とmotion moduleの導入状態を診断し、準備済み環境では既存の `txt2img` / `img2img` API に `alwayson_scripts.AnimateDiff` を合成して短いGIF/MP4/WEBP/WEBMを生成・`userdata\videos`へ保存する。runtime には `sd-forge-animatediff` を配置済みで、UIからmotion module置き場を開ける。外部モデルの巨大DLは自動化しない。画像生成用のCivitai推薦/LoRA推薦パネルはVideoタブから外し、ベースcheckpointとmotion moduleを分けて操作するGUIへ整理した。起動中Forgeが `Script 'AnimateDiff' not found` を返した件は、単なる再起動不足ではなく、同梱Forgeの `backend.*` APIと拡張側の旧 `ldm_patched` / `modules_forge` 参照の不一致が原因だったため、runtime内の `sd-forge-animatediff` を現行Forge向けに最小パッチした。具体的には state dict loader、FakeInitialModel参照、disabled ControlNet unit、motion module dtype cast、`num_timesteps` fallback を修正し、`/sdapi/v1/scripts` で `animatediff` がtxt2img/img2img両方に出ることを確認した。SD1.5 checkpoint + `mm_sd15_v2.safetensors` + 512px + 8 frames / Context batch 4 のAPIスモークで `runtime\forge\webui\outputs\txt2img-images\AnimateDiff\2026-05-17\00001-5-codex-smoke5.gif` を生成済み。`mm_sd15_v2.safetensors` はSD1.5用なので、`n4mik4ILSFWNSFW_v20` のようなSDXL checkpointではSDXL対応motion moduleが必要。利用者向け手順は [`VIDEO_GENERATION_GUIDE_2026-05-17.html`](VIDEO_GENERATION_GUIDE_2026-05-17.html) に整理した。
+- 2026-05-17: 既存のForge + AnimateDiff経路を8GB VRAM前提で補強した。Videoの既定値を 8 frames / Context batch 4 に変更し、`Video`タブ内に `nvidia-smi` ベースのGPU/VRAM/RAM/動画保存先空き容量診断を追加した。空きVRAM 6GB未満、Context batch 5以上、17 frames以上、重い解像度/フレーム構成、SDXL checkpoint + SD1.5 motion module / SD1.5 checkpoint + SDXL motion module の疑いを警告する。preload/IPC/API surfaceに `forge.inspectVideoRuntime()` を追加し、DOM QAのselector smokeもVideoタブとruntime診断を確認するよう拡張した。検証は `npm.cmd run typecheck:node`, `npm.cmd run typecheck:web`, `npm.cmd run build`, Electron remote debugging + `npm.cmd run qa:dom -- selectors --port=9338`, `npm.cmd run qa:dom:api -- --port=9338` が成功。
+- 2026-05-17: Phase V1のFramePack外部連携を最小実装した。`AppSettings.framePackPath` を追加し、VideoタブにFramePack外部バックエンドカードを追加。FramePackフォルダ選択、`run.bat`/`update.bat`/出力フォルダ検出、`run.bat`起動、フォルダを開く、最新GIF/MP4/WEBP/WEBM出力を `userdata\videos` に取り込んで既存の動画プレビューへ表示するところまで入れた。FramePackはForge runtimeに混ぜず、外部アプリとして分離する。DOM QAのAPI surfaceは `videoBackends.inspectFramePack/startFramePack/importLatestFramePackOutput` も確認する。検証は `npm.cmd run typecheck:node`, `npm.cmd run typecheck:web`, `npm.cmd run build`, Electron remote debugging + `npm.cmd run qa:dom -- selectors --port=9338`, `npm.cmd run qa:dom:api -- --port=9338` が成功。
+- 2026-05-17: Toolsに「モデル自動振り分け」を追加した。`runtime\forge\webui\models\Stable-diffusion` を入口として `.safetensors` ヘッダで LoRA / LyCORIS / VAE / ControlNet / Embedding / Text Encoder を判定し、明確なものだけ標準フォルダへ移動する。checkpoint、未完了ダウンロード、判定不能ファイルは勝手に移動しない。実フォルダのプレビューでは 13件中 12件をcheckpointとして維持、1件を判定不能としてスキップ、移動候補0件だった。細部修正として LyCORIS を独立ライブラリ種別にし、移動後のadapter再スキャン、ru/pt表示、専用DOM QA `node scripts/dom-qa.cjs model-auto-organize --port=9338` を追加した。検証は `npm.cmd run typecheck:node`, `npm.cmd run typecheck:web`, `npm.cmd run build`, Electron remote debugging + `npm.cmd run qa:dom -- selectors --port=9338`, `npm.cmd run qa:dom:api -- --port=9338`, `node scripts/dom-qa.cjs model-auto-organize --port=9338`, 実IPC `tools.planModelAutoOrganize()` が成功。
+- 2026-05-17: モデル自動振り分けとモデルライブラリを拡張した。Anima/Flux系のように `.safetensors` ではあるが通常のStable Diffusion checkpointではないDiT系モデルを `unsupported_diffusion` として検出し、`runtime\forge\webui\models\Unsupported-StableDiffusion` へ隔離できるようにした。`lizanima_v10.safetensors` はこの判定で `Stable Diffusion非対応` の移動候補になる。モデルライブラリは管理画面として、サムネ表示、Civitai hash照合からのmetadata/thumbnail取得、Civitaiページリンク、お気に入り、モデル別メモ、種別/お気に入り/検索フィルタを追加した。検証は `npm.cmd run typecheck:node`, `npm.cmd run typecheck:web`, `npm.cmd run build`, `npm.cmd run qa:dom:api -- --port=9338`, `node scripts/dom-qa.cjs model-auto-organize --port=9338`, Electron DOMでモデルライブラリカード/お気に入り/Civitai情報ボタン/メモ欄の表示確認が成功。
+- 2026-05-17: モデルライブラリをTools内の折りたたみカードから独立した `Models` トップレベルタブへ移動した。一覧は広い作業面で2列表示し、ファイル数/容量/お気に入り/Civitai未取得数を常時表示する。表示中かつ未取得のモデルをまとめて処理する `tools.refreshModelLibraryCivitaiBatch()` を追加し、Civitai metadata/description/thumbnail を一括取得できるようにした。モデルの「保存先」ボタンは `showItemInFolder` の許可範囲へ Forge `webui\models` / `embeddings` / `outputs` と `userdata\model-library` を追加して、モデルファイルの場所も直接開けるように修正した。検証は `npm.cmd run typecheck:node`, `npm.cmd run typecheck:web`, `npm.cmd run build`, `npm.cmd run qa:dom:api -- --port=9338`, `npm.cmd run qa:dom -- selectors --port=9338`, Electron DOMで `Models` タブ/一括取得/保存先ボタン/Tools側からの分離表示を確認し、実IPCでモデル保存先表示と一括Civitai取得1件成功を確認した。
 
 ---
 
@@ -556,7 +561,6 @@ rg -n "[ぁ-んァ-ン一-龯]" src\components src\App.tsx src\lib -g '!i18n.ts'
 
 | 項目 | 待ち条件 |
 |---|---|
-| ComfyUI PNG メタデータ完全対応 | 実際に ComfyUI 画像を再利用する頻度が上がったとき。 |
 | Mac/Linux 対応 | Windows 以外で使う必要が出たとき。Forge 起動まわりが Windows 前提。 |
 | SQLite 履歴移行 | 500 件 LRU で運用上困ったとき。 |
 | 自然言語編集 | VRAM 8GB と外部 API 課金の制約が変わったとき。 |
@@ -605,3 +609,11 @@ npm run dev
 - Upscale の `denoise=0.25`, `tileOverlap=96`, `ultimateMaskBlur=16`, `ultimatePadding=64`, `ultimateSeamsFixType=3` は drift 対策の要点。
 - `buildAlwaysOnScripts(state, { forUpscaleDiffusion: true })` は Upscale 専用で、PromptPanel の拡張設定を混ぜない設計を維持する。
 - イベントハンドラや非同期処理の翻訳は `useT()` ではなく非フック版 `t()` を使う。
+
+---
+
+## 2026-05-21 Forge専用化整理
+
+- このリポジトリはForge版として維持し、別アプリ側の第2エンジン実験とは責務を分ける。
+- 生成エンジン切替、専用runtime、workflow/recipe、専用DOM QAはForge版から削除対象とする。
+- VideoタブはForge AnimateDiffとFramePack外部連携を扱う。

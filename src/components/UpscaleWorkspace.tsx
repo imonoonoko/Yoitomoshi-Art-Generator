@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Upload, X, Wand2, Download, Send, Sparkles, GitCompare } from 'lucide-react'
+import { Upload, X, Wand2, Download, Send, Sparkles, GitCompare, History } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore, type UpscaleState } from '@/lib/store'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { api } from '@/lib/ipc'
 import { buildAlwaysOnScripts } from '@/lib/extension-payload'
+import { makeThumbnail } from '@/lib/generation-utils'
 import { suggestUpscaleSettings, applyUpscaleSuggestion, type UpscaleSuggestion, type Genre, type UpscaleMetadata } from '@/lib/upscale-suggest'
 import { Slider, SelectField } from './extensions/controls'
 import { PromptEditor } from './PromptEditor'
@@ -75,6 +76,7 @@ export function UpscaleWorkspace(): JSX.Element {
   const [compareSaving, setCompareSaving] = useState(false)
   const [compareCriteria, setCompareCriteria] = useState(DEFAULT_COMPARE_CRITERIA)
   const [compareCandidates, setCompareCandidates] = useState<UpscaleComparisonCandidate[]>([])
+  const [historySaving, setHistorySaving] = useState(false)
 
   useEffect(() => {
     if (status.kind !== 'ready') return
@@ -502,6 +504,56 @@ export function UpscaleWorkspace(): JSX.Element {
     return `data:image/png;base64,${first}`
   }
 
+  async function saveOutputToHistory(): Promise<void> {
+    if (!u.outputImage || historySaving) return
+    setHistorySaving(true)
+    try {
+      const state = useStore.getState()
+      const dims = await imageDimensions(u.outputImage)
+      const item = await api.storage.addHistory({
+        pngBase64: dataUrlToBase64(u.outputImage),
+        thumbDataUrl: await makeThumbnail(u.outputImage, 320),
+        prompt: state.prompt,
+        negativePrompt: state.negativePrompt,
+        params: {
+          steps: state.params.steps,
+          cfgScale: state.params.cfgScale,
+          width: dims.width,
+          height: dims.height,
+          sampler: state.params.sampler,
+          scheduler: state.params.scheduler,
+          seed: state.params.seed,
+          batchSize: 1,
+          imageIndex: 0,
+          imageCount: 1,
+          model: state.selectedModelTitle,
+          vae: state.selectedVae,
+          clipSkip: state.params.clipSkip,
+          denoisingStrength: u.method === 'simple' ? undefined : u.denoise,
+          activeLoras: state.activeLoras,
+          upscale: {
+            engine: 'forge',
+            method: u.method,
+            mode: null,
+            scale: u.scale,
+            upscaler: u.upscaler,
+            outputWidth: dims.width,
+            outputHeight: dims.height,
+            tileWidth: u.method === 'simple' ? null : normalizeTileSize(u.method === 'ultimate' ? u.ultimateTileWidth : u.tileWidth, 512),
+            tileHeight: u.method === 'simple' ? null : normalizeTileSize(u.method === 'ultimate' ? u.ultimateTileHeight || u.ultimateTileWidth : u.tileHeight, 512),
+            tileOverlap: u.method === 'simple' ? null : normalizeTileOverlap(u.tileOverlap, u.method === 'ultimate' ? u.ultimateTileWidth || 512 : u.tileWidth, u.method === 'ultimate' ? u.ultimateTileHeight || u.ultimateTileWidth || 512 : u.tileHeight)
+          }
+        }
+      })
+      useStore.getState().setHistory((await api.storage.listHistory()).slice(0, 500))
+      toast.success(tStatic('upscale.savedToHistory', { id: item.id.slice(0, 8) }))
+    } catch (e) {
+      toast.error(tStatic('upscale.historySaveFailed', { message: (e as Error).message }))
+    } finally {
+      setHistorySaving(false)
+    }
+  }
+
   function downloadOutput(): void {
     if (!u.outputImage) return
     const a = document.createElement('a')
@@ -871,6 +923,7 @@ export function UpscaleWorkspace(): JSX.Element {
           className="btn btn-primary w-full justify-center text-base font-semibold py-2.5 gap-2"
           onClick={runUpscale}
           disabled={!u.inputImage || u.isRunning}
+          data-testid="upscale-run-button"
         >
           <Wand2 className={cn('h-5 w-5', u.isRunning && 'animate-pulse')} />
           {u.isRunning ? t('upscale.running') : t('upscale.run')}
@@ -904,9 +957,19 @@ export function UpscaleWorkspace(): JSX.Element {
             <img
               src={u.outputImage}
               alt="upscaled output"
+              data-testid="upscale-output-image"
               className="max-w-full max-h-[70vh] object-contain mx-auto rounded shadow-2xl"
             />
             <div className="flex justify-center gap-2">
+              <button
+                className="btn gap-1.5"
+                onClick={() => { void saveOutputToHistory() }}
+                disabled={historySaving}
+                data-testid="upscale-save-history"
+              >
+                <History className={cn('h-3.5 w-3.5', historySaving && 'animate-pulse')} />
+                {historySaving ? t('upscale.historySaving') : t('upscale.saveHistory')}
+              </button>
               <button className="btn gap-1.5" onClick={downloadOutput}>
                 <Download className="h-3.5 w-3.5" />
                 {t('upscale.download')}
@@ -1202,6 +1265,17 @@ function filePathOf(file: File): string | null {
   return typeof path === 'string' && path.length > 0 ? path : null
 }
 
+function normalizeTileSize(value: number, fallback: number): number {
+  const raw = Number.isFinite(value) && value > 0 ? value : fallback
+  return Math.max(64, Math.min(4096, Math.round(raw)))
+}
+
+function normalizeTileOverlap(value: number, tileWidth: number, tileHeight: number): number {
+  const maxOverlap = Math.max(0, Math.min(tileWidth, tileHeight) - 1)
+  const raw = Number.isFinite(value) ? value : 64
+  return Math.max(0, Math.min(maxOverlap, Math.round(raw)))
+}
+
 interface ScalePresetsProps {
   value: number
   onChange: (v: number) => void
@@ -1253,6 +1327,12 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
   const bytes = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
   return bytes
+}
+
+function dataUrlToBase64(dataUrl: string): string {
+  const commaIdx = dataUrl.indexOf(',')
+  if (commaIdx < 0) throw new Error('No base64 separator in data URL')
+  return dataUrl.slice(commaIdx + 1)
 }
 
 async function imageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {

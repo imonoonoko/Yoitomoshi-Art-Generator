@@ -6,6 +6,8 @@ const COMMANDS = new Set([
   'selectors',
   'p2-fixture',
   'api-surface',
+  'forge-core-smoke',
+  'forge-controlnet-diagnostic',
   'tagger-smoke',
   'tagger-blacklist-filter',
   'partial-delete-smoke',
@@ -18,7 +20,8 @@ const COMMANDS = new Set([
   'dynamic-prompt',
   'generation-modes',
   'adapter-scan-collision',
-  'workspace-preflight'
+  'workspace-preflight',
+  'model-auto-organize'
 ])
 
 async function main() {
@@ -42,6 +45,16 @@ async function main() {
     }
     if (command === 'api-surface') {
       const result = await evaluate(cdp, apiSurfaceExpression())
+      printResult(result)
+      return
+    }
+    if (command === 'forge-core-smoke') {
+      const result = await evaluate(cdp, forgeCoreSmokeExpression())
+      printResult(result)
+      return
+    }
+    if (command === 'forge-controlnet-diagnostic') {
+      const result = await evaluate(cdp, forgeControlNetDiagnosticExpression())
       printResult(result)
       return
     }
@@ -121,6 +134,11 @@ async function main() {
       printResult(result)
       return
     }
+    if (command === 'model-auto-organize') {
+      const result = await evaluate(cdp, modelAutoOrganizeExpression())
+      printResult(result)
+      return
+    }
     const result = await evaluate(cdp, preflightMismatchExpression())
     printResult(result)
   } finally {
@@ -153,6 +171,8 @@ function printUsage() {
   node scripts/dom-qa.cjs selectors [--port=9338]
   node scripts/dom-qa.cjs p2-fixture [--port=9338]
   node scripts/dom-qa.cjs api-surface [--port=9338]
+  node scripts/dom-qa.cjs forge-core-smoke [--port=9338]
+  node scripts/dom-qa.cjs forge-controlnet-diagnostic [--port=9338]
   node scripts/dom-qa.cjs tagger-smoke [--port=9338]
   node scripts/dom-qa.cjs tagger-blacklist-filter [--port=9338]
   node scripts/dom-qa.cjs partial-delete-smoke [--port=9338]
@@ -166,6 +186,7 @@ function printUsage() {
   node scripts/dom-qa.cjs generation-modes [--port=9338]
   node scripts/dom-qa.cjs adapter-scan-collision [--port=9338]
   node scripts/dom-qa.cjs workspace-preflight [--port=9338]
+  node scripts/dom-qa.cjs model-auto-organize [--port=9338]
 
 Prerequisite:
   Start Electron with --remote-debugging-port=<port> before running this script.
@@ -235,8 +256,11 @@ function selectorsExpression() {
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
     document.querySelector('[data-testid="main-tab-txt2img"]')?.click()
     await sleep(100)
-    const ids = [
+    const baseIds = [
       'main-tab-txt2img',
+      'main-tab-tags',
+      'main-tab-video',
+      'main-tab-models',
       'main-tab-tools',
       'side-tab-library',
       'side-tab-lora',
@@ -257,7 +281,38 @@ function selectorsExpression() {
       'generation-panel-extensions',
       'parameters-panel',
     ]
-    const selectors = Object.fromEntries(ids.map((id) => [id, Boolean(document.querySelector('[data-testid="' + id + '"]'))]))
+    const selectors = Object.fromEntries(baseIds.map((id) => [id, Boolean(document.querySelector('[data-testid="' + id + '"]'))]))
+    document.querySelector('[data-testid="main-tab-tags"]')?.click()
+    await sleep(500)
+    const tagIds = [
+      'tags-workspace-library',
+      'tags-workspace-quick-add',
+      'tags-workspace-positive',
+      'tags-workspace-negative',
+    ]
+    for (const id of tagIds) {
+      selectors[id] = Boolean(document.querySelector('[data-testid="' + id + '"]'))
+    }
+    document.querySelector('[data-testid="main-tab-video"]')?.click()
+    await sleep(1500)
+    const videoIds = [
+      'video-workspace',
+      'video-base-settings',
+      'video-smoke-preset',
+      'video-preset-row',
+      'video-model-resource-panel',
+      'video-open-civitai-checkpoints',
+      'video-tag-palette',
+      'video-generation-panel',
+      'video-generation-body',
+      'video-runtime-diagnostics',
+      'video-framepack-panel',
+      'video-source-mode',
+      'video-generate-button',
+    ]
+    for (const id of videoIds) {
+      selectors[id] = Boolean(document.querySelector('[data-testid="' + id + '"]'))
+    }
     return {
       ok: Object.values(selectors).every(Boolean),
       selectors
@@ -271,12 +326,516 @@ function apiSurfaceExpression() {
     const surface = {
       checkLibraryIntegrity: typeof tools.checkLibraryIntegrity === 'function',
       deletePartialFile: typeof tools.deletePartialFile === 'function',
+      planModelAutoOrganize: typeof tools.planModelAutoOrganize === 'function',
+      applyModelAutoOrganize: typeof tools.applyModelAutoOrganize === 'function',
+      updateModelLibraryEntry: typeof tools.updateModelLibraryEntry === 'function',
+      refreshModelLibraryCivitai: typeof tools.refreshModelLibraryCivitai === 'function',
+      refreshModelLibraryCivitaiBatch: typeof tools.refreshModelLibraryCivitaiBatch === 'function',
       runTagger: typeof tools.runTagger === 'function',
-      saveWorkspace: typeof window.api?.storage?.saveWorkspace === 'function'
+      inspectVideoSupport: typeof window.api?.forge?.inspectVideoSupport === 'function',
+      inspectVideoRuntime: typeof window.api?.forge?.inspectVideoRuntime === 'function',
+      inspectFramePack: typeof window.api?.videoBackends?.inspectFramePack === 'function',
+      startFramePack: typeof window.api?.videoBackends?.startFramePack === 'function',
+      importLatestFramePackOutput: typeof window.api?.videoBackends?.importLatestFramePackOutput === 'function',
+      openVideoModelFolder: typeof window.api?.forge?.openVideoModelFolder === 'function',
+      saveWorkspace: typeof window.api?.storage?.saveWorkspace === 'function',
+      saveGeneratedVideo: typeof window.api?.storage?.saveGeneratedVideo === 'function'
     }
     return {
       ok: Object.values(surface).every(Boolean),
       surface
+    }
+  })()`
+}
+
+function forgeCoreSmokeExpression() {
+  return `(async () => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const waitUntil = async (fn, timeoutMs, label) => {
+      const started = Date.now()
+      let lastError = null
+      while (Date.now() - started < timeoutMs) {
+        try {
+          const value = await fn()
+          if (value) return value
+        } catch (error) {
+          lastError = error
+        }
+        await sleep(1000)
+      }
+      throw new Error(label + ' timed out' + (lastError ? ': ' + lastError.message : ''))
+    }
+
+    const api = window.api
+    if (!api?.forge?.txt2img ||
+        !api?.forge?.img2img ||
+        !api?.forge?.status ||
+        !api?.forge?.listModels ||
+        !api?.forge?.listSamplers ||
+        !api?.forge?.listSchedulers ||
+        !api?.forge?.listUpscalers ||
+        !api?.forge?.extraSingleImage ||
+        !api?.forge?.listControlnetModels ||
+        !api?.forge?.listControlnetModules ||
+        !api?.forge?.controlnetDetect) {
+      throw new Error('Forge IPC surface is not available')
+    }
+    const asDataUrl = (image) => String(image || '').startsWith('data:')
+      ? String(image)
+      : 'data:image/png;base64,' + String(image || '')
+    const stripDataUrl = (image) => String(image || '').replace(/^data:image\\/[a-z]+;base64,/, '')
+    const hasImage = (image) => typeof image === 'string' && image.length > 100
+    const parseInfo = (info) => {
+      try { return JSON.parse(info || '{}') } catch { return {} }
+    }
+
+    const beforeStatus = await api.forge.status()
+    const shouldStopAfter = beforeStatus.kind !== 'ready'
+    if (beforeStatus.kind === 'stopped') {
+      await api.forge.start()
+    }
+    const readyStatus = await waitUntil(async () => {
+      const status = await api.forge.status()
+      if (status.kind === 'error') throw new Error(status.message)
+      return status.kind === 'ready' ? status : null
+    }, 180000, 'Forge ready')
+
+    const models = await waitUntil(async () => {
+      const list = await api.forge.listModels()
+      return Array.isArray(list) && list.length > 0 ? list : null
+    }, 60000, 'Forge model list')
+    const selectedModel =
+      models.find((model) => String(model.title || '').includes('pixelstyleckpt_strength07')) ||
+      models.find((model) => String(model.title || '').includes('dasiwaAnima_luminousLabyrinthV1')) ||
+      models[0]
+    const samplers = await api.forge.listSamplers()
+    const sampler = samplers.find((item) => item.name === 'Euler')?.name || samplers[0]?.name || 'Euler'
+    const schedulers = await api.forge.listSchedulers()
+    const scheduler = schedulers.includes('normal') ? 'normal' : schedulers[0]
+    const req = {
+      prompt: 'yoitomoshi forge regression smoke, simple clean icon',
+      negative_prompt: 'lowres, blurry',
+      steps: 1,
+      cfg_scale: 1,
+      width: 128,
+      height: 128,
+      sampler_name: sampler,
+      seed: 123456,
+      batch_size: 1,
+      n_iter: 1,
+      override_settings: {
+        sd_model_checkpoint: selectedModel.title
+      },
+      override_settings_restore_afterwards: true
+    }
+    if (scheduler) req.scheduler = scheduler
+
+    const txt2img = await api.forge.txt2img(req)
+    const txtInfo = parseInfo(txt2img.info)
+    const txtImage = Array.isArray(txt2img.images) ? txt2img.images.find(Boolean) : null
+    if (!hasImage(txtImage)) throw new Error('Forge txt2img returned no image')
+
+    const img2img = await api.forge.img2img({
+      ...req,
+      prompt: 'yoitomoshi forge regression img2img smoke, simple clean icon',
+      seed: 123457,
+      init_images: [stripDataUrl(txtImage)],
+      denoising_strength: 0.35,
+      resize_mode: 0
+    })
+    const img2imgInfo = parseInfo(img2img.info)
+    const img2imgImage = Array.isArray(img2img.images) ? img2img.images.find(Boolean) : null
+    if (!hasImage(img2imgImage)) throw new Error('Forge img2img returned no image')
+
+    const upscalers = await api.forge.listUpscalers()
+    const upscaler = upscalers.find((name) => /nearest/i.test(name)) ||
+      upscalers.find((name) => name && name !== 'None') ||
+      upscalers[0] ||
+      'Nearest'
+    const upscale = await api.forge.extraSingleImage({
+      image: stripDataUrl(txtImage),
+      upscaler,
+      resize: 2
+    })
+    if (!hasImage(upscale?.image)) throw new Error('Forge extra-single-image returned no image')
+
+    const controlnetModels = await api.forge.listControlnetModels()
+    const controlnetModules = await api.forge.listControlnetModules()
+    const controlnetModule = controlnetModules.find((name) => /canny/i.test(name)) ||
+      controlnetModules.find((name) => name === 'None') ||
+      'None'
+    const tileControlnetModel = controlnetModels.find((name) => /tile/i.test(name))
+    const tileControlnetModule = controlnetModules.find((name) => /tile_resample|tile/i.test(name))
+    const cannyControlnetModel = controlnetModels.find((name) => /canny/i.test(name))
+    const preferredControlnetModel = tileControlnetModel ||
+      cannyControlnetModel ||
+      controlnetModels.find((name) => name && name !== 'None') ||
+      'None'
+    const preferredControlnetModule = tileControlnetModel && tileControlnetModule
+      ? tileControlnetModule
+      : /canny/i.test(preferredControlnetModel) && /canny/i.test(controlnetModule)
+      ? controlnetModule
+      : 'None'
+    const controlnetDetect = await api.forge.controlnetDetect({
+      image: asDataUrl(txtImage),
+      module: controlnetModule,
+      processorRes: 128,
+      thresholdA: 100,
+      thresholdB: 200,
+      resizeMode: 1
+    })
+    if (!hasImage(controlnetDetect?.image)) throw new Error('Forge ControlNet detect returned no image')
+
+    let stoppedAfter = false
+    if (shouldStopAfter) {
+      await api.forge.stop()
+      await waitUntil(async () => {
+        const status = await api.forge.status()
+        return status.kind === 'stopped' ? status : null
+      }, 60000, 'Forge stop')
+      stoppedAfter = true
+    }
+
+    return {
+      ok: true,
+      statusBefore: beforeStatus.kind,
+      statusReady: readyStatus.kind,
+      stoppedAfter,
+      port: readyStatus.port ?? null,
+      modelCount: models.length,
+      selectedModel: selectedModel.title,
+      sampler,
+      scheduler: scheduler || null,
+      txt2img: {
+        imageCount: Array.isArray(txt2img.images) ? txt2img.images.length : 0,
+        imagePrefix: String(txtImage).slice(0, 24),
+        infoSeed: txtInfo.seed ?? null,
+        infoModelName: txtInfo.sd_model_name ?? txtInfo.model_name ?? null
+      },
+      img2img: {
+        imageCount: Array.isArray(img2img.images) ? img2img.images.length : 0,
+        imagePrefix: String(img2imgImage).slice(0, 24),
+        infoSeed: img2imgInfo.seed ?? null
+      },
+      upscale: {
+        upscaler,
+        upscalerCount: upscalers.length,
+        imagePrefix: String(upscale.image).slice(0, 24)
+      },
+      controlnet: {
+        modelCount: controlnetModels.length,
+        moduleCount: controlnetModules.length,
+        detectModule: controlnetModule,
+        preferredGenerationModel: preferredControlnetModel,
+        preferredGenerationModule: preferredControlnetModule,
+        detectPrefix: String(controlnetDetect.image).slice(0, 32),
+        generationSkipped: true,
+        generationSkipReason: 'ControlNet alwayson generation is tracked as a separate regression after payload/model compatibility failures.'
+      }
+    }
+  })()`
+}
+
+function forgeControlNetDiagnosticExpression() {
+  return `(async () => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const waitUntil = async (fn, timeoutMs, label) => {
+      const started = Date.now()
+      let lastError = null
+      while (Date.now() - started < timeoutMs) {
+        try {
+          const value = await fn()
+          if (value) return value
+        } catch (error) {
+          lastError = error
+        }
+        await sleep(1000)
+      }
+      throw new Error(label + ' timed out' + (lastError ? ': ' + lastError.message : ''))
+    }
+    const stripDataUrl = (image) => String(image || '').replace(/^data:image\\/[a-z]+;base64,/, '')
+    const hasImage = (image) => typeof image === 'string' && image.length > 100
+    const parseInfo = (info) => {
+      try { return JSON.parse(info || '{}') } catch { return {} }
+    }
+    const makeInputImage = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 512
+      canvas.height = 512
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('Canvas is unavailable')
+      const gradient = ctx.createLinearGradient(0, 0, 512, 512)
+      gradient.addColorStop(0, '#263a77')
+      gradient.addColorStop(1, '#f3d37a')
+      ctx.fillStyle = gradient
+      ctx.fillRect(0, 0, 512, 512)
+      ctx.fillStyle = '#fff8e8'
+      ctx.fillRect(144, 96, 224, 320)
+      ctx.strokeStyle = '#111111'
+      ctx.lineWidth = 18
+      ctx.strokeRect(144, 96, 224, 320)
+      ctx.beginPath()
+      ctx.arc(256, 188, 58, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(256, 248)
+      ctx.lineTo(256, 370)
+      ctx.moveTo(174, 302)
+      ctx.lineTo(338, 302)
+      ctx.stroke()
+      return canvas.toDataURL('image/png')
+    }
+
+    const api = window.api
+    if (!api?.forge?.txt2img ||
+        !api?.forge?.img2img ||
+        !api?.forge?.status ||
+        !api?.forge?.listModels ||
+        !api?.forge?.listSamplers ||
+        !api?.forge?.listSchedulers ||
+        !api?.forge?.listControlnetModels ||
+        !api?.forge?.listControlnetModules) {
+      throw new Error('Forge IPC surface is not available')
+    }
+
+    const beforeStatus = await api.forge.status()
+    const shouldStopAfter = beforeStatus.kind !== 'ready'
+    if (beforeStatus.kind === 'stopped') await api.forge.start()
+    const readyStatus = await waitUntil(async () => {
+      const status = await api.forge.status()
+      if (status.kind === 'error') throw new Error(status.message)
+      return status.kind === 'ready' ? status : null
+    }, 180000, 'Forge ready')
+
+    const models = await waitUntil(async () => {
+      const list = await api.forge.listModels()
+      return Array.isArray(list) && list.length > 0 ? list : null
+    }, 60000, 'Forge model list')
+    const sd15Model =
+      models.find((model) => /pixelstyleckpt_strength07/i.test(String(model.title || ''))) ||
+      models.find((model) => /dasiwaAnima_luminousLabyrinthV1/i.test(String(model.title || ''))) ||
+      models[0]
+    const sdxlModel =
+      models.find((model) => /novaAnimeXL_ilV190/i.test(String(model.title || ''))) ||
+      models.find((model) => /n4mik4|sdxl|xl/i.test(String(model.title || ''))) ||
+      sd15Model
+    const samplers = await api.forge.listSamplers()
+    const sampler = samplers.find((item) => item.name === 'Euler')?.name || samplers[0]?.name || 'Euler'
+    const schedulers = await api.forge.listSchedulers()
+    const scheduler = schedulers.includes('normal') ? 'normal' : schedulers[0]
+    const controlnetModels = await api.forge.listControlnetModels()
+    const controlnetModules = await api.forge.listControlnetModules()
+    const tileModel = controlnetModels.find((name) => /tile/i.test(name))
+    const tileModule = controlnetModules.find((name) => /^tile_resample$/i.test(name)) ||
+      controlnetModules.find((name) => /tile/i.test(name))
+    const cannyModel = controlnetModels.find((name) => /canny/i.test(name))
+    const cannyModule = controlnetModules.find((name) => /^canny$/i.test(name)) ||
+      controlnetModules.find((name) => /canny/i.test(name))
+    const lineartModel = controlnetModels.find((name) => /lineart|misto/i.test(name))
+    const inputDataUrl = makeInputImage()
+    const inputRaw = stripDataUrl(inputDataUrl)
+    const baseReq = {
+      prompt: 'yoitomoshi forge controlnet diagnostic, simple clean icon',
+      negative_prompt: 'lowres, blurry',
+      steps: 1,
+      cfg_scale: 1,
+      width: 512,
+      height: 512,
+      sampler_name: sampler,
+      seed: 223344,
+      batch_size: 1,
+      n_iter: 1,
+      override_settings_restore_afterwards: true
+    }
+    if (scheduler) baseReq.scheduler = scheduler
+    const unit = ({ module, model, image, enumStyle = 'number' }) => ({
+      enabled: true,
+      module,
+      model,
+      image,
+      weight: 0.55,
+      resize_mode: enumStyle === 'string' ? 'Crop and Resize' : 1,
+      processor_res: 512,
+      threshold_a: 100,
+      threshold_b: 200,
+      guidance_start: 0,
+      guidance_end: 1,
+      pixel_perfect: false,
+      control_mode: enumStyle === 'string' ? 'Balanced' : 0,
+      hr_option: enumStyle === 'string' ? 'Both' : 0
+    })
+    const controlnet = (args) => ({ ControlNet: { args: [args] } })
+    const cases = [
+      tileModel && tileModule ? {
+        id: 'img2img-sdxl-tile-raw',
+        endpoint: 'img2img',
+        model: sdxlModel.title,
+        unit: unit({ module: tileModule, model: tileModel, image: inputRaw })
+      } : null,
+      tileModel && tileModule ? {
+        id: 'img2img-sdxl-tile-data-url',
+        endpoint: 'img2img',
+        model: sdxlModel.title,
+        unit: unit({ module: tileModule, model: tileModel, image: inputDataUrl })
+      } : null,
+      tileModel && tileModule ? {
+        id: 'txt2img-sdxl-tile-data-url',
+        endpoint: 'txt2img',
+        model: sdxlModel.title,
+        unit: unit({ module: tileModule, model: tileModel, image: inputDataUrl })
+      } : null,
+      lineartModel ? {
+        id: 'txt2img-sdxl-lineart-none-data-url-string-enums',
+        endpoint: 'txt2img',
+        model: sdxlModel.title,
+        unit: unit({ module: 'None', model: lineartModel, image: inputDataUrl, enumStyle: 'string' })
+      } : null,
+      cannyModel && cannyModule ? {
+        id: 'txt2img-sd15-canny-raw',
+        endpoint: 'txt2img',
+        model: sd15Model.title,
+        unit: unit({ module: cannyModule, model: cannyModel, image: inputRaw })
+      } : null
+    ].filter(Boolean)
+
+    const results = []
+    for (const testCase of cases) {
+      const req = {
+        ...baseReq,
+        prompt: baseReq.prompt + ', ' + testCase.id,
+        seed: baseReq.seed + results.length,
+        override_settings: { sd_model_checkpoint: testCase.model },
+        alwayson_scripts: controlnet(testCase.unit)
+      }
+      try {
+        const res = testCase.endpoint === 'img2img'
+          ? await api.forge.img2img({
+              ...req,
+              init_images: [inputRaw],
+              denoising_strength: 0.35,
+              resize_mode: 0
+            })
+          : await api.forge.txt2img(req)
+        const image = Array.isArray(res.images) ? res.images.find(Boolean) : null
+        const info = parseInfo(res.info)
+        results.push({
+          id: testCase.id,
+          ok: hasImage(image),
+          endpoint: testCase.endpoint,
+          checkpoint: testCase.model,
+          module: testCase.unit.module,
+          model: testCase.unit.model,
+          imageKind: String(testCase.unit.image).startsWith('data:') ? 'data-url' : 'raw-base64',
+          imageCount: Array.isArray(res.images) ? res.images.length : 0,
+          imagePrefix: image ? String(image).slice(0, 24) : '',
+          infoSeed: info.seed ?? null
+        })
+      } catch (error) {
+        results.push({
+          id: testCase.id,
+          ok: false,
+          endpoint: testCase.endpoint,
+          checkpoint: testCase.model,
+          module: testCase.unit.module,
+          model: testCase.unit.model,
+          imageKind: String(testCase.unit.image).startsWith('data:') ? 'data-url' : 'raw-base64',
+          error: error?.message || String(error)
+        })
+      }
+    }
+
+    let stoppedAfter = false
+    if (shouldStopAfter) {
+      await api.forge.stop()
+      await waitUntil(async () => {
+        const status = await api.forge.status()
+        return status.kind === 'stopped' ? status : null
+      }, 60000, 'Forge stop')
+      stoppedAfter = true
+    }
+
+    const passing = results.filter((result) => result.ok)
+    return {
+      ok: passing.length > 0,
+      statusBefore: beforeStatus.kind,
+      statusReady: readyStatus.kind,
+      stoppedAfter,
+      port: readyStatus.port ?? null,
+      checkpointCandidates: {
+        sd15: sd15Model.title,
+        sdxl: sdxlModel.title
+      },
+      controlnetCatalog: {
+        modelCount: controlnetModels.length,
+        moduleCount: controlnetModules.length,
+        tileModel: tileModel || null,
+        tileModule: tileModule || null,
+        lineartModel: lineartModel || null,
+        cannyModel: cannyModel || null,
+        cannyModule: cannyModule || null
+      },
+      passingCaseIds: passing.map((result) => result.id),
+      results
+    }
+  })()`
+}
+
+function modelAutoOrganizeExpression() {
+  return `(async () => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const testId = (id) => document.querySelector('[data-testid="' + id + '"]')
+    const click = (element) => {
+      if (!element) throw new Error('Cannot click missing element')
+      element.scrollIntoView({ block: 'center', inline: 'center' })
+      element.click()
+    }
+    const waitUntil = async (predicate, timeoutMs, label) => {
+      const start = Date.now()
+      while (Date.now() - start < timeoutMs) {
+        const value = predicate()
+        if (value) return value
+        await sleep(200)
+      }
+      throw new Error('Timed out waiting for ' + label)
+    }
+
+    click(await waitUntil(() => testId('main-tab-tools'), 10000, 'Tools tab'))
+    await sleep(500)
+    if (!testId('model-auto-organizer-card')) {
+      click(await waitUntil(() => testId('tool-section-auto-organize-toggle'), 10000, 'auto organizer toggle'))
+    }
+    const card = await waitUntil(() => testId('model-auto-organizer-card'), 10000, 'auto organizer card')
+    const previewButton = await waitUntil(() => testId('model-auto-organize-preview'), 10000, 'auto organizer preview')
+    const applyButton = await waitUntil(() => testId('model-auto-organize-apply'), 10000, 'auto organizer apply')
+
+    const plan = await window.api.tools.planModelAutoOrganize()
+    click(previewButton)
+    await waitUntil(() => testId('model-auto-organize-summary'), 20000, 'auto organizer summary')
+    const summary = testId('model-auto-organize-summary')
+    const list = testId('model-auto-organize-list')
+
+    return {
+      ok: Boolean(card) &&
+        Boolean(summary) &&
+        (plan.items.length === 0 || Boolean(list)) &&
+        applyButton.disabled === (plan.totals.movable === 0),
+      sourceDir: plan.sourceDir,
+      totals: plan.totals,
+      ui: {
+        card: Boolean(card),
+        preview: Boolean(previewButton),
+        applyDisabled: Boolean(applyButton.disabled),
+        summary: Boolean(summary),
+        list: Boolean(list),
+        rowCount: card.querySelectorAll('[data-testid^="model-auto-organize-row-"]').length
+      },
+      sample: plan.items.slice(0, 8).map((item) => ({
+        filename: item.filename,
+        action: item.action,
+        kind: item.detectedKind,
+        target: item.targetLabel,
+        reason: item.reason
+      }))
     }
   })()`
 }
@@ -1060,6 +1619,18 @@ function p2FixtureExpression() {
         await window.api.storage.deleteWorkspace(workspace.id)
       }
     }
+    const pickSdxlModelTitle = async () => {
+      const models = await window.api.forge.listModels().catch(() => [])
+      const preferred = models.find((model) =>
+        /novaAnimeXL/i.test([model.title, model.modelName, model.filename].filter(Boolean).join(' '))
+      )
+      const sdxl = preferred ?? models.find((model) =>
+        /sdxl|\\bxl\\b|pony|illustrious|animagine|noobai/i.test(
+          [model.title, model.modelName, model.filename].filter(Boolean).join(' ')
+        )
+      )
+      return sdxl?.title || sdxl?.modelName || snapshot.selectedModelTitle
+    }
 
     let saved = null
     await cleanupTempWorkspaces()
@@ -1071,19 +1642,22 @@ function p2FixtureExpression() {
         return text.includes('ZImageTurbo') && text.includes('cinematic realistic style') && text.includes('hand')
       }, 90000, 'Hands v2.1 metadata')
 
+      const selectedModelTitle = await pickSdxlModelTitle()
       saved = await window.api.storage.saveWorkspace({
         name: tempPrefix + ' ' + Date.now(),
-        snapshot
+        snapshot: { ...snapshot, selectedModelTitle }
       })
       click(await waitUntil(() => testId('main-tab-tools'), 10000, 'Tools tab'))
       click(await waitUntil(() => testId('workspace-restore-' + saved.id), 10000, 'workspace restore button'))
 
-      const requiredWarnings = ['lora-base', 'lora-trigger', 'sdxl-size', 'cn-base-0']
-      await waitUntil(() => requiredWarnings.every((key) => testId('preflight-item-' + key)), 10000, 'P2 warning items')
+      const requiredWarnings = ['lora-base', 'lora-trigger', 'sdxl-size']
+      const requiredBlockers = ['cn-base-0']
+      const requiredItems = [...requiredWarnings, ...requiredBlockers]
+      await waitUntil(() => requiredItems.every((key) => testId('preflight-item-' + key)), 10000, 'P2 preflight items')
       const generateButton = await waitUntil(() => testId('generate-button'), 10000, 'generate button')
       const beforeDisabled = generateButton.disabled
       const beforeReason = generateButton.getAttribute('data-disabled-reason') || ''
-      const preflightBefore = Object.fromEntries(requiredWarnings.map((key) => {
+      const preflightBefore = Object.fromEntries(requiredItems.map((key) => {
         const node = testId('preflight-item-' + key)
         return [key, {
           exists: Boolean(node),
@@ -1108,12 +1682,17 @@ function p2FixtureExpression() {
         deletePartialFile: typeof window.api.tools.deletePartialFile === 'function',
         checkLibraryIntegrity: typeof window.api.tools.checkLibraryIntegrity === 'function'
       }
-      click(await waitUntil(() => testId('tool-section-library-toggle'), 10000, 'library section toggle'))
+      click(await waitUntil(() => testId('main-tab-models'), 10000, 'Models tab'))
+      await waitUntil(() => testId('model-library-workspace'), 10000, 'model library workspace')
       const libraryCard = await waitUntil(() => testId('model-library-card'), 10000, 'model library card')
 
       return {
-        ok: beforeDisabled && Object.values(apiSurface).every(Boolean) && promptSectionVisible,
+        ok: beforeDisabled &&
+          preflightBefore['cn-base-0']?.severity === 'block' &&
+          Object.values(apiSurface).every(Boolean) &&
+          promptSectionVisible,
         workspaceId: saved.id,
+        selectedModelTitle,
         generate: {
           disabledBeforeQuickFix: beforeDisabled,
           disabledReasonBeforeQuickFix: beforeReason
@@ -1236,6 +1815,18 @@ function preflightMismatchExpression() {
         await window.api.storage.deleteWorkspace(workspace.id)
       }
     }
+    const pickSdxlModelTitle = async () => {
+      const models = await window.api.forge.listModels().catch(() => [])
+      const preferred = models.find((model) =>
+        /novaAnimeXL/i.test([model.title, model.modelName, model.filename].filter(Boolean).join(' '))
+      )
+      const sdxl = preferred ?? models.find((model) =>
+        /sdxl|\\bxl\\b|pony|illustrious|animagine|noobai/i.test(
+          [model.title, model.modelName, model.filename].filter(Boolean).join(' ')
+        )
+      )
+      return sdxl?.title || sdxl?.modelName || snapshot.selectedModelTitle
+    }
 
     let saved = null
     await cleanupTempWorkspaces()
@@ -1247,9 +1838,10 @@ function preflightMismatchExpression() {
         return text.includes('ZImageTurbo') && text.includes('cinematic realistic style') && text.includes('hand')
       }, 90000, 'Hands v2.1 metadata')
 
+      const selectedModelTitle = await pickSdxlModelTitle()
       saved = await window.api.storage.saveWorkspace({
         name: tempPrefix + ' ' + Date.now(),
-        snapshot
+        snapshot: { ...snapshot, selectedModelTitle }
       })
       click(await waitUntil(() => testId('main-tab-tools'), 10000, 'Tools tab'))
       click(await waitUntil(() => testId('workspace-restore-' + saved.id), 10000, 'workspace restore button'))
@@ -1266,8 +1858,9 @@ function preflightMismatchExpression() {
         }]
       }))
       return {
-        ok: true,
+        ok: items['cn-base-0']?.severity === 'block',
         workspaceId: saved.id,
+        selectedModelTitle,
         blockers: Number(panel?.getAttribute('data-preflight-blockers')),
         warnings: Number(panel?.getAttribute('data-preflight-warnings')),
         summary: summary?.innerText || '',

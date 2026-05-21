@@ -55,6 +55,10 @@ export function buildWorkspaceSnapshot(
       outputHistoryId: includeImages ? upscale.outputHistoryId : null,
       isRunning: false
     },
+    video: {
+      ...s.video,
+      lastResult: null
+    },
     controlnet,
     regionalPrompter: { ...s.regionalPrompter },
     fabric,

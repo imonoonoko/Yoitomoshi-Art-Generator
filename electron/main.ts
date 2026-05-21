@@ -38,6 +38,12 @@ const startupMetrics: StartupMetrics = {
   forgeLastStatusKind: null
 }
 
+const qaRemoteDebuggingPort = resolveQaRemoteDebuggingPort()
+if (qaRemoteDebuggingPort) {
+  app.commandLine.appendSwitch('remote-debugging-address', '127.0.0.1')
+  app.commandLine.appendSwitch('remote-debugging-port', qaRemoteDebuggingPort)
+}
+
 // --- Portable userdata setup ---------------------------------------------
 //
 // User-facing data lives in <project>/userdata, while Electron's Chromium
@@ -97,6 +103,15 @@ function isAllowedExternalUrl(rawUrl: string): boolean {
   } catch {
     return false
   }
+}
+
+function resolveQaRemoteDebuggingPort(): string | null {
+  const fromEnv = process.env.YOITOMOSHI_REMOTE_DEBUGGING_PORT
+  const value = fromEnv
+  if (!value || !/^\d{2,5}$/.test(value)) return null
+  const port = Number(value)
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null
+  return String(port)
 }
 
 /**

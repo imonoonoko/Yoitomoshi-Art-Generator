@@ -105,7 +105,8 @@ userdata/
 
 | Раздел | Функции |
 |---|---|
-| Генерация | txt2img / img2img / drag-and-drop + Ctrl+V / пакетная |
+| Генерация | txt2img / img2img / Video / Upscale / drag-and-drop + Ctrl+V / пакетная |
+| Модели | Отдельное рабочее пространство для миниатюр моделей/LoRA, метаданных Civitai, избранного и заметок |
 | Параметры | Sampler / Steps / CFG / Size / Seed / Clip Skip / VAE / Denoising / тонкая настройка веса (Ctrl+↑↓) |
 | Промпты | Встроенная библиотека тегов (prompt-all-in-one MIT) + пользовательские / автодополнение / счётчик токенов / подсветка / быстрые пресеты |
 | LoRA | UI карточек / мульти-LoRA / автоподсказки (рекомендации модели +200) / автовставка trigger-words |
@@ -147,13 +148,13 @@ npm run dist
 ## Лицензия и сторонние библиотеки
 
 - Прилагаемый `resources/prompt-library.ja.yaml` — из [Physton/sd-webui-prompt-all-in-one](https://github.com/Physton/sd-webui-prompt-all-in-one) (MIT)
-- Основные зависимости: Electron / electron-vite / Vite 5 / React 19 / Tailwind / Radix UI / Zustand / js-yaml / lucide-react
+- Основные зависимости: Electron / electron-vite / Vite 7 / React 19 / Tailwind / Radix UI / Zustand / js-yaml / lucide-react
 
 ## Известные ограничения
 
 - **Узкий круг распространения**: создавалось для личного пользования, не предназначено для широкой аудитории
 - **NSFW-фильтр только в поиске Civitai**: сама генерация не модерируется (это на стороне Forge / модели)
-- **Метаданные PNG в стиле ComfyUI не поддерживаются**: только формат A1111 (чанк `parameters` / EXIF UserComment)
+- **Метаданные PNG**: поддерживается только формат A1111 / Forge (чанк `parameters` / EXIF UserComment)
 - **Mac/Linux не тестировались**: код кроссплатформенный, но запуск Forge ориентирован на Windows
 
 ## Контакты

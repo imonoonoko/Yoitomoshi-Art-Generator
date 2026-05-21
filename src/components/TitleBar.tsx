@@ -33,6 +33,7 @@ export function TitleBar({
   onModelChanged
 }: Props): JSX.Element {
   const status = useStore((s) => s.forgeStatus)
+  const currentTab = useStore((s) => s.currentTab)
   const models = useStore((s) => s.models)
   const selected = useStore((s) => s.selectedModelTitle)
   const setModels = useStore((s) => s.setModels)
@@ -120,7 +121,9 @@ export function TitleBar({
           onClick={() => setOpen(!open)}
           disabled={status.kind !== 'ready'}
         >
-          <span className="text-xs text-ink-2 mr-1">{t('titlebar.model')}</span>
+          <span className="text-xs text-ink-2 mr-1">
+            {currentTab === 'video' ? t('video.baseCheckpointShort') : t('titlebar.model')}
+          </span>
           <span className="font-mono text-xs truncate max-w-[280px]">
             {selected || t('titlebar.modelNotSelected')}
           </span>
@@ -134,7 +137,8 @@ export function TitleBar({
             {models.length === 0 ? (
               <div className="p-3 text-sm text-ink-2">{t('titlebar.noModels')}</div>
             ) : (
-              models.map((m) => {
+              <>
+              {models.map((m) => {
                 const updateInfo = m.sha256 ? modelUpdates.get(m.sha256) : undefined
                 return (
                   <button
@@ -165,7 +169,8 @@ export function TitleBar({
                     </div>
                   </button>
                 )
-              })
+              })}
+              </>
             )}
           </div>
         )}

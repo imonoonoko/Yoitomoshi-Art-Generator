@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { useStore } from '@/lib/store'
 import { api } from '@/lib/ipc'
 import { useT, t as tStatic } from '@/lib/i18n'
+import { WorkspaceCard } from './ToolsWorkspace'
 
 export function PresetList(): JSX.Element {
   const presets = useStore((s) => s.presets)
@@ -50,20 +51,29 @@ export function PresetList(): JSX.Element {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-2 border-b border-line shrink-0 flex gap-1.5">
-        <input
-          className="input flex-1 text-xs"
-          placeholder={t('preset.namePlaceholder')}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && save()}
-        />
-        <button className="btn btn-primary" onClick={save} title={t('preset.saveTitle')}>
-          <Save className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
       <div className="flex-1 overflow-y-auto">
+        <div className="border-b border-line p-2">
+          <WorkspaceCard compact />
+        </div>
+
+        <div className="border-b border-line p-2">
+          <div className="mb-2 text-xs font-semibold text-ink-1">{t('preset.promptSection')}</div>
+          <div className="flex gap-1.5">
+            <input
+              className="input flex-1 text-xs"
+              placeholder={t('preset.namePlaceholder')}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void save()
+              }}
+            />
+            <button className="btn btn-primary" onClick={() => { void save() }} title={t('preset.saveTitle')}>
+              <Save className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
         {presets.length === 0 ? (
           <div className="p-4 text-sm text-ink-3 text-center">
             {t('preset.empty')}

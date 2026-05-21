@@ -21,6 +21,11 @@ type RawSdModel = {
   sha256: string | null
 }
 
+type ScriptsList = {
+  txt2img: string[]
+  img2img: string[]
+}
+
 /**
  * Thin REST client for Forge's A1111-compatible API.
  * Lives in main process so credentials/tokens are never exposed to renderer.
@@ -69,6 +74,14 @@ export class ForgeApi {
 
   async refreshModels(): Promise<void> {
     await this.req<unknown>('/sdapi/v1/refresh-checkpoints', { method: 'POST' })
+  }
+
+  async listScripts(): Promise<ScriptsList> {
+    const r = await this.req<Partial<ScriptsList>>('/sdapi/v1/scripts')
+    return {
+      txt2img: Array.isArray(r.txt2img) ? r.txt2img : [],
+      img2img: Array.isArray(r.img2img) ? r.img2img : []
+    }
   }
 
   /**

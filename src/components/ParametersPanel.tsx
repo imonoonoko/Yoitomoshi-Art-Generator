@@ -82,7 +82,6 @@ export function ParametersPanel(): JSX.Element {
     recommendation?.baseModel ?? null,
     t
   )
-
   return (
     <div className="grid grid-cols-2 gap-2.5" data-testid="parameters-panel">
       <div className="col-span-2 rounded-md border border-line bg-bg-2/60 p-2">
