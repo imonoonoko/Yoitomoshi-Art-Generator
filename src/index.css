@@ -12,7 +12,7 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-  /* Subtle scrollbar — matches ComfyUI's understated look */
+  /* Subtle scrollbar for the dark desktop UI */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {

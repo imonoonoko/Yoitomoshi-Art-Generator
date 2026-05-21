@@ -6,6 +6,12 @@ import { useT, t as tStatic } from '@/lib/i18n'
 import { getExtensionGuardIssues } from '@/lib/extension-guards'
 import { baseModelsCompatible } from '@/lib/lora-suggest'
 import { approxTokenCount, formatPromptText, promptAppend, promptNeedsFormatting } from '@/lib/prompt-utils'
+import {
+  checkpointPromptContextFromModel,
+  checkpointPromptProfileSuggests,
+  findCheckpointPromptProfile,
+  formatPromptForCheckpoint
+} from '@/lib/checkpoint-prompt-profile'
 import { parseAdapterTokens } from '@/lib/adapter-tokens'
 import { buildDynamicPromptContext, hasDynamicPromptSyntax, resolveDynamicPrompt } from '@/lib/dynamic-prompts'
 import { cn } from '@/lib/utils'
@@ -180,6 +186,32 @@ export function buildPreflightItems(state: AppState): PreflightItem[] {
       messageKey: 'preflight.promptFormatSuggested'
     })
   }
+  const selectedModel = state.models.find((model) => model.title === state.selectedModelTitle) ?? null
+  const checkpointPromptContext = checkpointPromptContextFromModel(selectedModel, state.recommendation)
+  const checkpointPromptProfile = findCheckpointPromptProfile(state.checkpointPromptProfiles, checkpointPromptContext)
+  const positiveModelFormat = formatPromptForCheckpoint(
+    state.prompt,
+    'positive',
+    checkpointPromptContext,
+    checkpointPromptProfile
+  )
+  const negativeModelFormat = formatPromptForCheckpoint(
+    state.negativePrompt,
+    'negative',
+    checkpointPromptContext,
+    checkpointPromptProfile
+  )
+  if (
+    checkpointPromptProfileSuggests(positiveModelFormat.profile) &&
+    (positiveModelFormat.modelChanged || negativeModelFormat.modelChanged)
+  ) {
+    items.push({
+      severity: 'warn',
+      key: 'model-prompt-format',
+      messageKey: 'preflight.modelPromptFormatSuggested',
+      params: { family: positiveModelFormat.family }
+    })
+  }
   if (hasDynamicPromptSyntax(state.prompt) || hasDynamicPromptSyntax(state.negativePrompt)) {
     const context = buildDynamicPromptContext({
       library: state.library,
@@ -236,6 +268,14 @@ export function buildPreflightItems(state: AppState): PreflightItem[] {
     })
   }
   const checkpointBase = state.recommendation?.baseModel ?? inferBaseModelFromTitle(state.selectedModelTitle)
+  if (checkpointBase && isSdxlFamily(checkpointBase) && isLikelySd15Vae(state.selectedVae)) {
+    items.push({
+      severity: 'warn',
+      key: 'vae-base',
+      messageKey: 'preflight.vaeBaseMismatch',
+      params: { name: state.selectedVae }
+    })
+  }
   const incompatibleLoras = state.activeLoras.filter((active) => {
     const meta = state.loraMeta.get(active.name)
     return Boolean(checkpointBase && meta?.baseModel && !baseModelsCompatible(checkpointBase, meta.baseModel))
@@ -297,7 +337,7 @@ export function buildPreflightItems(state: AppState): PreflightItem[] {
         const mismatch = controlNetBaseMismatch(checkpointBase, unit.model)
         if (mismatch) {
           items.push({
-            severity: 'warn',
+            severity: 'block',
             key: `cn-base-${index}`,
             messageKey: 'preflight.controlnetBaseMismatch',
             params: { unit: index + 1, expected: mismatch.expected, actual: mismatch.actual }
@@ -321,7 +361,7 @@ export function buildPreflightItems(state: AppState): PreflightItem[] {
 }
 
 function canQuickFixPreflightItem(key: string): boolean {
-  return key === 'lora-trigger' || key === 'sdxl-size' || key === 'prompt-format'
+  return key === 'lora-trigger' || key === 'sdxl-size' || key === 'prompt-format' || key === 'model-prompt-format'
 }
 
 function quickFixPreflightItem(key: string): void {
@@ -337,6 +377,23 @@ function quickFixPreflightItem(key: string): void {
     if (negativeResult.summary.changed) state.setNegativePrompt(negativeResult.prompt)
     toast.success(tStatic('preflight.fixedPromptFormat'))
     focusPreflightItem(key)
+    return
+  }
+
+  if (key === 'model-prompt-format') {
+    const selectedModel = state.models.find((model) => model.title === state.selectedModelTitle) ?? null
+    const context = checkpointPromptContextFromModel(selectedModel, state.recommendation)
+    const profile = findCheckpointPromptProfile(state.checkpointPromptProfiles, context)
+    const promptResult = formatPromptForCheckpoint(state.prompt, 'positive', context, profile)
+    const negativeResult = formatPromptForCheckpoint(state.negativePrompt, 'negative', context, profile)
+    if (!promptResult.changed && !negativeResult.changed) {
+      focusPreflightItem(key)
+      return
+    }
+    if (promptResult.changed) state.setPrompt(promptResult.prompt)
+    if (negativeResult.changed) state.setNegativePrompt(negativeResult.prompt)
+    toast.success(tStatic('preflight.fixedModelPromptFormat'))
+    focusPreflightItem('prompt-tokens')
     return
   }
 
@@ -393,13 +450,13 @@ interface PreflightTarget {
 
 function preflightTargetForKey(key: string): PreflightTarget | null {
   if (key === 'tab') return { tab: 'txt2img', testIds: ['main-tab-txt2img'] }
-  if (key === 'model' || key === 'vae' || key === 'forge') {
+  if (key === 'model' || key === 'vae' || key === 'vae-base' || key === 'forge') {
     return { sideTab: 'library', testIds: ['side-tab-library', 'side-content-library'] }
   }
   if (key === 'img2img-image') {
     return { tab: 'img2img', testIds: ['input-image-panel', 'input-image-empty'] }
   }
-  if (key === 'prompt-tokens' || key === 'prompt-format' || key.startsWith('adapter-')) {
+  if (key === 'prompt-tokens' || key === 'prompt-format' || key === 'model-prompt-format' || key.startsWith('adapter-')) {
     return { tab: 'txt2img', testIds: ['prompt-positive-section'] }
   }
   if (key === 'dynamic-prompt') {
@@ -454,7 +511,7 @@ function clickByTestId(id: string): void {
 
 function inferBaseModelFromTitle(title: string | null): string | null {
   if (!title) return null
-  if (/sdxl|pony|illustrious|animagine|noobai/i.test(title)) return 'SDXL'
+  if (/sdxl|pony|illustrious|animagine|noobai|[a-z0-9]xl(?:[_\-.]|$)/i.test(title)) return 'SDXL'
   if (/sd\s*1\.5|sd1\.5|sd15|v1-?5/i.test(title)) return 'SD 1.5'
   if (/flux/i.test(title)) return 'FLUX'
   return null
@@ -462,6 +519,12 @@ function inferBaseModelFromTitle(title: string | null): string | null {
 
 function isSdxlFamily(baseModel: string): boolean {
   return /sdxl|pony|illustrious|animagine|noobai/i.test(baseModel)
+}
+
+function isLikelySd15Vae(selectedVae: string): boolean {
+  if (!selectedVae || selectedVae === 'Automatic' || selectedVae === 'None') return false
+  if (/sdxl|pony|illustrious|animagine|noobai|fix.?fp16/i.test(selectedVae)) return false
+  return /sd\s*1\.5|sd1\.5|sd15|vae[-_]?ft[-_]?mse|840000|ema[-_]?pruned/i.test(selectedVae)
 }
 
 function controlNetBaseMismatch(checkpointBase: string, controlNetModel: string): {

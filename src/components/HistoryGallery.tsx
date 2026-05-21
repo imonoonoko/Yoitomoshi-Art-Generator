@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { stripLoraTokens } from '@/lib/lora-suggest'
 import { promptAppend } from '@/lib/prompt-utils'
+import { buildHistoryExperimentGroups, type HistoryExperimentGroup } from '@/lib/history-fingerprint'
 import { DEFAULT_TAGGER_BLACKLIST, DEFAULT_TAGGER_MIN_SCORE, parseTaggerBlacklist } from '@shared/tagger-filter'
 import type { HistoryItem, HistoryLabel, HistoryTagReview, TaggerRunResult } from '@shared/types'
 
@@ -132,6 +133,10 @@ export function HistoryGallery(): JSX.Element {
   const fabricPositiveCount = history.filter((h) => h.label && FABRIC_POSITIVE_LABELS.has(h.label)).length
   const fabricNegativeCount = history.filter((h) => h.label === 'rejected').length
   const reviewingItem = reviewingId ? history.find((item) => item.id === reviewingId) ?? null : null
+  const experimentGroups = useMemo(
+    () => buildHistoryExperimentGroups(filtered, { minItems: 2, maxGroups: 4 }),
+    [filtered]
+  )
   const visibleReviewCandidates = useMemo(() => {
     if (!reviewResult?.ok) return []
     const q = reviewCandidateQuery.trim().toLowerCase()
@@ -436,6 +441,13 @@ export function HistoryGallery(): JSX.Element {
         {compareItems.length === 2 && (
           <PromptDiffPanel left={compareItems[0]} right={compareItems[1]} onClear={() => setCompareIds([])} />
         )}
+        {experimentGroups.length > 0 && (
+          <HistoryExperimentGroups
+            groups={experimentGroups}
+            onRestore={(id) => { void restore(id) }}
+            onCompare={(ids) => setCompareIds(ids.slice(0, 2))}
+          />
+        )}
         {reviewingItem && (
           <div className="rounded-md border border-line bg-bg-2/60 p-2 text-[10px] space-y-2" data-testid="history-tag-review-panel">
             <div className="flex items-center gap-1.5">
@@ -645,12 +657,14 @@ export function HistoryGallery(): JSX.Element {
                       {h.tagReview.acceptedTags.length}
                     </span>
                   ) : null}
-                  {h.dynamicPrompt ? (
-                    <span className="absolute top-8 right-1 z-10 inline-flex items-center gap-1 rounded bg-bg-2/90 px-1.5 py-1 text-[10px] text-accent backdrop-blur" title={`prompt seed ${h.dynamicPrompt.promptSeed}`}>
-                      <Braces className="h-3 w-3" />
-                      {h.dynamicPrompt.usedWildcards.length || 1}
-                    </span>
-                  ) : null}
+                  {h.dynamicPrompt && (
+                    <div className="absolute top-8 right-1 z-10 flex flex-col items-end gap-1">
+                      <span className="inline-flex items-center gap-1 rounded bg-bg-2/90 px-1.5 py-1 text-[10px] text-accent backdrop-blur" title={`prompt seed ${h.dynamicPrompt.promptSeed}`}>
+                        <Braces className="h-3 w-3" />
+                        {h.dynamicPrompt.usedWildcards.length || 1}
+                      </span>
+                    </div>
+                  )}
                   <img
                     src={h.thumbDataUrl}
                     alt={h.prompt.slice(0, 80)}
@@ -752,6 +766,71 @@ function HistorySelect({
         <option key={option} value={option}>{getLabel ? getLabel(option) : option}</option>
       ))}
     </select>
+  )
+}
+
+function HistoryExperimentGroups({
+  groups,
+  onRestore,
+  onCompare
+}: {
+  groups: HistoryExperimentGroup[]
+  onRestore(id: string): void
+  onCompare(ids: string[]): void
+}): JSX.Element {
+  const t = useT()
+  return (
+    <section className="rounded-md border border-line bg-bg-2/60 p-2 space-y-2" data-testid="history-experiment-groups">
+      <div className="flex items-center gap-1.5">
+        <GitCompare className="h-3.5 w-3.5 text-accent" />
+        <span className="text-[11px] font-semibold text-ink-1">{t('history.experimentTitle')}</span>
+        <span className="ml-auto text-[10px] text-ink-3">{t('history.experimentHint')}</span>
+      </div>
+      <div className="grid gap-1.5">
+        {groups.map((group) => (
+          <div key={group.fingerprint} className="rounded border border-line/80 bg-bg-1/70 p-1.5">
+            <div className="mb-1 flex items-center gap-1.5">
+              <div className="min-w-0 flex-1 truncate text-[10px] font-mono text-ink-2" title={group.keyTags.join(', ')}>
+                {group.keyTags.join(', ')}
+              </div>
+              <span className="shrink-0 rounded bg-bg-3 px-1.5 py-0.5 text-[10px] text-ink-3">
+                {t('history.experimentMeta', {
+                  count: group.items.length,
+                  models: group.modelCount,
+                  loras: group.loraStateCount,
+                  seeds: group.seedCount
+                })}
+              </span>
+              <button
+                type="button"
+                className="btn px-1.5 py-0.5 text-[10px]"
+                onClick={() => onCompare(group.items.slice(0, 2).map((item) => item.id))}
+                disabled={group.items.length < 2}
+                title={t('history.experimentCompare')}
+              >
+                {t('history.experimentCompareShort')}
+              </button>
+            </div>
+            <div className="flex gap-1 overflow-x-auto">
+              {group.items.slice(0, 8).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="relative h-12 w-12 shrink-0 overflow-hidden rounded border border-line bg-bg-3"
+                  onClick={() => onRestore(item.id)}
+                  title={new Date(item.createdAt).toLocaleString()}
+                >
+                  <img src={item.thumbDataUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  <span className="absolute bottom-0 inset-x-0 bg-black/70 px-0.5 text-[8px] font-mono text-ink-1">
+                    {item.params.seed >= 0 ? String(item.params.seed).slice(-4) : 'rand'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 

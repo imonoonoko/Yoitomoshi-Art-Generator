@@ -18,6 +18,8 @@
     "qa:dom:preflight": "node scripts/dom-qa.cjs preflight-mismatch",
     "qa:dom:p2": "node scripts/dom-qa.cjs p2-fixture",
     "qa:dom:api": "node scripts/dom-qa.cjs api-surface",
+    "qa:dom:forge-core": "node scripts/dom-qa.cjs forge-core-smoke",
+    "qa:dom:forge-controlnet": "node scripts/dom-qa.cjs forge-controlnet-diagnostic",
     "qa:dom:tagger": "node scripts/dom-qa.cjs tagger-smoke",
     "qa:dom:tagger-blacklist": "node scripts/dom-qa.cjs tagger-blacklist-filter",
     "qa:dom:partial-delete": "node scripts/dom-qa.cjs partial-delete-smoke",
@@ -40,6 +42,7 @@
     "appId": "jp.yoitomoshi.art-generator",
     "productName": "Yoitomoshi Art Generator",
     "directories": {
+      "buildResources": "build",
       "output": "dist"
     },
     "files": [
@@ -65,10 +68,16 @@
       }
     ],
     "win": {
+      "icon": "build/icon.ico",
       "signAndEditExecutable": false,
       "target": [
         "nsis"
       ]
+    },
+    "nsis": {
+      "artifactName": "Yoitomoshi-Art-Generator-Setup-${version}.${ext}",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
     }
   },
   "dependencies": {

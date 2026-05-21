@@ -1,9 +1,10 @@
 import { ipcMain, BrowserWindow, shell, dialog } from 'electron'
-import { copyFile, mkdir, readdir, rename, stat, statfs, unlink } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, readdir, rename, stat, statfs, unlink } from 'node:fs/promises'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { totalmem } from 'node:os'
 import { IPC } from '../src/shared/ipc-channels.js'
 import { DEFAULT_TAGGER_BLACKLIST, DEFAULT_TAGGER_MIN_SCORE, normalizeTaggerFilterToken } from '../src/shared/tagger-filter.js'
 import type { ForgeManager } from './forge-manager.js'
@@ -34,6 +35,11 @@ import type {
   CharacterCompositeIntegrationStatus,
   ControlNetDetectRequest,
   DownloadJob,
+  ForgeVideoSupportInfo,
+  FramePackSupportInfo,
+  GeneratedVideoSaveRequest,
+  GenerationProgress,
+  ImportedExternalVideoResult,
   HuggingFaceSearchOptions,
   HistoryItem,
   HistoryTagReview,
@@ -41,6 +47,9 @@ import type {
   Img2ImgResponse,
   LibraryIntegrityReport,
   ModelFormatConversionResult,
+  ModelAutoOrganizeItem,
+  ModelAutoOrganizePlan,
+  ModelAutoOrganizeResult,
   ModelHashResult,
   LoraUsageRecord,
   ModelMergerEstimate,
@@ -48,6 +57,8 @@ import type {
   ModelMergerRequest,
   ModelMergerResult,
   ModelMergerSupportReport,
+  ModelLibraryCivitaiBatchRequest,
+  ModelLibraryCivitaiBatchResult,
   ModelLibraryEntry,
   ModelLibraryEntryType,
   ModelLibraryRecoveryResult,
@@ -63,6 +74,8 @@ import type {
   TaggerRunTag,
   Txt2ImgRequest,
   Txt2ImgResponse,
+  VideoRuntimeDiagnostics,
+  VideoOutputFormat,
   WorkspaceSnapshot,
   WorkspaceImageReference,
   UpscaleComparisonSaveRequest,
@@ -120,7 +133,11 @@ const MAX_PROMPT_CHARS = 20_000
 const MAX_SCRIPT_ARGS_BYTES = 20 * 1024 * 1024
 const MAX_ALWAYS_ON_BYTES = 120 * 1024 * 1024
 const MAX_IMAGE_BASE64_CHARS = 120 * 1024 * 1024
+const MAX_VIDEO_BASE64_CHARS = 320 * 1024 * 1024
 const MAX_WORKSPACE_IMAGE_BYTES = 80 * 1024 * 1024
+const VIDEO_OUTPUT_FORMATS = new Set<VideoOutputFormat>(['GIF', 'MP4', 'WEBP', 'WEBM'])
+const VIDEO_MODEL_EXTS = new Set(['.ckpt', '.safetensors', '.pt', '.pth'])
+const VIDEO_OUTPUT_FILE_EXTS = new Set(['.gif', '.mp4', '.webp', '.webm'])
 const MODEL_MERGER_LOG_TAIL_LIMIT = 120
 const MODEL_MERGER_DISK_MARGIN_BYTES = 512 * 1024 * 1024
 
@@ -146,7 +163,8 @@ const MODEL_HEALTH_FOLDERS: Array<{
   { id: 'loras', label: 'LoRA', expected: 'lora', parts: ['webui', 'models', 'Lora'] },
   { id: 'vae', label: 'VAE', expected: 'vae', parts: ['webui', 'models', 'VAE'] },
   { id: 'controlnet', label: 'ControlNet', expected: 'controlnet', parts: ['webui', 'models', 'ControlNet'] },
-  { id: 'tagger', label: 'Tagger', expected: 'tagger', parts: ['webui', 'models', 'Tagger'], optional: true }
+  { id: 'tagger', label: 'Tagger', expected: 'tagger', parts: ['webui', 'models', 'Tagger'], optional: true },
+  { id: 'unsupported', label: 'Stable Diffusion非対応', expected: 'unsupported_diffusion', parts: ['webui', 'models', 'Unsupported-StableDiffusion'], optional: true }
 ]
 
 const MODEL_LIBRARY_FOLDERS: Array<{
@@ -155,6 +173,7 @@ const MODEL_LIBRARY_FOLDERS: Array<{
 }> = [
   { type: 'Checkpoint', parts: ['webui', 'models', 'Stable-diffusion'] },
   { type: 'LORA', parts: ['webui', 'models', 'Lora'] },
+  { type: 'LyCORIS', parts: ['webui', 'models', 'LyCORIS'] },
   { type: 'VAE', parts: ['webui', 'models', 'VAE'] },
   { type: 'Controlnet', parts: ['webui', 'models', 'ControlNet'] },
   { type: 'Tagger', parts: ['webui', 'models', 'Tagger'] },
@@ -164,8 +183,14 @@ const MODEL_LIBRARY_FOLDERS: Array<{
   { type: 'Upscaler', parts: ['webui', 'models', 'RealESRGAN'] },
   { type: 'Upscaler', parts: ['webui', 'models', 'SwinIR'] },
   { type: 'Upscaler', parts: ['webui', 'models', 'ScuNET'] },
-  { type: 'Upscaler', parts: ['webui', 'models', 'LDSR'] }
+  { type: 'Upscaler', parts: ['webui', 'models', 'LDSR'] },
+  { type: 'TextEncoder', parts: ['webui', 'models', 'text_encoder'] },
+  { type: 'Unsupported', parts: ['webui', 'models', 'Unsupported-StableDiffusion'] }
 ]
+
+const AUTO_ORGANIZE_SOURCE_PARTS = ['webui', 'models', 'Stable-diffusion']
+const AUTO_ORGANIZE_PARTIAL_EXTS = new Set(['.partial', '.crdownload'])
+const AUTO_ORGANIZE_CANDIDATE_EXTS = new Set([...MODEL_FILE_EXTS, ...AUTO_ORGANIZE_PARTIAL_EXTS])
 
 const PY_CONVERT_TO_SAFETENSORS = `
 import os
@@ -544,6 +569,37 @@ function validateImagePayload(raw: unknown, label: string): string {
   return raw
 }
 
+function validateGeneratedVideoSaveRequest(input: unknown): GeneratedVideoSaveRequest {
+  assertPlainObject(input, 'generated video save request')
+  const format = input.format
+  if (typeof format !== 'string' || !VIDEO_OUTPUT_FORMATS.has(format as VideoOutputFormat)) {
+    throw new Error('Invalid video format')
+  }
+  const base64 = optionalString(input.base64, 'video data', MAX_VIDEO_BASE64_CHARS, {
+    trim: false,
+    allowWhitespace: true
+  })
+  if (!base64) throw new Error('Video data is required')
+  const payload = base64.replace(/^data:[^;]+;base64,/i, '').replace(/\s/g, '')
+  if (!payload || !/^[A-Za-z0-9+/=]+$/.test(payload)) {
+    throw new Error('Invalid video data')
+  }
+
+  return {
+    base64: payload,
+    format: format as VideoOutputFormat,
+    prompt: optionalString(input.prompt, 'prompt', MAX_PROMPT_CHARS, { trim: false, allowWhitespace: true }) ?? '',
+    negativePrompt: optionalString(input.negativePrompt, 'negative prompt', MAX_PROMPT_CHARS, { trim: false, allowWhitespace: true }) ?? '',
+    model: optionalString(input.model, 'model', 500) ?? null,
+    motionModule: optionalString(input.motionModule, 'motion module', 500) ?? '',
+    width: boundedInteger(input.width, 'width', 64, 8192) ?? 0,
+    height: boundedInteger(input.height, 'height', 64, 8192) ?? 0,
+    frames: boundedInteger(input.frames, 'frames', 1, 240) ?? 1,
+    fps: boundedInteger(input.fps, 'fps', 1, 120) ?? 1,
+    seed: boundedInteger(input.seed, 'seed', -1, Number.MAX_SAFE_INTEGER) ?? -1
+  }
+}
+
 function validateControlNetDetectRequest(input: unknown): ControlNetDetectRequest {
   assertPlainObject(input, 'ControlNet detect request')
   const image = validateImagePayload(input.image, 'ControlNet input image')
@@ -578,6 +634,34 @@ function assertAllowedUrl(rawUrl: unknown, label: string, allowedDomains: string
     throw new Error(`Blocked external domain: ${host}`)
   }
   return url.toString()
+}
+
+function normalizeLocalHttpUrl(rawUrl: unknown, label: string): string {
+  const raw = typeof rawUrl === 'string' && rawUrl.trim()
+    ? rawUrl.trim()
+    : 'http://127.0.0.1:8188'
+  if (raw.length > 2048) throw new Error(`Invalid ${label}`)
+  assertNoControlChars(raw, label)
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    throw new Error(`Invalid ${label}`)
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(`${label} must use http or https`)
+  }
+  if (url.username || url.password) {
+    throw new Error(`${label} must not contain credentials`)
+  }
+  const host = url.hostname.toLowerCase()
+  if (!['127.0.0.1', 'localhost', '::1'].includes(host)) {
+    throw new Error(`${label} must point to localhost`)
+  }
+  url.hash = ''
+  url.search = ''
+  url.pathname = url.pathname.replace(/\/+$/, '')
+  return url.toString().replace(/\/$/, '')
 }
 
 function assertAbsolutePath(rawPath: unknown, label: string): string {
@@ -660,6 +744,326 @@ function readDisabledExtensions(forgePath: string): string[] {
   }
 }
 
+async function inspectForgeVideoSupport(
+  storage: Storage,
+  api?: Pick<ForgeApi, 'listScripts'>
+): Promise<ForgeVideoSupportInfo> {
+  const forgePath = resolve(storage.getSettings().forgePath)
+  const extensionsDir = join(forgePath, 'webui', 'extensions')
+  const disabledConfig = new Set(readDisabledExtensions(forgePath).map((name) => name.toLowerCase()))
+  const warnings: string[] = []
+
+  let enabledName: string | null = null
+  let enabledPath: string | null = null
+  let disabledPath: string | null = null
+
+  if (existsSync(extensionsDir)) {
+    const entries = await readdir(extensionsDir, { withFileTypes: true }).catch(() => [])
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      const name = entry.name
+      const normalized = name.toLowerCase()
+      if (!normalized.includes('animatediff')) continue
+      const full = join(extensionsDir, name)
+      if (normalized.endsWith('.disabled')) {
+        disabledPath = disabledPath ?? full
+        continue
+      }
+      enabledName = enabledName ?? name
+      enabledPath = enabledPath ?? full
+    }
+  }
+
+  const configDisabled = enabledName ? disabledConfig.has(enabledName.toLowerCase()) : false
+  const installed = Boolean(enabledPath || disabledPath)
+  const enabled = Boolean(enabledPath && !configDisabled)
+  if (!installed) warnings.push('extension-missing')
+  else if (!enabled) warnings.push('extension-disabled')
+
+  const modelDir = enabledPath
+    ? join(enabledPath, 'model')
+    : disabledPath
+      ? join(disabledPath, 'model')
+      : null
+  const modulePaths = modelDir ? await walkFilesByExt(modelDir, VIDEO_MODEL_EXTS, 120) : []
+  const motionModules = await Promise.all(
+    modulePaths.map(async (path) => ({
+      name: basename(path),
+      path,
+      sizeBytes: await stat(path).then((s) => s.size).catch(() => 0)
+    }))
+  )
+  motionModules.sort((a, b) => a.name.localeCompare(b.name))
+  if (installed && motionModules.length === 0) {
+    warnings.push('motion-module-missing')
+  }
+
+  let apiScript: ForgeVideoSupportInfo['apiScript'] = {
+    checked: false,
+    available: false,
+    txt2imgName: null,
+    img2imgName: null
+  }
+  if (api) {
+    try {
+      const scripts = await api.listScripts()
+      const txt2imgName = scripts.txt2img.find((name) => name.toLowerCase() === 'animatediff') ?? null
+      const img2imgName = scripts.img2img.find((name) => name.toLowerCase() === 'animatediff') ?? null
+      apiScript = {
+        checked: true,
+        available: Boolean(txt2imgName && img2imgName),
+        txt2imgName,
+        img2imgName
+      }
+    } catch {
+      apiScript = {
+        checked: false,
+        available: false,
+        txt2imgName: null,
+        img2imgName: null
+      }
+    }
+  }
+  if (enabled && apiScript.checked && !apiScript.available) {
+    warnings.push('script-missing')
+  }
+
+  return {
+    forgePath,
+    extension: {
+      installed,
+      enabled,
+      name: enabledName,
+      path: enabledPath,
+      disabledPath
+    },
+    modelDir,
+    motionModules,
+    apiScript,
+    warnings
+  }
+}
+
+async function inspectVideoRuntime(storage: Storage): Promise<VideoRuntimeDiagnostics> {
+  const dataRoot = resolve(storage.getDataRoot())
+  const warnings: string[] = []
+  const [gpus, dataRootFreeBytes] = await Promise.all([
+    queryNvidiaSmiGpus().catch(() => {
+      warnings.push('nvidia-smi-unavailable')
+      return []
+    }),
+    getFreeBytes(dataRoot)
+  ])
+  if (dataRootFreeBytes == null) warnings.push('disk-free-unavailable')
+  if (gpus.length === 0 && !warnings.includes('nvidia-smi-unavailable')) {
+    warnings.push('gpu-unavailable')
+  }
+
+  return {
+    checkedAt: Date.now(),
+    dataRoot,
+    dataRootFreeBytes,
+    systemMemoryTotalBytes: totalmem(),
+    gpus,
+    warnings
+  }
+}
+
+async function inspectFramePackSupport(storage: Storage): Promise<FramePackSupportInfo> {
+  const configured = storage.getSettings().framePackPath?.trim()
+  const warnings: string[] = []
+  if (!configured) {
+    return {
+      configuredPath: null,
+      pathExists: false,
+      runBatPath: null,
+      updateBatPath: null,
+      outputDir: null,
+      canLaunch: false,
+      warnings: ['framepack-path-missing']
+    }
+  }
+
+  const root = resolve(configured)
+  const pathExists = existsSync(root)
+  if (!pathExists) warnings.push('framepack-path-missing')
+  const runBatPath = pathExists ? firstExistingFile(root, ['run.bat', 'run_one_click.bat', 'run_framepack.bat']) : null
+  const updateBatPath = pathExists ? firstExistingFile(root, ['update.bat']) : null
+  const outputDir = pathExists ? firstExistingDirectory(root, ['outputs', 'output', 'webui/outputs']) : null
+  if (pathExists && !runBatPath) warnings.push('framepack-run-missing')
+
+  return {
+    configuredPath: root,
+    pathExists,
+    runBatPath,
+    updateBatPath,
+    outputDir,
+    canLaunch: Boolean(runBatPath),
+    warnings
+  }
+}
+
+async function startFramePack(storage: Storage): Promise<FramePackSupportInfo> {
+  const info = await inspectFramePackSupport(storage)
+  if (!info.runBatPath) throw new Error('FramePack run.bat was not found')
+  const result = await shell.openPath(info.runBatPath)
+  if (result) throw new Error(result)
+  return info
+}
+
+async function openFramePackFolder(storage: Storage): Promise<void> {
+  const info = await inspectFramePackSupport(storage)
+  const target = info.outputDir ?? info.configuredPath
+  if (!target) throw new Error('FramePack path is not configured')
+  const result = await shell.openPath(target)
+  if (result) throw new Error(result)
+}
+
+async function importLatestFramePackOutput(storage: Storage): Promise<ImportedExternalVideoResult> {
+  const info = await inspectFramePackSupport(storage)
+  const outputDir = info.outputDir ?? info.configuredPath
+  if (!outputDir) throw new Error('FramePack output folder was not found')
+  const files = await walkFilesByExt(outputDir, VIDEO_OUTPUT_FILE_EXTS, 600)
+  const candidates = await Promise.all(
+    files.map(async (file) => ({
+      file,
+      stats: await stat(file).catch(() => null)
+    }))
+  )
+  const latest = candidates
+    .filter((item): item is { file: string; stats: NonNullable<typeof item.stats> } => Boolean(item.stats?.isFile()))
+    .sort((a, b) => b.stats.mtimeMs - a.stats.mtimeMs)[0]
+  if (!latest) throw new Error('No FramePack video output was found')
+  if (latest.stats.size > MAX_VIDEO_BASE64_CHARS) {
+    throw new Error('FramePack output is too large to import')
+  }
+  const format = videoFormatFromPath(latest.file)
+  const base64 = (await readFile(latest.file)).toString('base64')
+  const saved = storage.saveGeneratedVideo({
+    base64,
+    format,
+    prompt: '',
+    negativePrompt: '',
+    model: 'FramePack',
+    motionModule: 'FramePack',
+    width: 0,
+    height: 0,
+    frames: 0,
+    fps: 0,
+    seed: -1
+  })
+  return {
+    sourcePath: resolve(latest.file),
+    base64,
+    format,
+    saved
+  }
+}
+
+async function fetchJson<T>(url: string, timeoutMs: number): Promise<T> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    return await response.json() as T
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function firstExistingFile(root: string, candidates: string[]): string | null {
+  for (const candidate of candidates) {
+    const full = join(root, ...candidate.split(/[\\/]+/))
+    if (existsSync(full)) return full
+  }
+  return null
+}
+
+function firstExistingDirectory(root: string, candidates: string[]): string | null {
+  for (const candidate of candidates) {
+    const full = join(root, ...candidate.split(/[\\/]+/))
+    if (existsSync(full)) return full
+  }
+  return null
+}
+
+function videoFormatFromPath(file: string): VideoOutputFormat {
+  const ext = extname(file).toLowerCase()
+  if (ext === '.mp4') return 'MP4'
+  if (ext === '.webp') return 'WEBP'
+  if (ext === '.webm') return 'WEBM'
+  return 'GIF'
+}
+
+async function queryNvidiaSmiGpus(): Promise<VideoRuntimeDiagnostics['gpus']> {
+  const query = [
+    'name',
+    'driver_version',
+    'memory.total',
+    'memory.used',
+    'memory.free',
+    'utilization.gpu',
+    'temperature.gpu'
+  ].join(',')
+  const result = await runProcessWithExit('nvidia-smi', [
+    `--query-gpu=${query}`,
+    '--format=csv,noheader,nounits'
+  ])
+  if (result.code !== 0) {
+    throw new Error(result.stderr || result.stdout || 'nvidia-smi failed')
+  }
+  return result.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [name, driverVersion, total, used, free, utilization, temperature] = line.split(',').map((part) => part.trim())
+      return {
+        name: name || 'NVIDIA GPU',
+        driverVersion: driverVersion || null,
+        memoryTotalMiB: parseNullableNumber(total),
+        memoryUsedMiB: parseNullableNumber(used),
+        memoryFreeMiB: parseNullableNumber(free),
+        utilizationGpuPercent: parseNullableNumber(utilization),
+        temperatureC: parseNullableNumber(temperature)
+      }
+    })
+}
+
+function parseNullableNumber(value: string | undefined): number | null {
+  if (!value || value === '[N/A]') return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function runProcessWithExit(command: string, args: string[], timeoutMs = 5000): Promise<{ stdout: string; stderr: string; code: number | null }> {
+  return new Promise((resolveProcess) => {
+    const child = spawn(command, args, { windowsHide: true })
+    let stdout = ''
+    let stderr = ''
+    let settled = false
+    const settle = (code: number | null): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolveProcess({ stdout, stderr, code })
+    }
+    const timer = setTimeout(() => {
+      stderr += `\n${command} timed out after ${timeoutMs}ms`
+      child.kill()
+      settle(null)
+    }, timeoutMs)
+    child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8') })
+    child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8') })
+    child.once('error', (e) => {
+      stderr += `\n${e.message}`
+      settle(null)
+    })
+    child.once('close', (code) => settle(code))
+  })
+}
+
 async function assertForgeRoot(rawPath: unknown): Promise<string> {
   const forgePath = await assertExistingDirectory(rawPath, 'Forge path')
   const launchPy = join(forgePath, 'webui', 'launch.py')
@@ -723,6 +1127,14 @@ async function validateSettingsInput(input: unknown, current: AppSettings): Prom
   }
   assertNoControlChars(forgeExtraArgsRaw, 'Forge extra args')
 
+  const framePackPathRaw = input.framePackPath
+  let framePackPath = ''
+  if (typeof framePackPathRaw === 'string' && framePackPathRaw.trim()) {
+    framePackPath = await assertExistingDirectory(framePackPathRaw, 'FramePack path')
+  } else if (framePackPathRaw != null && framePackPathRaw !== '') {
+    throw new Error('Invalid FramePack path')
+  }
+
   return {
     ...current,
     forgePath,
@@ -731,7 +1143,8 @@ async function validateSettingsInput(input: unknown, current: AppSettings): Prom
     outputDir,
     civitaiApiKey,
     uiLanguage: uiLanguage as AppSettings['uiLanguage'],
-    forgeExtraArgs: forgeExtraArgsRaw.trim()
+    forgeExtraArgs: forgeExtraArgsRaw.trim(),
+    framePackPath
   }
 }
 
@@ -1388,6 +1801,350 @@ async function scanModelHealth(forgePath: string): Promise<{
   }
 }
 
+interface ModelAutoOrganizeTarget {
+  type: ModelLibraryEntryType
+  label: string
+  dir: string
+}
+
+async function planModelAutoOrganize(forgePath: string): Promise<ModelAutoOrganizePlan> {
+  const sourceDir = join(forgePath, ...AUTO_ORGANIZE_SOURCE_PARTS)
+  await mkdir(sourceDir, { recursive: true })
+  const candidates = await walkAutoOrganizeCandidates(sourceDir)
+  const items = await Promise.all(candidates.map((file) => buildAutoOrganizeItem(forgePath, sourceDir, file)))
+  items.sort((a, b) => {
+    const rank = (item: ModelAutoOrganizeItem): number =>
+      item.action === 'move' ? 0 : item.action === 'skip' ? 1 : 2
+    return rank(a) - rank(b) || a.filename.localeCompare(b.filename)
+  })
+  return makeAutoOrganizePlan(sourceDir, items)
+}
+
+async function applyModelAutoOrganize(
+  forgePath: string,
+  api: Pick<ForgeApi, 'refreshModels' | 'refreshVaes'>,
+  storage: Storage
+): Promise<ModelAutoOrganizeResult> {
+  const planned = await planModelAutoOrganize(forgePath)
+  const items: ModelAutoOrganizeItem[] = []
+  const moved: ModelAutoOrganizeResult['moved'] = []
+
+  for (const item of planned.items) {
+    if (item.action !== 'move' || !item.dest || !item.targetType) {
+      items.push(item)
+      continue
+    }
+
+    const source = resolve(item.source)
+    const dest = resolve(item.dest)
+    if (!isSubpath(planned.sourceDir, source)) {
+      items.push({ ...item, action: 'skip', reason: 'Source is outside the Stable-diffusion folder' })
+      continue
+    }
+    if (existsSync(dest)) {
+      items.push({ ...item, action: 'skip', reason: 'Destination already exists' })
+      continue
+    }
+
+    try {
+      await mkdir(dirname(dest), { recursive: true })
+      await moveModelFile(source, dest)
+      const sizeBytes = await stat(dest).then((s) => s.size).catch(() => item.sizeBytes)
+      moved.push({
+        source,
+        dest,
+        sizeBytes,
+        detectedKind: item.detectedKind,
+        adapterSubtype: item.adapterSubtype,
+        targetType: item.targetType
+      })
+      items.push({ ...item, sizeBytes, action: 'move', reason: '移動しました' })
+    } catch (e) {
+      items.push({ ...item, action: 'skip', reason: (e as Error).message })
+    }
+  }
+
+  const refreshed = {
+    checkpoints: false,
+    loras: false,
+    vaes: false
+  }
+  if (moved.length > 0) {
+    try {
+      await api.refreshModels()
+      refreshed.checkpoints = true
+    } catch (e) {
+      console.warn('[models] refresh checkpoints after auto-organize failed:', e)
+    }
+    try {
+      await api.refreshVaes()
+      refreshed.vaes = true
+    } catch (e) {
+      console.warn('[models] refresh VAEs after auto-organize failed:', e)
+    }
+    if (moved.some((item) => item.targetType === 'LORA' || item.targetType === 'LyCORIS')) {
+      try {
+        await scanLoras(forgePath)
+        refreshed.loras = true
+      } catch (e) {
+        console.warn('[models] refresh adapters after auto-organize failed:', e)
+      }
+    }
+    await scanModelLibrary(forgePath, storage).catch((e) => {
+      console.warn('[models] library rescan after auto-organize failed:', e)
+    })
+  }
+
+  return {
+    ...makeAutoOrganizePlan(planned.sourceDir, items),
+    moved,
+    refreshed
+  }
+}
+
+async function walkAutoOrganizeCandidates(root: string): Promise<string[]> {
+  const out: string[] = []
+  if (!existsSync(root)) return out
+  async function visit(dir: string): Promise<void> {
+    const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || entry.name === '__pycache__') continue
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        await visit(full)
+      } else if (entry.isFile() && AUTO_ORGANIZE_CANDIDATE_EXTS.has(extname(entry.name).toLowerCase())) {
+        out.push(full)
+      }
+    }
+  }
+  await visit(root)
+  return out
+}
+
+async function buildAutoOrganizeItem(
+  forgePath: string,
+  sourceDir: string,
+  file: string
+): Promise<ModelAutoOrganizeItem> {
+  const source = resolve(file)
+  const st = await stat(source)
+  const filename = basename(source)
+  const ext = extname(filename).toLowerCase()
+  const base = {
+    source,
+    filename,
+    sizeBytes: st.size
+  }
+
+  if (AUTO_ORGANIZE_PARTIAL_EXTS.has(ext)) {
+    return {
+      ...base,
+      detectedKind: 'unknown',
+      targetType: null,
+      targetLabel: null,
+      targetDir: null,
+      dest: null,
+      action: 'skip',
+      reason: '未完了ダウンロードは移動しません'
+    }
+  }
+
+  if (st.size === 0) {
+    return {
+      ...base,
+      detectedKind: 'unknown',
+      targetType: null,
+      targetLabel: null,
+      targetDir: null,
+      dest: null,
+      action: 'skip',
+      reason: '空ファイルは移動しません'
+    }
+  }
+
+  const inspected = await inspectForAutoOrganize(source)
+  if (inspected.kind === 'unknown') {
+    return {
+      ...base,
+      detectedKind: 'unknown',
+      adapterSubtype: inspected.adapterSubtype,
+      targetType: null,
+      targetLabel: null,
+      targetDir: null,
+      dest: null,
+      action: 'skip',
+      reason: '安全に種別判定できないため移動しません'
+    }
+  }
+
+  const target = autoOrganizeTargetFor(forgePath, inspected.kind, inspected.adapterSubtype)
+  if (!target) {
+    return {
+      ...base,
+      detectedKind: inspected.kind,
+      adapterSubtype: inspected.adapterSubtype,
+      targetType: null,
+      targetLabel: null,
+      targetDir: null,
+      dest: null,
+      action: 'skip',
+      reason: `${describeKind(inspected.kind)} の自動配置先は未定義です`
+    }
+  }
+
+  const dest = join(target.dir, filename)
+  if (isSubpath(target.dir, source)) {
+    return {
+      ...base,
+      detectedKind: inspected.kind,
+      adapterSubtype: inspected.adapterSubtype,
+      targetType: target.type,
+      targetLabel: target.label,
+      targetDir: target.dir,
+      dest: source,
+      action: 'keep',
+      reason: `すでに ${target.label} にあります`
+    }
+  }
+
+  if (!isSubpath(sourceDir, source)) {
+    return {
+      ...base,
+      detectedKind: inspected.kind,
+      adapterSubtype: inspected.adapterSubtype,
+      targetType: target.type,
+      targetLabel: target.label,
+      targetDir: target.dir,
+      dest,
+      action: 'skip',
+      reason: 'Stable-diffusion フォルダ外のため移動しません'
+    }
+  }
+
+  if (existsSync(dest)) {
+    return {
+      ...base,
+      detectedKind: inspected.kind,
+      adapterSubtype: inspected.adapterSubtype,
+      targetType: target.type,
+      targetLabel: target.label,
+      targetDir: target.dir,
+      dest,
+      action: 'skip',
+      reason: '移動先に同名ファイルが既にあります'
+    }
+  }
+
+  return {
+    ...base,
+    detectedKind: inspected.kind,
+    adapterSubtype: inspected.adapterSubtype,
+    targetType: target.type,
+    targetLabel: target.label,
+    targetDir: target.dir,
+    dest,
+    action: 'move',
+    reason: `${describeKind(inspected.kind)} と判定しました`
+  }
+}
+
+async function inspectForAutoOrganize(
+  file: string
+): Promise<{ kind: ModelKind; adapterSubtype?: ModelAutoOrganizeItem['adapterSubtype'] }> {
+  const ext = extname(file).toLowerCase()
+  if (ext === '.safetensors') {
+    const inspected = await inspectSafetensors(file)
+    return { kind: inspected.kind, adapterSubtype: inspected.adapterSubtype }
+  }
+  if (ext === '.vae') {
+    return { kind: 'vae' }
+  }
+  return { kind: 'unknown' }
+}
+
+function autoOrganizeTargetFor(
+  forgePath: string,
+  kind: ModelKind,
+  adapterSubtype?: ModelAutoOrganizeItem['adapterSubtype']
+): ModelAutoOrganizeTarget | null {
+  switch (kind) {
+    case 'checkpoint':
+      return {
+        type: 'Checkpoint',
+        label: 'Checkpoints',
+        dir: join(forgePath, 'webui', 'models', 'Stable-diffusion')
+      }
+    case 'lora': {
+      const lycorisLike = adapterSubtype && ['LoHa', 'LoKr', 'LyCORIS'].includes(adapterSubtype)
+      return {
+        type: lycorisLike ? 'LyCORIS' : 'LORA',
+        label: lycorisLike ? 'LyCORIS' : 'LoRA',
+        dir: join(forgePath, 'webui', 'models', lycorisLike ? 'LyCORIS' : 'Lora')
+      }
+    }
+    case 'vae':
+      return {
+        type: 'VAE',
+        label: 'VAE',
+        dir: join(forgePath, 'webui', 'models', 'VAE')
+      }
+    case 'controlnet':
+      return {
+        type: 'Controlnet',
+        label: 'ControlNet',
+        dir: join(forgePath, 'webui', 'models', 'ControlNet')
+      }
+    case 'embedding':
+      return {
+        type: 'Embedding',
+        label: 'Embeddings',
+        dir: join(forgePath, 'webui', 'embeddings')
+      }
+    case 'text_encoder':
+      return {
+        type: 'TextEncoder',
+        label: 'Text Encoder',
+        dir: join(forgePath, 'webui', 'models', 'text_encoder')
+      }
+    case 'unsupported_diffusion':
+      return {
+        type: 'Unsupported',
+        label: 'Stable Diffusion非対応',
+        dir: join(forgePath, 'webui', 'models', 'Unsupported-StableDiffusion')
+      }
+    case 'tagger':
+    case 'unknown':
+      return null
+  }
+}
+
+function makeAutoOrganizePlan(sourceDir: string, items: ModelAutoOrganizeItem[]): ModelAutoOrganizePlan {
+  return {
+    sourceDir,
+    scannedAt: Date.now(),
+    totals: {
+      scanned: items.length,
+      movable: items.filter((item) => item.action === 'move').length,
+      kept: items.filter((item) => item.action === 'keep').length,
+      skipped: items.filter((item) => item.action === 'skip').length,
+      totalBytes: items.reduce((sum, item) => sum + item.sizeBytes, 0),
+      movableBytes: items.reduce((sum, item) => sum + (item.action === 'move' ? item.sizeBytes : 0), 0)
+    },
+    items
+  }
+}
+
+async function moveModelFile(source: string, dest: string): Promise<void> {
+  try {
+    await rename(source, dest)
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code
+    if (code !== 'EXDEV') throw e
+    await copyFile(source, dest)
+    await unlink(source)
+  }
+}
+
 function summarizeModelLibrary(
   root: string,
   entries: ModelLibraryEntry[],
@@ -1470,6 +2227,8 @@ async function scanModelLibrary(forgePath: string, storage: Storage): Promise<Mo
         lastModifiedAt,
         sourceMeta: previous?.sourceMeta,
         previewPath: previous?.previewPath,
+        favorite: previous?.favorite ?? false,
+        notes: previous?.notes ?? '',
         civitai: previous?.civitai
       })
     }
@@ -1827,6 +2586,156 @@ async function hashModelLibraryEntry(storage: Storage, rawId: string): Promise<M
   return { entryId: entry.id, path: safePath, sha256 }
 }
 
+function updateModelLibraryEntry(storage: Storage, rawId: string, rawPatch: unknown): ModelLibraryEntry {
+  const id = validateModelLibraryEntryId(rawId)
+  const entry = storage.listModelLibrary().find((item) => item.id === id)
+  if (!entry) throw new Error('Model library entry not found')
+  if (!rawPatch || typeof rawPatch !== 'object' || Array.isArray(rawPatch)) {
+    throw new Error('Invalid model library update')
+  }
+  const patch = rawPatch as Record<string, unknown>
+  const next: ModelLibraryEntry = { ...entry }
+  if ('favorite' in patch) {
+    if (typeof patch.favorite !== 'boolean') throw new Error('Invalid favorite flag')
+    next.favorite = patch.favorite
+  }
+  if ('notes' in patch) {
+    next.notes = optionalString(patch.notes, 'model notes', 4000, {
+      allowWhitespace: true,
+      trim: false
+    }) ?? ''
+  }
+  return storage.upsertModelLibraryEntry(next)
+}
+
+async function refreshModelLibraryCivitai(storage: Storage, rawId: string): Promise<ModelLibraryEntry> {
+  const id = validateModelLibraryEntryId(rawId)
+  let entry = storage.listModelLibrary().find((item) => item.id === id)
+  if (!entry) throw new Error('Model library entry not found')
+  const safePath = await assertExistingFile(entry.path, 'model file', MODEL_FILE_EXTS)
+  const settings = storage.getSettings()
+  const forgeRoot = resolve(settings.forgePath, 'webui')
+  if (!isSubpath(forgeRoot, safePath)) {
+    throw new Error('Model library entry is outside the Forge folder')
+  }
+  if (!entry.sha256) {
+    await hashModelLibraryEntry(storage, id)
+    entry = storage.listModelLibrary().find((item) => item.id === id) ?? entry
+  }
+  if (!entry.sha256) throw new Error('SHA-256 could not be computed')
+  const rec = await fetchByHash(entry.sha256, settings.civitaiApiKey)
+  if (!rec) throw new Error('Civitai metadata was not found for this file')
+
+  const sourceMeta: NonNullable<ModelLibraryEntry['sourceMeta']> = {
+    ...(entry.sourceMeta ?? { provider: 'civitai' as const }),
+    provider: 'civitai',
+    name: rec.modelName,
+    creator: rec.creator ?? entry.sourceMeta?.creator,
+    pageUrl: rec.civitaiUrl ?? entry.sourceMeta?.pageUrl,
+    thumbnailUrl: rec.thumbnailUrl,
+    expectedSha256: entry.sha256,
+    modelId: rec.modelId,
+    modelVersionId: rec.modelVersionId,
+    versionName: rec.versionName,
+    baseModel: rec.baseModel,
+    description: rec.description ?? entry.sourceMeta?.description ?? null,
+    tags: rec.tags ?? entry.sourceMeta?.tags ?? []
+  }
+  let previewPath = entry.previewPath ?? sourceMeta.previewPath ?? null
+  if (rec.thumbnailUrl) {
+    previewPath = await cacheModelPreview(storage, entry.id, rec.thumbnailUrl).catch(() => previewPath)
+  }
+  return storage.upsertModelLibraryEntry({
+    ...entry,
+    source: 'civitai',
+    sourceMeta: { ...sourceMeta, previewPath },
+    previewPath,
+    civitai: {
+      url: rec.civitaiUrl ?? undefined,
+      expectedSha256: entry.sha256
+    }
+  })
+}
+
+async function refreshModelLibraryCivitaiBatch(
+  storage: Storage,
+  rawRequest: unknown
+): Promise<ModelLibraryCivitaiBatchResult> {
+  const req = validateModelLibraryCivitaiBatchRequest(rawRequest)
+  const all = storage.listModelLibrary()
+  const byId = new Map(all.map((entry) => [entry.id, entry]))
+  const targets = req.entryIds
+    ? req.entryIds.map((id) => byId.get(id)).filter((entry): entry is ModelLibraryEntry => Boolean(entry))
+    : all
+  const limited = targets.slice(0, req.limit)
+  const errors: ModelLibraryCivitaiBatchResult['errors'] = []
+  let updated = 0
+  let skipped = Math.max(0, targets.length - limited.length)
+  let notFound = 0
+  let failed = 0
+  let attempted = 0
+
+  for (const entry of limited) {
+    if (req.onlyMissing && !needsCivitaiMetadata(entry)) {
+      skipped += 1
+      continue
+    }
+    attempted += 1
+    try {
+      await refreshModelLibraryCivitai(storage, entry.id)
+      updated += 1
+    } catch (e) {
+      const message = (e as Error).message
+      if (/404|not found|見つか/i.test(message)) notFound += 1
+      else failed += 1
+      errors.push({ entryId: entry.id, name: entry.name, message })
+    }
+    await delay(180)
+  }
+
+  return {
+    requested: targets.length,
+    attempted,
+    updated,
+    skipped,
+    notFound,
+    failed,
+    errors: errors.slice(0, 30),
+    entries: storage.listModelLibrary()
+  }
+}
+
+function validateModelLibraryCivitaiBatchRequest(raw: unknown): {
+  entryIds: string[] | undefined
+  onlyMissing: boolean
+  limit: number
+} {
+  const input = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? raw as Record<string, unknown>
+    : {}
+  const entryIds = Array.isArray(input.entryIds)
+    ? input.entryIds.map((id) => validateModelLibraryEntryId(id)).slice(0, 300)
+    : undefined
+  const limit = boundedNumber(input.limit, 'Civitai batch limit', 1, 300) ?? 80
+  return {
+    entryIds,
+    onlyMissing: input.onlyMissing !== false,
+    limit
+  }
+}
+
+function needsCivitaiMetadata(entry: ModelLibraryEntry): boolean {
+  if (entry.sourceMeta?.provider !== 'civitai') return true
+  if (!entry.sourceMeta.modelId || !entry.sourceMeta.modelVersionId) return true
+  if (!entry.sourceMeta.description && !entry.notes) return true
+  if (!entry.previewPath && !entry.sourceMeta.previewPath) return true
+  return false
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 async function recoverModelLibrary(storage: Storage): Promise<ModelLibraryRecoveryResult> {
   const settings = storage.getSettings()
   await scanModelLibrary(settings.forgePath, storage).catch(() => null)
@@ -1871,13 +2780,16 @@ async function recoverModelLibrary(storage: Storage): Promise<ModelLibraryRecove
           sourceMeta: {
             provider: 'civitai',
             name: rec.modelName,
+            creator: rec.creator ?? undefined,
             pageUrl: rec.civitaiUrl ?? undefined,
             thumbnailUrl: rec.thumbnailUrl,
             expectedSha256: next.sha256,
             modelId: rec.modelId,
             modelVersionId: rec.modelVersionId,
             versionName: rec.versionName,
-            baseModel: rec.baseModel
+            baseModel: rec.baseModel,
+            description: rec.description ?? null,
+            tags: rec.tags ?? []
           }
         })
         metadataRefetched += 1
@@ -2505,6 +3417,8 @@ export function registerIpcHandlers(deps: {
   })
   ipcMain.handle(IPC.forgeListSamplers, () => api.listSamplers())
   ipcMain.handle(IPC.forgeListSchedulers, () => api.listSchedulers())
+  ipcMain.handle(IPC.forgeInspectVideoSupport, () => inspectForgeVideoSupport(storage, api))
+  ipcMain.handle(IPC.forgeInspectVideoRuntime, () => inspectVideoRuntime(storage))
   // Forge ≥ f2 doesn't expose /sdapi/v1/loras, so we scan the filesystem
   // directly. Both list and refresh do the same thing — there's no caching to
   // bust on the Forge side, our scan is the source of truth.
@@ -2533,6 +3447,12 @@ export function registerIpcHandlers(deps: {
   ipcMain.handle(IPC.forgeExtraSingleImage, async (_e, opts: Parameters<typeof api.extraSingleImage>[0]) => {
     return api.extraSingleImage(validateExtraSingleImageOptions(opts))
   })
+
+  // External video backends ---------------------------------------------
+  ipcMain.handle(IPC.framePackInspect, () => inspectFramePackSupport(storage))
+  ipcMain.handle(IPC.framePackStart, () => startFramePack(storage))
+  ipcMain.handle(IPC.framePackOpenFolder, () => openFramePackFolder(storage))
+  ipcMain.handle(IPC.framePackImportLatest, () => importLatestFramePackOutput(storage))
 
   // Tools tab — local filesystem inspection (no Forge required).
   ipcMain.handle(IPC.toolsPickModelFile, async () => {
@@ -2585,8 +3505,23 @@ export function registerIpcHandlers(deps: {
   ipcMain.handle(IPC.toolsCheckLibraryIntegrity, () => checkLibraryIntegrity(storage))
   ipcMain.handle(IPC.toolsDeletePartialFile, (_e, path: string) => deleteLibraryPartialFile(storage, path))
   ipcMain.handle(IPC.toolsHashModelLibraryEntry, (_e, id: string) => hashModelLibraryEntry(storage, id))
+  ipcMain.handle(IPC.toolsUpdateModelLibraryEntry, (_e, id: string, patch: unknown) =>
+    updateModelLibraryEntry(storage, id, patch)
+  )
+  ipcMain.handle(IPC.toolsRefreshModelLibraryCivitai, (_e, id: string) =>
+    refreshModelLibraryCivitai(storage, id)
+  )
+  ipcMain.handle(IPC.toolsRefreshModelLibraryCivitaiBatch, (_e, req) =>
+    refreshModelLibraryCivitaiBatch(storage, req)
+  )
   ipcMain.handle(IPC.toolsRunTagger, (_e, req) => runLocalTagger(storage, req))
   ipcMain.handle(IPC.toolsRecoverModelLibrary, () => recoverModelLibrary(storage))
+  ipcMain.handle(IPC.toolsPlanModelAutoOrganize, () =>
+    planModelAutoOrganize(storage.getSettings().forgePath)
+  )
+  ipcMain.handle(IPC.toolsApplyModelAutoOrganize, () =>
+    applyModelAutoOrganize(storage.getSettings().forgePath, api, storage)
+  )
   ipcMain.handle(IPC.toolsConvertModelFormat, () => convertModelFormat(storage, win))
   ipcMain.handle(IPC.toolsInspectMergerSupport, () =>
     inspectMergerSupport(storage.getSettings().forgePath)
@@ -2616,6 +3551,10 @@ export function registerIpcHandlers(deps: {
       stop = true
       await poller
     })
+  }
+
+  function emitGenerationProgress(progress: GenerationProgress): void {
+    if (!win.isDestroyed()) win.webContents.send(IPC.forgeProgressUpdate, progress)
   }
 
   ipcMain.handle(
@@ -2719,6 +3658,16 @@ export function registerIpcHandlers(deps: {
     const dir = join(settings.forgePath, 'webui', 'models', 'Stable-diffusion')
     await mkdir(dir, { recursive: true })
     shell.openPath(dir)
+  })
+
+  ipcMain.handle(IPC.forgeOpenVideoModelFolder, async () => {
+    const support = await inspectForgeVideoSupport(storage, api)
+    if (!support.modelDir) {
+      throw new Error('AnimateDiff extension folder was not found')
+    }
+    await mkdir(support.modelDir, { recursive: true })
+    const r = await shell.openPath(support.modelDir)
+    if (r) throw new Error(r)
   })
 
   // LoRA equivalents — same flow as checkpoint import but pointed at the
@@ -2943,10 +3892,10 @@ export function registerIpcHandlers(deps: {
     const settings = storage.getSettings()
     const sha = await hashModelFile(lora.path)
     const cached = storage.getLoraCivitai(sha)
-    if (cached) return cached
+    if (cached?.descriptionSource !== undefined && cached.recommendedPrompts !== undefined) return cached
     const fetched = await fetchLoraByHash(sha, settings.civitaiApiKey)
     if (fetched) storage.saveLoraCivitai(sha, fetched)
-    return fetched
+    return fetched ?? cached
   })
 
   ipcMain.handle(IPC.civitaiSearch, async (_e, opts: CivitaiSearchOptions) => {
@@ -3277,6 +4226,22 @@ export function registerIpcHandlers(deps: {
   ipcMain.handle(IPC.storageSetLoraFavorites, (_e, names: string[]) =>
     storage.setLoraFavorites(names)
   )
+  ipcMain.handle(IPC.storageListLoraPromptOverrides, () => storage.listLoraPromptOverrides())
+  ipcMain.handle(IPC.storageSaveLoraPromptOverride, (_e, input) =>
+    storage.saveLoraPromptOverride(input)
+  )
+  ipcMain.handle(IPC.storageDeleteLoraPromptOverride, (_e, id: string) =>
+    storage.deleteLoraPromptOverride(id)
+  )
+  ipcMain.handle(IPC.storageListCheckpointPromptProfiles, () =>
+    storage.listCheckpointPromptProfiles()
+  )
+  ipcMain.handle(IPC.storageSaveCheckpointPromptProfile, (_e, input) =>
+    storage.saveCheckpointPromptProfile(input)
+  )
+  ipcMain.handle(IPC.storageDeleteCheckpointPromptProfile, (_e, id: string) =>
+    storage.deleteCheckpointPromptProfile(id)
+  )
   ipcMain.handle(IPC.storageRecordLoraUsage, (_e, rec: LoraUsageRecord) => {
     storage.recordLoraUsage(rec)
   })
@@ -3307,6 +4272,9 @@ export function registerIpcHandlers(deps: {
   ipcMain.handle(IPC.storageSaveFabricFeedbackImage, (_e, imageDataUrl: string) =>
     saveFabricFeedbackImage(storage, imageDataUrl)
   )
+  ipcMain.handle(IPC.storageSaveGeneratedVideo, (_e, input: GeneratedVideoSaveRequest) =>
+    storage.saveGeneratedVideo(validateGeneratedVideoSaveRequest(input))
+  )
 
   // Library --------------------------------------------------------------
   ipcMain.handle(IPC.libraryLoad, () => ({
@@ -3329,15 +4297,29 @@ export function registerIpcHandlers(deps: {
   ipcMain.handle(IPC.showItemInFolder, async (_e, p: string) => {
     const target = assertAbsolutePath(p, 'item path')
     const historyRoot = resolve(storage.getDataRoot(), 'history')
-    const outputDir = storage.getSettings().outputDir
+    const videosRoot = resolve(storage.getDataRoot(), 'videos')
+    const settings = storage.getSettings()
+    const outputDir = settings.outputDir
+    const forgeWebuiRoot = resolve(settings.forgePath, 'webui')
     const allowedRoots = [
       historyRoot,
+      videosRoot,
+      resolve(storage.getDataRoot(), 'model-library'),
+      resolve(forgeWebuiRoot, 'models'),
+      resolve(forgeWebuiRoot, 'embeddings'),
+      resolve(forgeWebuiRoot, 'outputs'),
       ...(outputDir ? [outputDir] : [])
     ]
     if (!allowedRoots.some((root) => isSubpath(root, target))) {
       throw new Error('Path is outside allowed app output folders')
     }
     if (existsSync(target)) {
+      const st = await stat(target).catch(() => null)
+      if (st?.isDirectory()) {
+        const r = await shell.openPath(target)
+        if (r) throw new Error(r)
+        return
+      }
       shell.showItemInFolder(target)
       return
     }

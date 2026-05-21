@@ -9,6 +9,7 @@ export type ModelKind =
   | 'controlnet'
   | 'tagger'
   | 'text_encoder'
+  | 'unsupported_diffusion'
   | 'unknown'
 
 export interface InspectedModel {
@@ -108,6 +109,8 @@ function classify(
   let vaeOnly = 0
   let textEnc = 0
   let embeddingHits = 0
+  let animaLike = 0
+  let transformerLike = 0
 
   for (const k of keys) {
     if (/^lora_(unet|te[12]?)/i.test(k) ||
@@ -123,6 +126,10 @@ function classify(
       textEnc++
     } else if (k === 'string_to_param' || /^emb_params/.test(k)) {
       embeddingHits++
+    } else if (/^net\.(blocks|llm_adapter)\./i.test(k)) {
+      animaLike++
+    } else if (/^(double_blocks|single_blocks|transformer_blocks|img_in|txt_in|time_in|vector_in|final_layer)\./i.test(k)) {
+      transformerLike++
     }
   }
 
@@ -135,6 +142,13 @@ function classify(
   // Checkpoints embed a VAE so they have BOTH diffusion_model.* and first_stage_model.*
   // keys. Distinguish by checking whether diffusion_model is present at all.
   if (checkpoint / total > 0.2) return 'checkpoint'
+
+  // Anima/Flux-style DiT files are full generators, but not A1111/Forge
+  // Stable Diffusion checkpoints.
+  if ((animaLike / total > 0.2 && keys.some((k) => /^net\.llm_adapter\./i.test(k))) ||
+      transformerLike / total > 0.2) {
+    return 'unsupported_diffusion'
+  }
 
   if (controlnet / total > 0.2 || (controlnet > 0 && checkpoint === 0)) return 'controlnet'
 
@@ -180,6 +194,7 @@ export function describeKind(kind: ModelKind): string {
     case 'tagger': return 'Tagger'
     case 'embedding': return 'Textual Inversion (Embedding)'
     case 'text_encoder': return 'テキストエンコーダ'
+    case 'unsupported_diffusion': return 'Stable Diffusion非対応の拡散モデル'
     case 'unknown': return '不明な形式'
   }
 }

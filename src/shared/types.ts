@@ -62,6 +62,9 @@ export interface CivitaiRecommended {
   /** Civitai parent model ID — used for update-check (compare latest version against ours). */
   modelId: number
   baseModel: string             // "SD 1.5" | "SDXL 1.0" | "Pony" | "Illustrious" etc.
+  creator?: string | null
+  description?: string | null
+  tags?: string[]
   trainedWords: string[]        // trigger tokens
   // Inferred from Civitai's images metadata (median across non-NSFW samples)
   suggested: {
@@ -179,6 +182,11 @@ export interface LoraCivitaiMetadata {
   versionName: string
   baseModel: string
   trainedWords: string[]        // trigger words to insert with this LoRA
+  /** Plain-text Civitai model description, used to mine usage hints. */
+  description?: string | null
+  descriptionSource?: 'model' | 'version' | 'none'
+  /** Positive prompt snippets inferred from the description's recommended prompt sections. */
+  recommendedPrompts?: string[]
   /** Civitai's category tags ("character", "style", "concept", "clothing"…) */
   tags: string[]
   files?: CivitaiSearchFile[]
@@ -209,6 +217,59 @@ export interface ActiveLora {
   weight: number                // 0.0..1.5 typical, slider clamped to 0..2
   /** Trigger words captured at activation; used for auto-insertion / removal. */
   triggerWords: string[]
+}
+
+export interface LoraPromptOverride {
+  /** Stable storage key. Prefer sha256 when available, otherwise name/path fallback. */
+  id: string
+  loraName: string
+  loraAlias?: string
+  loraPath?: string
+  loraSha256?: string | null
+  /** Manual positive prompt snippets to append when this LoRA is selected. */
+  positivePrompt: string
+  /** Optional manual negative prompt snippets to append when this LoRA is selected. */
+  negativePrompt: string
+  /** Optional default LoRA weight. Null means use the app default. */
+  weight: number | null
+  /** Optional generation defaults to apply when this LoRA is selected. */
+  sampler?: string
+  steps?: number | null
+  cfgScale?: number | null
+  clipSkip?: number | null
+  autoApply: boolean
+  updatedAt: number
+}
+
+export type CheckpointPromptFamily =
+  | 'pony'
+  | 'illustrious'
+  | 'noobai'
+  | 'animagine'
+  | 'sdxl'
+  | 'sd15'
+  | 'flux'
+  | 'custom'
+
+export type CheckpointPromptProfileMode = 'manual' | 'suggest' | 'auto'
+
+export interface CheckpointPromptProfile {
+  /** Stable storage key. Prefer sha256 when available, otherwise checkpoint name fallback. */
+  id: string
+  checkpointTitle: string
+  checkpointName?: string
+  checkpointPath?: string
+  checkpointSha256?: string | null
+  family: CheckpointPromptFamily
+  /** Tags placed at the beginning of the positive prompt. */
+  positivePrefix: string[]
+  /** Tags appended after the user's positive prompt. */
+  positiveAppend: string[]
+  /** Tags appended to the negative prompt. */
+  negativeAppend: string[]
+  /** manual = saved for button use only; suggest = Preflight suggests; auto = reserved for future explicit auto mode. */
+  mode: CheckpointPromptProfileMode
+  updatedAt: number
 }
 
 /** Scored LoRA candidate for auto-suggestion. */
@@ -247,6 +308,63 @@ export interface LoraUsageRecord {
  *   }
  */
 export type AlwaysOnScripts = Record<string, { args: unknown[] }>
+
+export type VideoOutputFormat = 'GIF' | 'MP4' | 'WEBP' | 'WEBM'
+
+export interface VideoMotionModule {
+  name: string
+  path: string
+  sizeBytes: number
+}
+
+export interface ForgeVideoSupportInfo {
+  forgePath: string
+  extension: {
+    installed: boolean
+    enabled: boolean
+    name: string | null
+    path: string | null
+    disabledPath: string | null
+  }
+  modelDir: string | null
+  motionModules: VideoMotionModule[]
+  apiScript: {
+    checked: boolean
+    available: boolean
+    txt2imgName: string | null
+    img2imgName: string | null
+  }
+  warnings: string[]
+}
+
+export interface VideoRuntimeGpuInfo {
+  name: string
+  driverVersion: string | null
+  memoryTotalMiB: number | null
+  memoryUsedMiB: number | null
+  memoryFreeMiB: number | null
+  utilizationGpuPercent: number | null
+  temperatureC: number | null
+}
+
+export interface VideoRuntimeDiagnostics {
+  checkedAt: number
+  dataRoot: string
+  dataRootFreeBytes: number | null
+  systemMemoryTotalBytes: number | null
+  gpus: VideoRuntimeGpuInfo[]
+  warnings: string[]
+}
+
+export interface FramePackSupportInfo {
+  configuredPath: string | null
+  pathExists: boolean
+  runBatPath: string | null
+  updateBatPath: string | null
+  outputDir: string | null
+  canLaunch: boolean
+  warnings: string[]
+}
 
 export interface Txt2ImgRequest {
   prompt: string
@@ -330,6 +448,8 @@ export interface GenerationProgress {
     job: string
   }
   current_image: string | null  // base64 preview
+  current_image_mime?: string | null
+  current_image_node_id?: string | null
   textinfo: string | null
 }
 
@@ -349,11 +469,48 @@ export interface HistoryItem {
     sampler: string
     scheduler?: string
     seed: number
+    batchSize?: number
+    imageIndex?: number
+    imageCount?: number
+    iterationIndex?: number
+    iterationCount?: number
     model: string | null
     vae?: string | null
     clipSkip?: number
     denoisingStrength?: number
     activeLoras?: ActiveLora[]
+    upscale?: {
+      engine: 'forge'
+      method: string
+      mode?: string | null
+      scale: number
+      upscaler?: string | null
+      outputWidth?: number | null
+      outputHeight?: number | null
+      tileWidth?: number | null
+      tileHeight?: number | null
+      tileOverlap?: number | null
+    } | null
+    controlNet?: {
+      module: string
+      model: string
+      resolvedModel?: string
+      weight: number
+      guidanceStart: number
+      guidanceEnd: number
+      ignoredUnitCount?: number
+      unitCount?: number
+      units?: Array<{
+        module: string
+        model: string
+        resolvedModel?: string
+        imageMode?: 'canny' | 'preprocessed'
+        weight: number
+        guidanceStart: number
+        guidanceEnd: number
+      }>
+      warnings?: string[]
+    } | null
   }
   imagePath: string          // absolute path on disk
   thumbDataUrl: string       // small embedded thumbnail
@@ -430,6 +587,7 @@ export interface AppSettings {
   civitaiApiKey: string | null         // optional, for higher rate limit
   uiLanguage: UiLanguage
   forgeExtraArgs: string               // appended to launch command
+  framePackPath: string                // optional external FramePack one-click/source folder
 }
 
 export interface ModelImportResult {
@@ -654,6 +812,9 @@ export type ModelLibraryEntryType =
   | CivitaiAssetType
   | 'Upscaler'
   | 'Embedding'
+  | 'LyCORIS'
+  | 'TextEncoder'
+  | 'Unsupported'
   | 'Unknown'
 
 export type ModelSourceProvider =
@@ -676,6 +837,8 @@ export interface ModelSourceMetadata {
   baseModel?: string
   repoId?: string
   filePath?: string
+  description?: string | null
+  tags?: string[]
 }
 
 export interface ModelLibraryEntry {
@@ -691,10 +854,33 @@ export interface ModelLibraryEntry {
   lastModifiedAt: number | null
   sourceMeta?: ModelSourceMetadata
   previewPath?: string | null
+  favorite?: boolean
+  notes?: string
   civitai?: {
     url?: string
     expectedSha256?: string | null
   }
+}
+
+export interface ModelLibraryCivitaiBatchRequest {
+  entryIds?: string[]
+  onlyMissing?: boolean
+  limit?: number
+}
+
+export interface ModelLibraryCivitaiBatchResult {
+  requested: number
+  attempted: number
+  updated: number
+  skipped: number
+  notFound: number
+  failed: number
+  errors: Array<{
+    entryId: string
+    name: string
+    message: string
+  }>
+  entries: ModelLibraryEntry[]
 }
 
 export interface ModelLibrarySummary {
@@ -745,6 +931,65 @@ export interface PartialFileDeleteResult {
   path: string
   sizeBytes: number
   deleted: boolean
+}
+
+export type ModelAutoOrganizeDetectedKind =
+  | 'lora'
+  | 'checkpoint'
+  | 'vae'
+  | 'embedding'
+  | 'controlnet'
+  | 'tagger'
+  | 'text_encoder'
+  | 'unsupported_diffusion'
+  | 'unknown'
+
+export type ModelAutoOrganizeAction = 'move' | 'keep' | 'skip'
+
+export interface ModelAutoOrganizeItem {
+  source: string
+  filename: string
+  sizeBytes: number
+  detectedKind: ModelAutoOrganizeDetectedKind
+  adapterSubtype?: AdapterSubtype
+  targetType: ModelLibraryEntryType | null
+  targetLabel: string | null
+  targetDir: string | null
+  dest: string | null
+  action: ModelAutoOrganizeAction
+  reason: string
+}
+
+export interface ModelAutoOrganizePlan {
+  sourceDir: string
+  scannedAt: number
+  totals: {
+    scanned: number
+    movable: number
+    kept: number
+    skipped: number
+    totalBytes: number
+    movableBytes: number
+  }
+  items: ModelAutoOrganizeItem[]
+}
+
+export interface ModelAutoOrganizeMovedItem {
+  source: string
+  dest: string
+  sizeBytes: number
+  detectedKind: ModelAutoOrganizeDetectedKind
+  adapterSubtype?: AdapterSubtype
+  targetType: ModelLibraryEntryType
+}
+
+export interface ModelAutoOrganizeResult extends ModelAutoOrganizePlan {
+  moved: ModelAutoOrganizeMovedItem[]
+  refreshed: {
+    checkpoints: boolean
+    loras: boolean
+    vaes: boolean
+  }
 }
 
 export interface ModelHashResult {
@@ -870,6 +1115,36 @@ export interface ModelMergerProgress {
   error?: string
 }
 
+export interface GeneratedVideoSaveRequest {
+  base64: string
+  format: VideoOutputFormat
+  prompt: string
+  negativePrompt: string
+  model: string | null
+  motionModule: string
+  width: number
+  height: number
+  frames: number
+  fps: number
+  seed: number
+}
+
+export interface GeneratedVideoSaveResult {
+  id: string
+  createdAt: number
+  filePath: string
+  manifestPath: string
+  format: VideoOutputFormat
+  sizeBytes: number
+}
+
+export interface ImportedExternalVideoResult {
+  sourcePath: string
+  base64: string
+  format: VideoOutputFormat
+  saved: GeneratedVideoSaveResult
+}
+
 export type WorkspaceImageSaveMode = 'embed' | 'references' | 'settings-only'
 
 export type WorkspaceImageReference =
@@ -900,7 +1175,7 @@ export interface WorkspaceImageReferences {
 export interface WorkspaceSnapshot {
   imageSaveMode?: WorkspaceImageSaveMode
   imageReferences?: WorkspaceImageReferences
-  currentTab: 'txt2img' | 'img2img' | 'upscale' | 'tools'
+  currentTab: 'txt2img' | 'img2img' | 'tags' | 'video' | 'upscale' | 'models' | 'tools'
   prompt: string
   negativePrompt: string
   params: {
@@ -926,6 +1201,7 @@ export interface WorkspaceSnapshot {
   upscaleInputImageDataUrl: string | null
   upscaleOutputImageDataUrl: string | null
   upscale: Record<string, unknown>
+  video?: Record<string, unknown>
   controlnet: Record<string, unknown>
   regionalPrompter?: Record<string, unknown>
   fabric?: Record<string, unknown>

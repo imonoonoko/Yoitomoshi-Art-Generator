@@ -53,9 +53,6 @@ export interface PngInspection {
   keywords: string[]
   /** PNG: "parameters" chunk content if present (A1111 / Forge convention). */
   parameters: string | null
-  /** PNG: ComfyUI's "prompt" / "workflow" chunks. */
-  comfyPrompt: string | null
-  comfyWorkflow: string | null
   /** JPEG/WebP: an EXIF blob was located. */
   hasExif: boolean
   /** JPEG/WebP: the EXIF blob contained a UserComment. */
@@ -90,8 +87,6 @@ export async function inspectPngChunks(file: File): Promise<PngInspection> {
     hasPngSignature: false,
     keywords: [],
     parameters: null,
-    comfyPrompt: null,
-    comfyWorkflow: null,
     hasExif: false,
     hasUserComment: false
   }
@@ -162,8 +157,6 @@ function inspectPngChunksInternal(buf: Uint8Array, out: PngInspection): void {
       if (decoded) {
         out.keywords.push(decoded.keyword)
         if (decoded.keyword === 'parameters') out.parameters = decoded.value
-        else if (decoded.keyword === 'prompt') out.comfyPrompt = decoded.value
-        else if (decoded.keyword === 'workflow') out.comfyWorkflow = decoded.value
       }
     } else if (type === 'IEND') {
       break

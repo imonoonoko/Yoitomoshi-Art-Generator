@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { useStore } from './lib/store'
+import { useStore, type AppState } from './lib/store'
 import { api } from './lib/ipc'
 import {
   promptDigestOf,
@@ -13,6 +13,11 @@ import {
   imageDataUrlFromPngBase64,
   makeThumbnail
 } from './lib/generation-utils'
+import {
+  checkpointPromptContextFromModel,
+  findCheckpointPromptProfile,
+  formatPromptForCheckpoint
+} from './lib/checkpoint-prompt-profile'
 import { getExtensionGuardIssues } from './lib/extension-guards'
 import { TitleBar } from './components/TitleBar'
 import { MainTabs } from './components/MainTabs'
@@ -23,10 +28,19 @@ import { StartupOverlay } from './components/StartupOverlay'
 import { SettingsModal } from './components/SettingsModal'
 import { ShortcutsModal } from './components/ShortcutsModal'
 import { t as tStatic } from './lib/i18n'
-import type { CivitaiAssetType } from '@shared/types'
+import type { CivitaiAssetType, Txt2ImgResponse } from '@shared/types'
 
 const UpscaleWorkspace = lazy(() =>
   import('./components/UpscaleWorkspace').then((m) => ({ default: m.UpscaleWorkspace }))
+)
+const VideoWorkspace = lazy(() =>
+  import('./components/VideoWorkspace').then((m) => ({ default: m.VideoWorkspace }))
+)
+const PromptTagsWorkspace = lazy(() =>
+  import('./components/PromptTagsWorkspace').then((m) => ({ default: m.PromptTagsWorkspace }))
+)
+const ModelLibraryWorkspace = lazy(() =>
+  import('./components/ModelLibraryWorkspace').then((m) => ({ default: m.ModelLibraryWorkspace }))
 )
 const ToolsWorkspace = lazy(() =>
   import('./components/ToolsWorkspace').then((m) => ({ default: m.ToolsWorkspace }))
@@ -107,7 +121,10 @@ export default function App(): JSX.Element {
         // user wouldn't know where it went. Do NOT switch back if they're
         // already on img2img.
         const tab = useStore.getState().currentTab
-        if (tab !== 'img2img') {
+        if (tab === 'video') {
+          useStore.getState().patchVideo({ sourceMode: 'img2img' })
+          toast.success(tStatic('toast.imageLoaded'))
+        } else if (tab !== 'img2img') {
           useStore.getState().setCurrentTab('img2img')
           toast.success(tStatic('toast.imageLoadedTabSwitch'))
         } else {
@@ -138,6 +155,8 @@ export default function App(): JSX.Element {
         favorites,
         quickPresets,
         loraFavs,
+        loraPromptOverrides,
+        checkpointPromptProfiles,
         loraUsage,
         hiddenQuickPresets
       ] = await Promise.all([
@@ -148,6 +167,8 @@ export default function App(): JSX.Element {
         api.storage.getFavorites(),
         api.storage.listQuickPresets(),
         api.storage.getLoraFavorites(),
+        api.storage.listLoraPromptOverrides(),
+        api.storage.listCheckpointPromptProfiles(),
         api.storage.listLoraUsage(),
         api.storage.getHiddenQuickPresets()
       ])
@@ -161,6 +182,8 @@ export default function App(): JSX.Element {
       useStore.getState().setFavorites(new Set(favorites))
       useStore.getState().setQuickPresets(quickPresets)
       useStore.getState().setLoraFavorites(new Set(loraFavs))
+      useStore.getState().setLoraPromptOverrides(loraPromptOverrides)
+      useStore.getState().setCheckpointPromptProfiles(checkpointPromptProfiles)
       useStore.getState().setLoraUsage(loraUsage)
       useStore.getState().setHiddenQuickPresetIds(new Set(hiddenQuickPresets))
 
@@ -278,6 +301,7 @@ export default function App(): JSX.Element {
         api.forge.setCurrentModel(title),
         api.civitai.lookup(m).catch(() => null)
       ])
+      if (useStore.getState().selectedModelTitle !== title) return
       setRecommendation(rec)
       if (!rec) {
         toast(tStatic('toast.civitaiNoMatch'), { icon: 'ℹ' })
@@ -300,12 +324,29 @@ export default function App(): JSX.Element {
     } catch (e) {
       toast.error(tStatic('toast.modelInfoFailed', { message: (e as Error).message }))
     } finally {
-      setRecLoading(false)
+      if (useStore.getState().selectedModelTitle === title) {
+        setRecLoading(false)
+      }
     }
   }
 
+  function applyAutoCheckpointPromptFormatting(state: AppState): AppState {
+    const selectedModel = state.models.find((model) => model.title === state.selectedModelTitle) ?? null
+    const context = checkpointPromptContextFromModel(selectedModel, state.recommendation)
+    const profile = findCheckpointPromptProfile(state.checkpointPromptProfiles, context)
+    if (profile?.mode !== 'auto') return state
+    const promptResult = formatPromptForCheckpoint(state.prompt, 'positive', context, profile)
+    const negativeResult = formatPromptForCheckpoint(state.negativePrompt, 'negative', context, profile)
+    if (!promptResult.changed && !negativeResult.changed) return state
+    if (promptResult.changed) state.setPrompt(promptResult.prompt)
+    if (negativeResult.changed) state.setNegativePrompt(negativeResult.prompt)
+    toast.success(tStatic('prompt.modelFormatted'))
+    return useStore.getState()
+  }
+
   async function handleGenerate(): Promise<void> {
-    const s = useStore.getState()
+    let s = useStore.getState()
+    s = applyAutoCheckpointPromptFormatting(s)
     const guardIssue = getExtensionGuardIssues(s)[0]
     if (guardIssue) {
       toast.error(tStatic(guardIssue.messageKey, guardIssue.params))
@@ -326,15 +367,27 @@ export default function App(): JSX.Element {
       // than the implicit "is an input image set?" check. This makes the
       // user's intent explicit: clicking Generate on the txt2img tab always
       // runs txt2img, even if an inputImage is still in store from earlier.
-      let res
+      const generationResults: Array<{
+        res: Txt2ImgResponse
+        iterationIndex: number
+        iterationCount: number
+      }> = []
       if (plan.endpoint === 'img2img') {
         if (!s.inputImage) {
           toast.error(tStatic('toast.img2imgNeedsImage'))
           return
         }
-        res = await api.forge.img2img(buildImg2ImgRequest(plan, s.inputImage, plan.params.denoisingStrength, s.inpaintMaskImage))
+        generationResults.push({
+          res: await api.forge.img2img(buildImg2ImgRequest(plan, s.inputImage, plan.params.denoisingStrength, s.inpaintMaskImage)),
+          iterationIndex: 0,
+          iterationCount: Math.max(1, Math.round(plan.params.iterations))
+        })
       } else if (plan.endpoint === 'txt2img') {
-        res = await api.forge.txt2img(plan.baseReq)
+        generationResults.push({
+          res: await api.forge.txt2img(plan.baseReq),
+          iterationIndex: 0,
+          iterationCount: Math.max(1, Math.round(plan.params.iterations))
+        })
       } else {
         // upscale/tools tabs have their own workflows; the main Generate
         // button is hidden there, but if it ever fires from those tabs
@@ -342,38 +395,67 @@ export default function App(): JSX.Element {
         toast.error(tStatic('toast.cantGenerateInTab'))
         return
       }
-      const first = res.images[0]
-      if (first) {
-        const dataUrl = imageDataUrlFromPngBase64(first)
-        const actualSeed = generatedSeedFromInfo(res.info, 0, plan.params.seed)
-        // Store in history with a small thumbnail. We persist the prompt with
-        // <lora:> tags spliced in so restoring the entry recreates the exact
-        // generation conditions even if the user changes activeLoras later.
-        const thumb = await makeThumbnail(dataUrl, 320)
-        const item = await api.storage.addHistory({
-          pngBase64: first,
-          thumbDataUrl: thumb,
-          prompt: plan.finalPrompt,
-          negativePrompt: plan.baseReq.negative_prompt,
-          dynamicPrompt: plan.dynamicPrompt,
-          params: {
-            steps: plan.params.steps,
-            cfgScale: plan.params.cfgScale,
-            width: plan.params.width,
-            height: plan.params.height,
-            sampler: plan.params.sampler,
-            scheduler: plan.params.scheduler,
+      const generatedImages = generationResults.flatMap((result) =>
+        result.res.images.filter(Boolean).map((image, responseImageIndex) => ({
+          image,
+          responseImageIndex,
+          res: result.res,
+          iterationIndex: result.iterationIndex,
+          iterationCount: result.iterationCount
+        }))
+      )
+      if (generatedImages.length > 0) {
+        const preparedHistory = await Promise.all(generatedImages.map(async (entry, imageIndex) => {
+          const image = entry.image
+          const dataUrl = imageDataUrlFromPngBase64(image)
+          const actualSeed = generatedSeedFromInfo(entry.res.info, entry.responseImageIndex, plan.params.seed)
+          return {
+            pngBase64: image,
+            dataUrl,
+            thumbDataUrl: await makeThumbnail(dataUrl, 320),
             seed: actualSeed,
-            model: plan.model,
-            vae: s.selectedVae,
-            clipSkip: plan.params.clipSkip,
-            denoisingStrength: plan.params.denoisingStrength,
-            activeLoras: s.activeLoras
+            imageIndex,
+            iterationIndex: entry.iterationIndex,
+            iterationCount: entry.iterationCount,
+            res: entry.res
           }
-        })
-        setLastImage(dataUrl, item.id)
-        const updated = [item, ...useStore.getState().history].slice(0, 500)
-        setHistory(updated)
+        }))
+        let firstItemId: string | null = null
+        // addHistory prepends each item. Save from last to first so the visible
+        // History order matches the image order returned by the backend.
+        for (let i = preparedHistory.length - 1; i >= 0; i -= 1) {
+          const prepared = preparedHistory[i]
+          const item = await api.storage.addHistory({
+            pngBase64: prepared.pngBase64,
+            thumbDataUrl: prepared.thumbDataUrl,
+            prompt: plan.finalPrompt,
+            negativePrompt: plan.baseReq.negative_prompt,
+            dynamicPrompt: plan.dynamicPrompt,
+            params: {
+              steps: plan.params.steps,
+              cfgScale: plan.params.cfgScale,
+              width: plan.params.width,
+              height: plan.params.height,
+              sampler: plan.params.sampler,
+              scheduler: plan.params.scheduler,
+              seed: prepared.seed,
+              batchSize: plan.params.batchSize,
+              imageIndex: prepared.imageIndex,
+              imageCount: preparedHistory.length,
+              iterationIndex: prepared.iterationCount > 1 ? prepared.iterationIndex : undefined,
+              iterationCount: prepared.iterationCount > 1 ? prepared.iterationCount : undefined,
+              model: plan.model,
+              vae: s.selectedVae,
+              clipSkip: plan.params.clipSkip,
+              denoisingStrength: plan.params.denoisingStrength,
+              activeLoras: s.activeLoras,
+              controlNet: null
+            }
+          })
+          if (prepared.imageIndex === 0) firstItemId = item.id
+        }
+        setLastImage(preparedHistory[0].dataUrl, firstItemId ?? undefined)
+        setHistory((await api.storage.listHistory()).slice(0, 500))
 
         // Record LoRA usage for the suggestion engine. One row per active
         // LoRA, indexed by checkpoint + prompt digest so future scoring can
@@ -424,6 +506,21 @@ export default function App(): JSX.Element {
         {currentTab === 'upscale' && (
           <Suspense fallback={<WorkspaceLoading />}>
             <UpscaleWorkspace />
+          </Suspense>
+        )}
+        {currentTab === 'video' && (
+          <Suspense fallback={<WorkspaceLoading />}>
+            <VideoWorkspace onModelChanged={handleModelChanged} />
+          </Suspense>
+        )}
+        {currentTab === 'tags' && (
+          <Suspense fallback={<WorkspaceLoading />}>
+            <PromptTagsWorkspace />
+          </Suspense>
+        )}
+        {currentTab === 'models' && (
+          <Suspense fallback={<WorkspaceLoading />}>
+            <ModelLibraryWorkspace />
           </Suspense>
         )}
         {currentTab === 'tools' && (

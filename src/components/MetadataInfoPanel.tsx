@@ -6,6 +6,7 @@ import { api } from '@/lib/ipc'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { DroppedImageInsight } from './DroppedImageInsight'
+import type { HistoryItem } from '@shared/types'
 
 /**
  * Metadata strip that lives directly under the preview image.
@@ -35,6 +36,10 @@ export function MetadataInfoPanel(): JSX.Element | null {
   const selectedModel = useStore((s) => s.selectedModelTitle)
   const selectedVae = useStore((s) => s.selectedVae)
   const activeLoras = useStore((s) => s.activeLoras)
+  const lastImageHistoryId = useStore((s) => s.lastImageHistoryId)
+  const generatedHistoryItem = useStore((s) =>
+    s.lastImageHistoryId ? s.history.find((item) => item.id === s.lastImageHistoryId) ?? null : null
+  )
   const t = useT()
 
   // Default expanded when there's something to show (dropped image insight).
@@ -51,6 +56,7 @@ export function MetadataInfoPanel(): JSX.Element | null {
 
   const hasInsight = !!droppedInsight || droppedLoading
   const hasGenInfo = !!lastImage && !hasInsight
+  const generatedParams = generatedHistoryItem?.id === lastImageHistoryId ? generatedHistoryItem.params : null
 
   function copyPrompt(): void {
     const text =
@@ -172,9 +178,7 @@ export function MetadataInfoPanel(): JSX.Element | null {
         if (inspection.format === 'unknown') {
           toast.error(tStatic('mp.errUnsupportedFormat'))
         } else if (inspection.format === 'png') {
-          if (inspection.comfyPrompt || inspection.comfyWorkflow) {
-            toast.error(tStatic('mp.errComfyUI', { suggestPaste }))
-          } else if (inspection.keywords.length > 0) {
+          if (inspection.keywords.length > 0) {
             toast.error(tStatic('mp.errUnknownMeta', { keywords: inspection.keywords.join(', '), suggestPaste }))
           } else {
             toast.error(tStatic('mp.errPngNoMeta', { suggestPaste }))
@@ -243,7 +247,20 @@ export function MetadataInfoPanel(): JSX.Element | null {
               model={selectedModel}
               vae={selectedVae}
               activeLoras={activeLoras}
-              params={params}
+              params={{
+                sampler: generatedParams?.sampler ?? params.sampler,
+                steps: generatedParams?.steps ?? params.steps,
+                cfgScale: generatedParams?.cfgScale ?? params.cfgScale,
+                width: generatedParams?.width ?? params.width,
+                height: generatedParams?.height ?? params.height,
+                seed: generatedParams?.seed ?? params.seed,
+                clipSkip: generatedParams?.clipSkip ?? params.clipSkip,
+                batchSize: generatedParams?.batchSize,
+                imageIndex: generatedParams?.imageIndex,
+                imageCount: generatedParams?.imageCount,
+                iterationIndex: generatedParams?.iterationIndex,
+                iterationCount: generatedParams?.iterationCount
+              }}
               prompt={prompt}
             />
           )}
@@ -387,15 +404,7 @@ interface GenerationSummaryProps {
   model: string | null
   vae: string
   activeLoras: { name: string; weight: number }[]
-  params: {
-    sampler: string
-    steps: number
-    cfgScale: number
-    width: number
-    height: number
-    seed: number
-    clipSkip: number
-  }
+  params: Pick<HistoryItem['params'], 'sampler' | 'steps' | 'cfgScale' | 'width' | 'height' | 'seed' | 'clipSkip' | 'batchSize' | 'imageIndex' | 'imageCount' | 'iterationIndex' | 'iterationCount'>
   prompt: string
 }
 
@@ -438,6 +447,14 @@ function GenerationSummary({
           </span>
         </div>
       )}
+      {(params.iterationCount || params.imageCount) && (
+        <div className="flex items-baseline gap-2 text-ink-2" data-testid="metadata-run-summary">
+          <span className="w-14 shrink-0 text-ink-3 font-mono text-[10px]">Run</span>
+          <span className="text-ink-1 truncate font-mono text-[10px]" title={buildRunMetaTitle(params)}>
+            {formatRunSummary(params)}
+          </span>
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-x-3 gap-y-0.5 font-mono text-[10px] text-ink-2 pt-0.5">
         <span>Sampler: <span className="text-ink-0">{params.sampler}</span></span>
         <span>Steps: <span className="text-ink-0">{params.steps}</span></span>
@@ -450,4 +467,38 @@ function GenerationSummary({
       </div>
     </div>
   )
+}
+
+function formatRunSummary(params: GenerationSummaryProps['params']): string {
+  const parts: string[] = []
+  if (params.batchSize && params.batchSize > 1) {
+    parts.push(`batch ${displayOrdinal(batchSlotIndex(params), params.batchSize)}`)
+  }
+  if (params.iterationCount && params.iterationCount > 1) {
+    parts.push(`iteration ${displayOrdinal(params.iterationIndex, params.iterationCount)}`)
+  }
+  if (params.imageCount && params.imageCount > 1) {
+    parts.push(`image ${displayOrdinal(params.imageIndex, params.imageCount)}`)
+  }
+  return parts.join(' · ')
+}
+
+function buildRunMetaTitle(params: GenerationSummaryProps['params']): string {
+  return [
+    params.batchSize ? `batchSize: ${params.batchSize}` : '',
+    params.imageIndex !== undefined ? `imageIndex: ${params.imageIndex}` : '',
+    params.imageCount !== undefined ? `imageCount: ${params.imageCount}` : '',
+    params.iterationIndex !== undefined ? `iterationIndex: ${params.iterationIndex}` : '',
+    params.iterationCount !== undefined ? `iterationCount: ${params.iterationCount}` : ''
+  ].filter(Boolean).join('\n')
+}
+
+function displayOrdinal(index: number | undefined, total: number): string {
+  return `${(index ?? 0) + 1}/${total}`
+}
+
+function batchSlotIndex(params: GenerationSummaryProps['params']): number {
+  const batchSize = params.batchSize ?? 1
+  if (batchSize <= 1) return 0
+  return Math.max(0, params.imageIndex ?? 0) % batchSize
 }

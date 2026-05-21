@@ -1,9 +1,14 @@
 import { useMemo, type ReactNode } from 'react'
 import { CheckCircle2, Languages, ListChecks, Wand2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useStore } from '@/lib/store'
+import { useStore, type WorkspaceTab } from '@/lib/store'
 import { api } from '@/lib/ipc'
 import { approxTokenCount, formatPromptText, promptAppend } from '@/lib/prompt-utils'
+import {
+  checkpointPromptContextFromModel,
+  findCheckpointPromptProfile,
+  formatPromptForCheckpoint
+} from '@/lib/checkpoint-prompt-profile'
 import { translatePromptToEnglishTags } from '@/lib/prompt-translate'
 import { hasDynamicPromptSyntax } from '@/lib/dynamic-prompts'
 import { useT, t as tStatic } from '@/lib/i18n'
@@ -80,6 +85,22 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
     toast.success(tStatic('prompt.formatted'))
   }
 
+  function formatPromptForModelField(target: 'positive' | 'negative'): void {
+    const currentState = useStore.getState()
+    const selectedModel = currentState.models.find((model) => model.title === currentState.selectedModelTitle) ?? null
+    const context = checkpointPromptContextFromModel(selectedModel, currentState.recommendation)
+    const profile = findCheckpointPromptProfile(currentState.checkpointPromptProfiles, context)
+    const current = target === 'positive' ? currentState.prompt : currentState.negativePrompt
+    const result = formatPromptForCheckpoint(current, target, context, profile)
+    if (!result.changed) {
+      toast(tStatic('prompt.modelFormatUnchanged'), { icon: 'ℹ' })
+      return
+    }
+    if (target === 'positive') setPrompt(result.prompt)
+    else setNeg(result.prompt)
+    toast.success(tStatic('prompt.modelFormatted'))
+  }
+
   function appendPromptTagsToNegative(tokens: string[]): void {
     setNeg(tokens.reduce((next, token) => promptAppend(next, token), negative))
   }
@@ -102,6 +123,7 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
         onGenerate={onGenerate}
         onTranslate={translateCurrentPrompt}
         onFormat={formatPromptField}
+        onModelFormat={formatPromptForModelField}
         onPositiveMove={appendPromptTagsToNegative}
         onNegativeMove={appendNegativeTagsToPrompt}
       />
@@ -148,6 +170,7 @@ function PromptFields({
   onGenerate,
   onTranslate,
   onFormat,
+  onModelFormat,
   onPositiveMove,
   onNegativeMove
 }: {
@@ -159,6 +182,7 @@ function PromptFields({
   onGenerate(): Promise<void>
   onTranslate(): void
   onFormat(target: 'positive' | 'negative'): void
+  onModelFormat(target: 'positive' | 'negative'): void
   onPositiveMove(tokens: string[]): void
   onNegativeMove(tokens: string[]): void
 }): JSX.Element {
@@ -187,6 +211,16 @@ function PromptFields({
             >
               <ListChecks className="h-3 w-3" />
               {t('prompt.formatShort')}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost px-1.5 py-0.5 text-[10px] gap-1"
+              onClick={() => onModelFormat('positive')}
+              title={t('prompt.modelFormatTitle')}
+              data-testid="prompt-model-format-positive"
+            >
+              <Wand2 className="h-3 w-3" />
+              {t('prompt.modelFormatShort')}
             </button>
           </div>
           <TokenMeter text={prompt} />
@@ -224,6 +258,16 @@ function PromptFields({
             >
               <ListChecks className="h-3 w-3" />
               {t('prompt.formatShort')}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost px-1.5 py-0.5 text-[10px] gap-1"
+              onClick={() => onModelFormat('negative')}
+              title={t('prompt.modelFormatTitle')}
+              data-testid="prompt-model-format-negative"
+            >
+              <Wand2 className="h-3 w-3" />
+              {t('prompt.modelFormatShort')}
             </button>
           </div>
           <TokenMeter text={negative} />
@@ -393,7 +437,7 @@ function CreateModePanel({
   currentTab,
   onGenerate
 }: {
-  currentTab: 'txt2img' | 'img2img' | 'upscale' | 'tools'
+  currentTab: WorkspaceTab
   onGenerate(): Promise<void>
 }): JSX.Element {
   return (

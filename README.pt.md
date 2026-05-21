@@ -105,7 +105,8 @@ Mova **a pasta inteira do projeto** para outro disco ou PC — configurações, 
 
 | Área | Recursos |
 |---|---|
-| Geração | txt2img / img2img / arrastar-e-soltar + Ctrl+V / lote |
+| Geração | txt2img / img2img / Video / Upscale / arrastar-e-soltar + Ctrl+V / lote |
+| Modelos | Workspace dedicado para thumbnails de modelos/LoRA, metadados Civitai, favoritos e notas |
 | Parâmetros | Sampler / Steps / CFG / Size / Seed / Clip Skip / VAE / Denoising / ajuste fino de peso (Ctrl+↑↓) |
 | Prompts | Biblioteca nativa de tags (prompt-all-in-one MIT) + adições do usuário / autocompletar / contador de tokens / syntax highlight / quick presets |
 | LoRA | UI de cards / multi-LoRA / auto-sugestão (recomendações do modelo +200) / inserção automática de trigger-words |
@@ -147,13 +148,13 @@ O cache fica em `userdata/civitai/<sha>.json` com TTL de 14 dias. Apague o arqui
 ## Licença & terceiros
 
 - O `resources/prompt-library.ja.yaml` incluído vem de [Physton/sd-webui-prompt-all-in-one](https://github.com/Physton/sd-webui-prompt-all-in-one) (MIT)
-- Dependências principais: Electron / electron-vite / Vite 5 / React 19 / Tailwind / Radix UI / Zustand / js-yaml / lucide-react
+- Dependências principais: Electron / electron-vite / Vite 7 / React 19 / Tailwind / Radix UI / Zustand / js-yaml / lucide-react
 
 ## Limitações conhecidas
 
 - **Distribuição limitada**: feito para uso pessoal, não para distribuição pública geral
 - **Filtro NSFW só na busca do Civitai**: a geração em si não é moderada (responsabilidade do Forge / do modelo)
-- **Metadados PNG em formato ComfyUI não suportados**: só formato A1111 (chunk `parameters` / EXIF UserComment)
+- **Metadados PNG**: só formato A1111 / Forge (chunk `parameters` / EXIF UserComment)
 - **Mac/Linux não testados**: o código é multiplataforma, mas a inicialização do Forge assume Windows
 
 ## Contato

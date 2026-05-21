@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Yoitomoshi Art Generator icon">
+  <defs>
+    <linearGradient id="bg" x1="28" y1="228" x2="228" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#18223a"/>
+      <stop offset="0.52" stop-color="#2d5b6e"/>
+      <stop offset="1" stop-color="#e8b765"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="113" y1="190" x2="151" y2="66" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe7a8"/>
+      <stop offset="0.5" stop-color="#ffbf5b"/>
+      <stop offset="1" stop-color="#fff5d1"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <path d="M70 190c29-9 52-26 69-50 14-20 24-45 32-74 8 31 9 58 2 80-10 32-35 51-72 57-13 2-23-2-31-13Z" fill="#0f1726" opacity="0.28"/>
+  <path d="M128 205c-31 0-55-24-55-55 0-26 18-47 37-66 10-10 19-20 21-33 26 24 52 55 52 96 0 32-24 58-55 58Z" fill="url(#flame)"/>
+  <path d="M128 187c-18 0-32-14-32-32 0-16 12-28 22-39 5-6 10-12 11-20 17 16 31 34 31 59 0 18-14 32-32 32Z" fill="#fff8df"/>
+  <path d="M87 74h30l15 31 15-31h30l-31 55v54h-29v-54L87 74Z" fill="#18223a"/>
+  <path d="M117 129 87 74h30l15 31 15-31h30l-31 55v54h-29v-54Z" fill="#ffffff" opacity="0.14"/>
+</svg>

@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>動画生成セットアップガイド - Yoitomoshi Art Generator</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101218;
+      --panel: #171c24;
+      --panel2: #202733;
+      --line: #333c4c;
+      --ink: #f2f5f8;
+      --muted: #aab3c1;
+      --subtle: #7f8998;
+      --accent: #8fb4ff;
+      --accent2: #66cfb7;
+      --ok: #76d48d;
+      --warn: #edc461;
+      --bad: #e77c7c;
+      --code: #0d1017;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.76 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    }
+    a { color: #abc0ff; }
+    h1, h2, h3 { margin: 0; line-height: 1.25; letter-spacing: 0; }
+    h1 { margin-top: 8px; font-size: clamp(28px, 4vw, 42px); }
+    h2 { margin: 34px 0 12px; font-size: 21px; }
+    h3 { margin-bottom: 8px; font-size: 16px; }
+    p { margin: 8px 0 0; }
+    ul, ol { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 5px 0; }
+    code {
+      padding: 1px 5px;
+      border-radius: 5px;
+      border: 1px solid #2d3542;
+      background: var(--code);
+      color: #e5eaff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    pre {
+      margin: 10px 0 0;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--code);
+      padding: 12px;
+      color: #e5eaff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+      white-space: pre;
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+    th, td { border: 1px solid var(--line); padding: 10px; vertical-align: top; }
+    th { background: #1c2430; text-align: left; color: #dce6ff; font-size: 12px; }
+    td { background: rgba(255,255,255,.015); }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #151b26 0%, #101218 100%);
+    }
+    footer { margin-top: 42px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--subtle); }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 30px; }
+    .eyebrow {
+      margin: 0;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .lead { max-width: 940px; color: var(--muted); font-size: 16px; }
+    .meta, .nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill, .nav a {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.025);
+      white-space: nowrap;
+      font-weight: 700;
+    }
+    .pill { padding: 4px 10px; color: var(--muted); font-size: 12px; }
+    .nav a { padding: 5px 10px; font-size: 12px; text-decoration: none; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+    .card.soft { background: rgba(255,255,255,.025); }
+    .step {
+      display: inline-flex;
+      width: 28px;
+      height: 28px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid rgba(143,180,255,.5);
+      background: rgba(143,180,255,.12);
+      color: #dce6ff;
+      font-weight: 900;
+      font-size: 13px;
+    }
+    .callout {
+      margin-top: 14px;
+      border: 1px solid rgba(143,180,255,.42);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      background: rgba(143,180,255,.08);
+      padding: 14px;
+    }
+    .warn {
+      border-color: rgba(237,196,97,.45);
+      border-left-color: var(--warn);
+      background: rgba(237,196,97,.07);
+    }
+    .bad {
+      border-color: rgba(231,124,124,.45);
+      border-left-color: var(--bad);
+      background: rgba(231,124,124,.07);
+    }
+    .oktext { color: var(--ok); font-weight: 800; }
+    .warntext { color: var(--warn); font-weight: 800; }
+    .badtext { color: var(--bad); font-weight: 800; }
+    .path {
+      display: block;
+      margin-top: 8px;
+      overflow-wrap: anywhere;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--code);
+      padding: 10px;
+      color: #e5eaff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    .mini { color: var(--subtle); font-size: 12px; }
+    .status { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+    .status .card { padding: 12px; }
+    .status strong { display: block; color: var(--ink); }
+    @media (max-width: 900px) {
+      .wrap { padding: 22px; }
+      .grid, .grid2, .status { grid-template-columns: 1fr; }
+      table { table-layout: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">Yoitomoshi Art Generator / Video</p>
+      <h1>動画生成セットアップガイド</h1>
+      <p class="lead">
+        AnimateDiff用のmotion moduleをダウンロードして、Yoitomoshiの <code>Video</code> タブから
+        txt2vid / img2vid を試すまでの手順です。まずは軽い短尺GIFで成功確認し、その後に解像度やフレーム数を上げます。
+      </p>
+      <div class="meta">
+        <span class="pill">作成日: 2026-05-17</span>
+        <span class="pill">対象: Windows / PowerShell</span>
+        <span class="pill">保存先: <code>userdata\videos</code></span>
+        <span class="pill">初回推奨: SD1.5 + <code>mm_sd15_v2.safetensors</code></span>
+      </div>
+      <nav class="nav" aria-label="ページ内ナビゲーション">
+        <a href="#current">現在の状態</a>
+        <a href="#download">モデルをダウンロード</a>
+        <a href="#place">配置場所</a>
+        <a href="#generate">生成手順</a>
+        <a href="#trouble">詰まった時</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="current">
+      <h2>現在の状態</h2>
+      <div class="status">
+        <div class="card">
+          <strong class="oktext">Videoタブ</strong>
+          <p>実装済み。上部タブは <code>txt2img / img2img / Video / Upscale / Tools</code>。</p>
+        </div>
+        <div class="card">
+          <strong class="oktext">AnimateDiff拡張</strong>
+          <p><code>sd-forge-animatediff</code> は配置済み。</p>
+        </div>
+        <div class="card">
+          <strong class="warntext">motion module</strong>
+          <p>未配置。ここを入れると生成ボタンが使える状態に進む。</p>
+        </div>
+        <div class="card">
+          <strong class="warntext">実生成確認</strong>
+          <p>motion module配置後に短尺GIFで確認する。</p>
+        </div>
+      </div>
+      <div class="callout">
+        <h3>まず覚える場所</h3>
+        <p>
+          動画生成でもベースになるStable Diffusion checkpointは使います。motion moduleはそのcheckpointに時間方向の動きを足す部品です。
+          motion module自体はcheckpoint置き場ではなく、AnimateDiff拡張の <code>model</code> フォルダへ置きます。
+        </p>
+        <span class="path">C:\宵灯工房アート\Yoitomoshi-Art-Generator\runtime\forge\webui\extensions\sd-forge-animatediff\model</span>
+      </div>
+    </section>
+
+    <section id="download">
+      <h2>1. モデルをダウンロードする</h2>
+      <p>
+        初回はSD1.5系checkpointと <code>mm_sd15_v2.safetensors</code> の組み合わせが一番わかりやすいです。
+        SDXL checkpointにはSD1.5用motion moduleを使えません。SDXL系を使う場合はSDXL対応のmotion moduleを別途選びます。
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>用途</th>
+            <th>ダウンロードするファイル</th>
+            <th>目安サイズ</th>
+            <th>最初の設定</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>初回の動作確認</td>
+            <td><a href="https://huggingface.co/conrevo/AnimateDiff-A1111/resolve/main/motion_module/mm_sd15_v2.safetensors?download=true">mm_sd15_v2.safetensors</a></td>
+            <td>約909 MB</td>
+            <td>SD1.5 checkpoint / 8 frames / 8 FPS / Context batch 4</td>
+          </tr>
+          <tr>
+            <td>SD1.5の別候補</td>
+            <td><a href="https://huggingface.co/conrevo/AnimateDiff-A1111/resolve/main/motion_module/mm_sd15_v3.safetensors?download=true">mm_sd15_v3.safetensors</a></td>
+            <td>約837 MB</td>
+            <td>v2で動作確認後に試す。まずは8 framesから。</td>
+          </tr>
+          <tr>
+            <td>SDXLを試す場合</td>
+            <td><a href="https://huggingface.co/conrevo/AnimateDiff-A1111/resolve/main/motion_module/mm_sdxl_hs.safetensors?download=true">mm_sdxl_hs.safetensors</a></td>
+            <td>約475 MB</td>
+            <td>SDXL checkpoint専用。HotShot-XLはContext batch 8推奨。</td>
+          </tr>
+          <tr>
+            <td>SDXLの別候補</td>
+            <td><a href="https://huggingface.co/conrevo/AnimateDiff-A1111/resolve/main/motion_module/mm_sdxl_v10_beta.safetensors?download=true">mm_sdxl_v10_beta.safetensors</a></td>
+            <td>約475 MB</td>
+            <td>SDXL checkpoint専用。初回はSD1.5で通してから。</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout warn">
+        <h3>混ぜない</h3>
+        <p>
+          SD1.5 checkpointにはSD1.5用motion module、SDXL checkpointにはSDXL用motion moduleを使います。
+          例: <code>n4mik4ILSFWNSFW_v20</code> のようなSDXL checkpointに <code>mm_sd15_v2.safetensors</code> を合わせると失敗します。
+        </p>
+      </div>
+      <div class="grid2">
+        <div class="card soft">
+          <h3>ブラウザで落とす場合</h3>
+          <ol>
+            <li>上の <code>mm_sd15_v2.safetensors</code> リンクを開く。</li>
+            <li>ダウンロード完了を待つ。</li>
+            <li>ファイル名を変えずに <code>model</code> フォルダへ移動する。</li>
+          </ol>
+        </div>
+        <div class="card soft">
+          <h3>PowerShellで落とす場合</h3>
+          <p>回線やHugging Face側の応答で時間がかかるため、途中で止まる場合はブラウザダウンロードへ切り替えます。</p>
+<pre>$dest = "C:\宵灯工房アート\Yoitomoshi-Art-Generator\runtime\forge\webui\extensions\sd-forge-animatediff\model"
+New-Item -ItemType Directory -Force $dest
+Invoke-WebRequest `
+  -Uri "https://huggingface.co/conrevo/AnimateDiff-A1111/resolve/main/motion_module/mm_sd15_v2.safetensors?download=true" `
+  -OutFile (Join-Path $dest "mm_sd15_v2.safetensors")</pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="place">
+      <h2>2. motion moduleを配置する</h2>
+      <div class="grid">
+        <div class="card">
+          <span class="step">1</span>
+          <h3>アプリからフォルダを開く</h3>
+          <p><code>Video</code> タブを開き、Motion module置き場のフォルダボタンを押す。</p>
+        </div>
+        <div class="card">
+          <span class="step">2</span>
+          <h3>ファイルを置く</h3>
+          <p><code>mm_sd15_v2.safetensors</code> をそのフォルダへ入れる。サブフォルダに入れず直置きでよい。</p>
+        </div>
+        <div class="card">
+          <span class="step">3</span>
+          <h3>再確認する</h3>
+          <p><code>Video</code> タブの <code>再確認</code> を押す。候補欄にファイル名が出れば配置は通っている。</p>
+        </div>
+      </div>
+      <div class="callout">
+        <h3>Forgeの再起動</h3>
+        <p>
+          拡張を追加した直後や、生成時にAnimateDiffが効いていない場合は、Forgeを一度停止して再起動します。
+          motion moduleファイルの追加だけなら <code>再確認</code> で見えることがありますが、初回は再起動した方が判断しやすいです。
+        </p>
+      </div>
+    </section>
+
+    <section id="generate">
+      <h2>3. Videoタブで生成する</h2>
+      <div class="grid2">
+        <div class="card">
+          <h3>txt2vidの最短手順</h3>
+          <ol>
+            <li>Forgeを <code>ready</code> にする。</li>
+            <li>上部の <code>Video</code> タブを開く。</li>
+            <li><code>動画ベース</code> でベースcheckpointを選ぶ。</li>
+            <li>ソース切替で <code>txt2vid</code> を選ぶ。</li>
+            <li>prompt / negative promptを書く。</li>
+            <li>Motion moduleに <code>mm_sd15_v2.safetensors</code> を選ぶ。</li>
+            <li>動画生成スイッチをONにする。</li>
+            <li>短尺設定で <code>動画を生成</code> を押す。</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>img2vidの最短手順</h3>
+          <ol>
+            <li><code>Video</code> タブを開く。</li>
+            <li>ソース切替で <code>img2vid</code> を選ぶ。</li>
+            <li>入力画像欄に画像を入れる。</li>
+            <li>promptは画像をどう動かしたいかに寄せる。</li>
+            <li>denoiseは低めから試す。まずは <code>0.35</code> から <code>0.55</code>。</li>
+            <li>生成後は <code>userdata\videos</code> に保存される。</li>
+          </ol>
+        </div>
+      </div>
+
+      <h2>初回スモーク設定</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>推奨値</th>
+            <th>理由</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>checkpoint</td>
+            <td>SD1.5系</td>
+            <td><code>mm_sd15_v2.safetensors</code> と合わせやすい。</td>
+          </tr>
+          <tr>
+            <td>解像度</td>
+            <td>512 x 512 または 512 x 768</td>
+            <td>最初はVRAMと時間を抑えて、成功/失敗を早く見る。</td>
+          </tr>
+          <tr>
+            <td>Steps / CFG</td>
+            <td>16 steps / CFG 6</td>
+            <td>短尺確認では画質より通ることを優先する。</td>
+          </tr>
+          <tr>
+            <td>Frames / FPS</td>
+            <td>8 frames / 8 FPS</td>
+            <td>まずは約1秒でAnimateDiffが効くかだけを見る。</td>
+          </tr>
+          <tr>
+            <td>Context batch</td>
+            <td>4</td>
+            <td>8GB前後のVRAMでも通しやすい初回値。成功後に8-16へ上げる。</td>
+          </tr>
+          <tr>
+            <td>Format</td>
+            <td>GIF</td>
+            <td>最初の確認がしやすい。あとでMP4/WEBP/WEBMへ切り替える。</td>
+          </tr>
+          <tr>
+            <td>Batch / Iterations</td>
+            <td>1 / 1</td>
+            <td>Video生成では複数枚同時生成を避ける。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <h3>最初から高解像度にしない</h3>
+        <p>
+          動画生成は静止画よりVRAMと時間を使います。いきなり1024px超や長尺にせず、
+          まず <code>512 x 512 / 8 frames / Context batch 4 / GIF</code> でAnimateDiffが動くことを確認します。
+        </p>
+      </div>
+    </section>
+
+    <section id="trouble">
+      <h2>詰まった時の見方</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>表示/症状</th>
+            <th>主な原因</th>
+            <th>見る場所</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>AnimateDiff拡張が未導入です</code></td>
+            <td>拡張フォルダがない、または名前に <code>animatediff</code> が含まれていない。</td>
+            <td><code>runtime\forge\webui\extensions\sd-forge-animatediff</code></td>
+          </tr>
+          <tr>
+            <td><code>Motion moduleが見つかりません</code></td>
+            <td><code>.safetensors</code> が拡張の <code>model</code> フォルダにない。</td>
+            <td><code>Video</code> タブのフォルダボタンで開く場所。</td>
+          </tr>
+          <tr>
+            <td><code>Script 'AnimateDiff' not found</code></td>
+            <td>拡張フォルダ追加後、起動中のForgeプロセスがまだAnimateDiffを読み込んでいない。</td>
+            <td>Forgeを停止して再起動する。再起動後に <code>Video</code> タブの <code>再確認</code> を押す。</td>
+          </tr>
+          <tr>
+            <td>生成ボタンが押せない</td>
+            <td>Forgeがreadyでない、動画生成スイッチがOFF、motion module未選択、img2vidで入力画像がない。</td>
+            <td><code>Video</code> タブ上部の診断メッセージ。</td>
+          </tr>
+          <tr>
+            <td>静止画だけ返る/動画にならない</td>
+            <td>Forgeが拡張を読み込んでいない、またはAnimateDiff処理が途中で失敗して通常画像だけ返っている。</td>
+            <td>Forgeを再起動し、それでも出る場合はcheckpointとmotion moduleの系統を確認する。</td>
+          </tr>
+          <tr>
+            <td><code>Forgeが動画ではない結果を返しました</code></td>
+            <td>checkpointとmotion moduleの不一致が多い。SDXL checkpoint + <code>mm_sd15_v2.safetensors</code> など。</td>
+            <td>SD1.5 checkpoint + <code>mm_sd15_v2.safetensors</code> + 512px + 8 framesへ戻す。SDXLを使う場合はSDXL対応motion moduleへ切り替える。</td>
+          </tr>
+          <tr>
+            <td>大きく崩れる/ノイズになる</td>
+            <td>checkpointとmotion moduleの系統違い、解像度過大、フレーム数過大。</td>
+            <td>SD1.5 checkpoint + <code>mm_sd15_v2.safetensors</code> + 512pxへ戻して確認。</td>
+          </tr>
+          <tr>
+            <td>VRAM不足や極端に遅い</td>
+            <td>解像度、frames、Context batchが大きい。</td>
+            <td>512px、8 frames、Context batch 4へ下げる。成功後に少しずつ上げる。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>参考リンク</h2>
+      <ul>
+        <li><a href="https://github.com/continue-revolution/sd-forge-animatediff">sd-forge-animatediff GitHub</a>: Forge向けAnimateDiff拡張。</li>
+        <li><a href="https://github.com/continue-revolution/sd-forge-animatediff/blob/forge-master/docs/how-to-use.md">sd-forge-animatediff How to Use</a>: 導入、WebUI/API、パラメータ説明。</li>
+        <li><a href="https://github.com/continue-revolution/sd-forge-animatediff/blob/forge-master/docs/features.md">sd-forge-animatediff Features</a>: img2vid、Motion LoRA、V3、SDXLの注意点。</li>
+        <li><a href="https://huggingface.co/conrevo/AnimateDiff-A1111/tree/main/motion_module">conrevo/AnimateDiff-A1111 motion_module</a>: motion moduleの配布元。</li>
+      </ul>
+      <p class="mini">
+        参照時点: 2026-05-17。モデル一覧、サイズ、推奨は配布元側で変わる可能性があるため、
+        迷った場合はまずこのページのSD1.5初回スモーク設定へ戻してください。
+      </p>
+    </section>
+
+    <footer>
+      <p>Generated for Yoitomoshi Art Generator. Guide file: <code>docs/VIDEO_GENERATION_GUIDE_2026-05-17.html</code></p>
+    </footer>
+  </main>
+</body>
+</html>

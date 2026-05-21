@@ -1,11 +1,24 @@
 import { useEffect, useState } from 'react'
-import { Activity, AlertTriangle, ChevronDown, Database, Download, ExternalLink, FileSearch, FolderOpen, GitMerge, Package, Play, RefreshCw, Save, Search, ShieldCheck, Square, Tag, Trash2, Wrench } from 'lucide-react'
+import { Activity, AlertTriangle, ChevronDown, ClipboardPaste, Database, Download, ExternalLink, FileSearch, FolderOpen, GitMerge, ImageIcon, Package, Play, RefreshCw, Save, Search, ShieldCheck, Shuffle, Square, Star, Tag, Trash2, Wrench } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore } from '@/lib/store'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { api } from '@/lib/ipc'
 import { cn } from '@/lib/utils'
 import { promptAppend } from '@/lib/prompt-utils'
+import { stripAdapterTokens } from '@/lib/adapter-tokens'
+import { getBuiltInLoraPromptPreset } from '@/lib/builtin-lora-presets'
+import {
+  checkpointPromptContextFromLibraryEntry,
+  defaultCheckpointPromptProfile,
+  findCheckpointPromptProfile,
+  inferCheckpointPromptFamily,
+  joinProfileTags,
+  normalizeCheckpointProfileFamily,
+  normalizeCheckpointProfileMode,
+  preferredCheckpointPromptProfileId,
+  splitProfileTagText
+} from '@/lib/checkpoint-prompt-profile'
 import { buildWorkspaceSnapshot } from '@/lib/workspace-snapshot'
 import { TAGGER_CATALOG, taggerTierLabel, type TaggerCatalogItem } from '@/lib/tagger-catalog'
 import { DEFAULT_TAGGER_BLACKLIST, DEFAULT_TAGGER_MIN_SCORE, parseTaggerBlacklist } from '@shared/tagger-filter'
@@ -13,7 +26,12 @@ import type {
   DownloadJob,
   HuggingFaceSearchFile,
   LibraryIntegrityReport,
+  CheckpointPromptProfile,
+  LoraPromptOverride,
+  ModelAutoOrganizePlan,
+  ModelAutoOrganizeResult,
   ModelFormatConversionResult,
+  ModelLibraryEntry,
   ModelLibrarySummary,
   ModelMergerEstimate,
   ModelMergerProgress,
@@ -53,9 +71,6 @@ export function ToolsWorkspace(): JSX.Element {
     <main className="flex-1 overflow-auto p-6">
       <div className="max-w-3xl mx-auto space-y-4">
         <h2 className="text-lg font-semibold text-ink-1">{t('tools.title')}</h2>
-        <ToolSection title={t('tools.workspace.title')} icon={<Save className="h-4 w-4" />} defaultOpen>
-          <WorkspaceCard />
-        </ToolSection>
         <ToolSection title={t('tools.startup.title')} icon={<Activity className="h-4 w-4" />} defaultOpen>
           <StartupDiagnosticsCard />
         </ToolSection>
@@ -65,11 +80,11 @@ export function ToolsWorkspace(): JSX.Element {
         <ToolSection title={t('tools.tagger.title')} icon={<Tag className="h-4 w-4" />} defaultOpen testId="tagger">
           <TaggerCatalogCard />
         </ToolSection>
-        <ToolSection title={t('tools.library.title')} icon={<Database className="h-4 w-4" />} testId="library">
-          <ModelLibraryCard />
-        </ToolSection>
         <ToolSection title={t('tools.modelHealth.title')} icon={<AlertTriangle className="h-4 w-4" />}>
           <ModelHealthScanCard />
+        </ToolSection>
+        <ToolSection title={t('tools.autoOrganize.title')} icon={<Shuffle className="h-4 w-4" />} testId="auto-organize">
+          <ModelAutoOrganizerCard />
         </ToolSection>
         <ToolSection title={t('tools.inspector.title')} icon={<FileSearch className="h-4 w-4" />}>
           <ModelInspectorCard />
@@ -126,7 +141,7 @@ interface WorkspacePreflightResult {
   issues: WorkspacePreflightIssue[]
 }
 
-function WorkspaceCard(): JSX.Element {
+export function WorkspaceCard({ compact = false }: { compact?: boolean } = {}): JSX.Element {
   const t = useT()
   const [name, setName] = useState('')
   const [imageSaveMode, setImageSaveMode] = useState<WorkspaceImageSaveMode>('embed')
@@ -253,6 +268,7 @@ function WorkspaceCard(): JSX.Element {
         outputHistoryId: imageHistoryId(refs?.upscaleOutputImage),
         isRunning: false
       })
+      if (snap.video) s.patchVideo({ ...(snap.video as Partial<typeof s.video>), lastResult: null })
       s.patchControlnet(restoredControlnet as Partial<typeof s.controlnet>)
       if (snap.regionalPrompter) s.patchRegionalPrompter(snap.regionalPrompter as Partial<typeof s.regionalPrompter>)
       if (restoredFabric) s.patchFabric(restoredFabric)
@@ -288,7 +304,7 @@ function WorkspaceCard(): JSX.Element {
   }
 
   return (
-    <div className="card p-4 space-y-3">
+    <div className={cn('card space-y-3', compact ? 'p-3' : 'p-4')}>
       <div className="flex items-center gap-2">
         <Save className="h-5 w-5 text-accent" />
         <h3 className="text-sm font-semibold text-ink-1">{t('tools.workspace.title')}</h3>
@@ -306,7 +322,7 @@ function WorkspaceCard(): JSX.Element {
           {t('common.save')}
         </button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div className={cn('grid gap-2', compact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-3')}>
         <WorkspaceModeOption
           value="embed"
           checked={imageSaveMode === 'embed'}
@@ -331,7 +347,7 @@ function WorkspaceCard(): JSX.Element {
       </div>
       {workspaces.length > 0 && (
         <div className="border-t border-line pt-3 space-y-1.5">
-          {workspaces.slice(0, 6).map((workspace) => {
+          {workspaces.slice(0, compact ? 4 : 6).map((workspace) => {
             const preflight = workspacePreflights[workspace.id]
             return (
               <div
@@ -1015,8 +1031,16 @@ function isPartialIntegrityIssue(issue: LibraryIntegrityReport['issues'][number]
   )
 }
 
-function ModelLibraryCard(): JSX.Element {
+export function ModelLibraryCard(): JSX.Element {
   const t = useT()
+  const promptOverrides = useStore((s) => s.loraPromptOverrides)
+  const upsertPromptOverride = useStore((s) => s.upsertLoraPromptOverride)
+  const deletePromptOverride = useStore((s) => s.deleteLoraPromptOverride)
+  const checkpointPromptProfiles = useStore((s) => s.checkpointPromptProfiles)
+  const upsertCheckpointPromptProfile = useStore((s) => s.upsertCheckpointPromptProfile)
+  const deleteCheckpointPromptProfile = useStore((s) => s.deleteCheckpointPromptProfile)
+  const selectedModelTitle = useStore((s) => s.selectedModelTitle)
+  const recommendation = useStore((s) => s.recommendation)
   const [busy, setBusy] = useState(false)
   const [summary, setSummary] = useState<ModelLibrarySummary | null>(null)
   const [jobs, setJobs] = useState<DownloadJob[]>([])
@@ -1025,6 +1049,14 @@ function ModelLibraryCard(): JSX.Element {
   const [deletingPartialPath, setDeletingPartialPath] = useState<string | null>(null)
   const [libraryQuery, setLibraryQuery] = useState('')
   const [libraryType, setLibraryType] = useState('all')
+  const [favoriteOnly, setFavoriteOnly] = useState(false)
+  const [metadataBusyId, setMetadataBusyId] = useState<string | null>(null)
+  const [metadataBatchBusy, setMetadataBatchBusy] = useState(false)
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({})
+  const [overrideDrafts, setOverrideDrafts] = useState<Record<string, ModelLibraryPromptOverrideDraft>>({})
+  const [overrideBusyId, setOverrideBusyId] = useState<string | null>(null)
+  const [checkpointProfileDrafts, setCheckpointProfileDrafts] = useState<Record<string, ModelLibraryCheckpointProfileDraft>>({})
+  const [checkpointProfileBusyId, setCheckpointProfileBusyId] = useState<string | null>(null)
 
   async function load(): Promise<void> {
     const [nextSummary, nextJobs] = await Promise.all([
@@ -1156,6 +1188,254 @@ function ModelLibraryCard(): JSX.Element {
     }
   }
 
+  async function toggleFavorite(entry: ModelLibraryEntry): Promise<void> {
+    try {
+      await api.tools.updateModelLibraryEntry(entry.id, { favorite: !entry.favorite })
+      await load()
+      toast.success(tStatic('tools.library.favoriteSaved'))
+    } catch (e) {
+      toast.error(tStatic('tools.library.favoriteFailed', { message: (e as Error).message }))
+    }
+  }
+
+  async function saveNotes(entry: ModelLibraryEntry): Promise<void> {
+    const notes = noteDrafts[entry.id] ?? entry.notes ?? ''
+    if (notes === (entry.notes ?? '')) return
+    try {
+      await api.tools.updateModelLibraryEntry(entry.id, { notes })
+      await load()
+      toast.success(tStatic('tools.library.notesSaved'))
+    } catch (e) {
+      toast.error(tStatic('tools.library.notesFailed', { message: (e as Error).message }))
+    }
+  }
+
+  function updateOverrideDraft(entry: ModelLibraryEntry, patch: Partial<ModelLibraryPromptOverrideDraft>): void {
+    const builtIn = getBuiltInLoraPromptPreset(modelLibraryLoraTarget(entry), null, { selectedModelTitle, recommendation })?.override
+    const current = overrideDrafts[entry.id] ?? modelLibraryPromptOverrideDraft(
+      findModelLibraryPromptOverride(promptOverrides, entry) ?? builtIn
+    )
+    setOverrideDrafts((drafts) => ({
+      ...drafts,
+      [entry.id]: { ...current, ...patch }
+    }))
+  }
+
+  function copyNotesToPromptOverride(entry: ModelLibraryEntry): void {
+    const notes = noteDrafts[entry.id] ?? entry.notes ?? ''
+    updateOverrideDraft(entry, {
+      positivePrompt: stripAdapterTokens(notes).prompt
+    })
+  }
+
+  function copyBuiltInToPromptOverride(entry: ModelLibraryEntry): void {
+    const builtIn = getBuiltInLoraPromptPreset(modelLibraryLoraTarget(entry), null, { selectedModelTitle, recommendation })?.override
+    if (!builtIn) return
+    setOverrideDrafts((drafts) => ({
+      ...drafts,
+      [entry.id]: modelLibraryPromptOverrideDraft(builtIn)
+    }))
+  }
+
+  async function savePromptOverride(entry: ModelLibraryEntry): Promise<void> {
+    if (overrideBusyId) return
+    setOverrideBusyId(entry.id)
+    try {
+      const existing = findModelLibraryPromptOverride(useStore.getState().loraPromptOverrides, entry)
+      const builtIn = getBuiltInLoraPromptPreset(modelLibraryLoraTarget(entry), null, { selectedModelTitle, recommendation })?.override
+      const draft = overrideDrafts[entry.id] ?? modelLibraryPromptOverrideDraft(existing ?? builtIn)
+      const parsedWeight = draft.weight.trim() ? Number(draft.weight) : null
+      const weight = parsedWeight != null && Number.isFinite(parsedWeight)
+        ? Math.max(-1, Math.min(2, Math.round(parsedWeight * 100) / 100))
+        : null
+      const steps = parseOptionalDraftNumber(draft.steps, 1, 150, true)
+      const cfgScale = parseOptionalDraftNumber(draft.cfgScale, 1, 30, false)
+      const clipSkip = parseOptionalDraftNumber(draft.clipSkip, 1, 12, true)
+      const positivePrompt = stripAdapterTokens(draft.positivePrompt).prompt
+      const negativePrompt = stripAdapterTokens(draft.negativePrompt).prompt
+      const item: LoraPromptOverride = {
+        id: existing?.id ?? preferredModelLibraryPromptOverrideId(entry),
+        loraName: modelLibraryAdapterName(entry),
+        loraAlias: entry.sourceMeta?.name ?? modelLibraryAdapterName(entry),
+        loraPath: entry.path,
+        loraSha256: modelLibraryEntrySha(entry),
+        positivePrompt,
+        negativePrompt,
+        weight,
+        sampler: draft.sampler.trim() || undefined,
+        steps,
+        cfgScale,
+        clipSkip,
+        autoApply: draft.autoApply,
+        updatedAt: Date.now()
+      }
+      const saved = await api.storage.saveLoraPromptOverride(item)
+      upsertPromptOverride(saved)
+      setOverrideDrafts((drafts) => ({
+        ...drafts,
+        [entry.id]: modelLibraryPromptOverrideDraft(saved)
+      }))
+      toast.success(tStatic('loraCard.promptOverrideSaved'))
+    } catch (e) {
+      toast.error(tStatic('toast.saveFailed', { message: (e as Error).message }))
+    } finally {
+      setOverrideBusyId(null)
+    }
+  }
+
+  async function removePromptOverride(entry: ModelLibraryEntry): Promise<void> {
+    if (overrideBusyId) return
+    const existing = findModelLibraryPromptOverride(useStore.getState().loraPromptOverrides, entry)
+    if (!existing) return
+    setOverrideBusyId(entry.id)
+    try {
+      await api.storage.deleteLoraPromptOverride(existing.id)
+      deletePromptOverride(existing.id)
+      const builtIn = getBuiltInLoraPromptPreset(modelLibraryLoraTarget(entry), null, { selectedModelTitle, recommendation })?.override
+      setOverrideDrafts((drafts) => ({
+        ...drafts,
+        [entry.id]: modelLibraryPromptOverrideDraft(builtIn)
+      }))
+      toast.success(tStatic('loraCard.promptOverrideDeleted'))
+    } catch (e) {
+      toast.error(tStatic('toast.deleteFailed', { message: (e as Error).message }))
+    } finally {
+      setOverrideBusyId(null)
+    }
+  }
+
+  function updateCheckpointProfileDraft(entry: ModelLibraryEntry, patch: Partial<ModelLibraryCheckpointProfileDraft>): void {
+    const current = checkpointProfileDrafts[entry.id] ?? modelLibraryCheckpointProfileDraft(
+      findCheckpointPromptProfile(checkpointPromptProfiles, checkpointPromptContextFromLibraryEntry(entry)),
+      entry
+    )
+    setCheckpointProfileDrafts((drafts) => ({
+      ...drafts,
+      [entry.id]: { ...current, ...patch }
+    }))
+  }
+
+  function resetCheckpointProfileDraft(entry: ModelLibraryEntry): void {
+    const profile = defaultCheckpointPromptProfile(checkpointPromptContextFromLibraryEntry(entry))
+    setCheckpointProfileDrafts((drafts) => ({
+      ...drafts,
+      [entry.id]: modelLibraryCheckpointProfileDraft(profile, entry)
+    }))
+  }
+
+  async function saveCheckpointProfile(entry: ModelLibraryEntry): Promise<void> {
+    if (checkpointProfileBusyId) return
+    setCheckpointProfileBusyId(entry.id)
+    try {
+      const context = checkpointPromptContextFromLibraryEntry(entry)
+      const existing = findCheckpointPromptProfile(useStore.getState().checkpointPromptProfiles, context)
+      const draft = checkpointProfileDrafts[entry.id] ?? modelLibraryCheckpointProfileDraft(existing, entry)
+      const item: CheckpointPromptProfile = {
+        id: existing?.id ?? preferredCheckpointPromptProfileId(context),
+        checkpointTitle: entry.name,
+        checkpointName: context.name ?? entry.name,
+        checkpointPath: entry.path,
+        checkpointSha256: context.sha256 ?? null,
+        family: normalizeCheckpointProfileFamily(draft.family),
+        positivePrefix: splitProfileTagText(draft.positivePrefix),
+        positiveAppend: splitProfileTagText(draft.positiveAppend),
+        negativeAppend: splitProfileTagText(draft.negativeAppend),
+        mode: normalizeCheckpointProfileMode(draft.mode),
+        updatedAt: Date.now()
+      }
+      const saved = await api.storage.saveCheckpointPromptProfile(item)
+      upsertCheckpointPromptProfile(saved)
+      setCheckpointProfileDrafts((drafts) => ({
+        ...drafts,
+        [entry.id]: modelLibraryCheckpointProfileDraft(saved, entry)
+      }))
+      toast.success(tStatic('tools.library.checkpointProfileSaved'))
+    } catch (e) {
+      toast.error(tStatic('toast.saveFailed', { message: (e as Error).message }))
+    } finally {
+      setCheckpointProfileBusyId(null)
+    }
+  }
+
+  async function removeCheckpointProfile(entry: ModelLibraryEntry): Promise<void> {
+    if (checkpointProfileBusyId) return
+    const existing = findCheckpointPromptProfile(
+      useStore.getState().checkpointPromptProfiles,
+      checkpointPromptContextFromLibraryEntry(entry)
+    )
+    if (!existing) return
+    setCheckpointProfileBusyId(entry.id)
+    try {
+      await api.storage.deleteCheckpointPromptProfile(existing.id)
+      deleteCheckpointPromptProfile(existing.id)
+      setCheckpointProfileDrafts((drafts) => ({
+        ...drafts,
+        [entry.id]: modelLibraryCheckpointProfileDraft(undefined, entry)
+      }))
+      toast.success(tStatic('tools.library.checkpointProfileDeleted'))
+    } catch (e) {
+      toast.error(tStatic('toast.deleteFailed', { message: (e as Error).message }))
+    } finally {
+      setCheckpointProfileBusyId(null)
+    }
+  }
+
+  async function refreshCivitai(entry: ModelLibraryEntry): Promise<void> {
+    if (metadataBusyId) return
+    setMetadataBusyId(entry.id)
+    try {
+      const next = await api.tools.refreshModelLibraryCivitai(entry.id)
+      setNoteDrafts((current) => ({ ...current, [next.id]: next.notes ?? '' }))
+      await load()
+      toast.success(tStatic('tools.library.civitaiDone'))
+    } catch (e) {
+      toast.error(tStatic('tools.library.civitaiFailed', { message: (e as Error).message }))
+    } finally {
+      setMetadataBusyId(null)
+    }
+  }
+
+  async function refreshCivitaiBatch(targets: ModelLibraryEntry[]): Promise<void> {
+    if (metadataBatchBusy || targets.length === 0) return
+    setMetadataBatchBusy(true)
+    try {
+      const result = await api.tools.refreshModelLibraryCivitaiBatch({
+        entryIds: targets.map((entry) => entry.id),
+        onlyMissing: true,
+        limit: 120
+      })
+      setSummary({
+        ...(summary ?? {
+          root: '',
+          scannedAt: Date.now(),
+          totals: { files: result.entries.length, totalBytes: result.entries.reduce((sum, entry) => sum + entry.sizeBytes, 0) },
+          byType: {},
+          entries: []
+        }),
+        scannedAt: Date.now(),
+        entries: result.entries
+      })
+      await load()
+      toast.success(tStatic('tools.library.civitaiBatchDone', {
+        updated: result.updated,
+        skipped: result.skipped,
+        failed: result.failed + result.notFound
+      }))
+    } catch (e) {
+      toast.error(tStatic('tools.library.civitaiBatchFailed', { message: (e as Error).message }))
+    } finally {
+      setMetadataBatchBusy(false)
+    }
+  }
+
+  async function openEntryLocation(entry: ModelLibraryEntry): Promise<void> {
+    try {
+      await api.app.showItemInFolder(entry.path)
+    } catch (e) {
+      toast.error(tStatic('tools.library.openFailed', { message: (e as Error).message }))
+    }
+  }
+
   async function recoverLibrary(): Promise<void> {
     if (busy) return
     setBusy(true)
@@ -1179,7 +1459,8 @@ function ModelLibraryCard(): JSX.Element {
     .slice(0, 8)
   const libraryTypes = Object.keys(summary?.byType ?? {}).sort((a, b) => a.localeCompare(b))
   const normalizedQuery = libraryQuery.trim().toLocaleLowerCase()
-  const filteredEntries = (summary?.entries ?? []).filter((entry) => {
+  const filteredEntries = [...(summary?.entries ?? [])].filter((entry) => {
+    if (favoriteOnly && !entry.favorite) return false
     if (libraryType !== 'all' && entry.type !== libraryType) return false
     if (!normalizedQuery) return true
     return [
@@ -1190,10 +1471,20 @@ function ModelLibraryCard(): JSX.Element {
       entry.sourceMeta?.baseModel,
       entry.sourceMeta?.repoId,
       entry.sourceMeta?.creator,
+      entry.sourceMeta?.description,
+      entry.sourceMeta?.tags?.join(' '),
+      entry.notes,
       entry.sha256 ?? ''
     ].some((value) => value?.toLocaleLowerCase().includes(normalizedQuery))
-  })
-  const visibleEntries = filteredEntries.slice(0, 25)
+  }).sort((a, b) =>
+    Number(Boolean(b.favorite)) - Number(Boolean(a.favorite)) ||
+    b.lastSeenAt - a.lastSeenAt ||
+    a.name.localeCompare(b.name)
+  )
+  const visibleEntries = filteredEntries.slice(0, 60)
+  const favoriteCount = (summary?.entries ?? []).filter((entry) => entry.favorite).length
+  const missingCivitaiCount = (summary?.entries ?? []).filter(needsCivitaiInfo).length
+  const filteredMissingCivitai = filteredEntries.filter(needsCivitaiInfo)
   const recentJobs = jobs.slice(0, 5)
 
   return (
@@ -1211,9 +1502,11 @@ function ModelLibraryCard(): JSX.Element {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <HealthStat label={t('tools.library.files')} value={String(summary?.totals.files ?? 0)} ok={(summary?.totals.files ?? 0) > 0} />
         <HealthStat label={t('tools.library.size')} value={formatBytes(summary?.totals.totalBytes ?? 0)} ok={(summary?.totals.totalBytes ?? 0) > 0} />
+        <HealthStat label={t('tools.library.favorites')} value={String(favoriteCount)} ok={favoriteCount > 0} />
+        <HealthStat label={t('tools.library.civitaiMissing')} value={String(missingCivitaiCount)} ok={missingCivitaiCount === 0} />
       </div>
 
       {summary?.scanStats && (
@@ -1230,7 +1523,7 @@ function ModelLibraryCard(): JSX.Element {
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button className="btn text-xs gap-1.5" onClick={() => { void checkIntegrity() }} disabled={busy}>
           <ShieldCheck className="h-3.5 w-3.5" />
           {t('tools.library.integrity')}
@@ -1252,6 +1545,17 @@ function ModelLibraryCard(): JSX.Element {
             {hashingId ? t('tools.library.hashing') : t('tools.library.hashOne')}
           </button>
         )}
+        <button
+          className="btn text-xs gap-1.5"
+          onClick={() => { void refreshCivitaiBatch(filteredMissingCivitai) }}
+          disabled={metadataBatchBusy || filteredMissingCivitai.length === 0}
+          data-testid="model-library-civitai-batch"
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5', metadataBatchBusy && 'animate-spin')} />
+          {metadataBatchBusy
+            ? t('tools.library.fetchingCivitai')
+            : t('tools.library.fetchCivitaiBatch', { count: filteredMissingCivitai.length })}
+        </button>
       </div>
 
       {integrity && (
@@ -1310,7 +1614,7 @@ function ModelLibraryCard(): JSX.Element {
               {t('tools.library.filtered', { shown: visibleEntries.length, total: filteredEntries.length })}
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px_120px] gap-2">
             <input
               className="input h-8 text-xs"
               value={libraryQuery}
@@ -1328,25 +1632,360 @@ function ModelLibraryCard(): JSX.Element {
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
+            <label className="flex h-8 items-center gap-1.5 rounded border border-line bg-bg-2 px-2 text-xs text-ink-2">
+              <input
+                type="checkbox"
+                checked={favoriteOnly}
+                onChange={(event) => setFavoriteOnly(event.target.checked)}
+              />
+              <Star className="h-3.5 w-3.5 text-warn" />
+              {t('tools.library.favoriteOnly')}
+            </label>
           </div>
-          <div className="space-y-1.5">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
             {visibleEntries.length === 0 ? (
               <div className="text-xs text-ink-3">{t('tools.library.noEntries')}</div>
             ) : (
-              visibleEntries.map((entry) => (
-                <div key={entry.id} className="rounded-md border border-line bg-bg-2/50 p-2 text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="rounded bg-bg-3 px-1.5 py-0.5 text-[10px] text-ink-2 shrink-0">{entry.type}</span>
-                    <span className="font-mono text-[11px] text-ink-1 truncate">{entry.name}</span>
-                    <span className="ml-auto font-mono text-[10px] text-ink-3 shrink-0">{formatBytes(entry.sizeBytes)}</span>
+              visibleEntries.map((entry, index) => {
+                const previewSrc = modelPreviewSrc(entry)
+                const pageUrl = modelPageUrl(entry)
+                const description = entry.sourceMeta?.description || entry.notes || ''
+                const notesValue = noteDrafts[entry.id] ?? entry.notes ?? ''
+                const isAdapterEntry = isModelLibraryAdapterEntry(entry)
+                const isCheckpointEntry = isModelLibraryCheckpointEntry(entry)
+                const builtInPromptOverride = isAdapterEntry
+                  ? getBuiltInLoraPromptPreset(modelLibraryLoraTarget(entry), null, { selectedModelTitle, recommendation })?.override
+                  : undefined
+                const promptOverride = isAdapterEntry ? findModelLibraryPromptOverride(promptOverrides, entry) : undefined
+                const overrideDraft = overrideDrafts[entry.id] ?? modelLibraryPromptOverrideDraft(promptOverride ?? builtInPromptOverride)
+                const overrideBusy = overrideBusyId === entry.id
+                const checkpointContext = isCheckpointEntry ? checkpointPromptContextFromLibraryEntry(entry) : null
+                const checkpointProfile = checkpointContext
+                  ? findCheckpointPromptProfile(checkpointPromptProfiles, checkpointContext)
+                  : undefined
+                const checkpointProfileDraft = checkpointProfileDrafts[entry.id] ??
+                  modelLibraryCheckpointProfileDraft(checkpointProfile, entry)
+                const checkpointProfileBusy = checkpointProfileBusyId === entry.id
+                const metadataBusy = metadataBusyId === entry.id
+                return (
+                  <div
+                    key={entry.id}
+                    className={cn('rounded-md border bg-bg-2/50 p-2 text-xs', entry.favorite ? 'border-warn/50' : 'border-line')}
+                    data-testid={`model-library-entry-${index}`}
+                  >
+                    <div className="grid grid-cols-[72px_1fr] gap-2">
+                      <div className="h-[72px] w-[72px] overflow-hidden rounded border border-line bg-bg-3 flex items-center justify-center">
+                        {previewSrc ? (
+                          <img
+                            src={previewSrc}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            data-testid={`model-library-preview-${index}`}
+                          />
+                        ) : (
+                          <ImageIcon className="h-5 w-5 text-ink-3" />
+                        )}
+                      </div>
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="rounded bg-bg-3 px-1.5 py-0.5 text-[10px] text-ink-2 shrink-0">{entry.type}</span>
+                          <span className="font-mono text-[11px] text-ink-1 truncate">{entry.name}</span>
+                          <span className="ml-auto font-mono text-[10px] text-ink-3 shrink-0">{formatBytes(entry.sizeBytes)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-ink-3 min-w-0">
+                          <span className="shrink-0">{entry.sourceMeta?.name ?? entry.source}</span>
+                          {entry.sourceMeta?.baseModel && <span className="shrink-0">{entry.sourceMeta.baseModel}</span>}
+                          {entry.sourceMeta?.creator && <span className="shrink-0">@{entry.sourceMeta.creator}</span>}
+                          <span className="font-mono truncate">{entry.sha256 ? entry.sha256.slice(0, 12) : t('tools.library.shaMissing')}</span>
+                        </div>
+                        {description ? (
+                          <div className="line-clamp-2 text-[10px] leading-relaxed text-ink-3">
+                            {description}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-ink-3">{t('tools.library.noDescription')}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-1">
+                      <button
+                        type="button"
+                        className={cn('btn btn-ghost text-[10px] py-0.5 gap-1', entry.favorite && 'text-warn')}
+                        onClick={() => { void toggleFavorite(entry) }}
+                        title={entry.favorite ? t('tools.library.unfavorite') : t('tools.library.favorite')}
+                        data-testid={`model-library-favorite-${index}`}
+                      >
+                        <Star className={cn('h-3 w-3', entry.favorite && 'fill-current')} />
+                        {entry.favorite ? t('tools.library.unfavorite') : t('tools.library.favorite')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost text-[10px] py-0.5 gap-1"
+                        onClick={() => { void refreshCivitai(entry) }}
+                        disabled={Boolean(metadataBusyId)}
+                        title={t('tools.library.fetchCivitai')}
+                        data-testid={`model-library-fetch-civitai-${index}`}
+                      >
+                        <RefreshCw className={cn('h-3 w-3', metadataBusy && 'animate-spin')} />
+                        {metadataBusy ? t('tools.library.fetchingCivitai') : t('tools.library.fetchCivitai')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost text-[10px] py-0.5 gap-1"
+                        onClick={() => { void openEntryLocation(entry) }}
+                        title={t('tools.library.openFolder')}
+                        data-testid={`model-library-open-folder-${index}`}
+                      >
+                        <FolderOpen className="h-3 w-3" />
+                        {t('tools.library.openFolder')}
+                      </button>
+                      {pageUrl && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost text-[10px] py-0.5 gap-1 ml-auto"
+                          onClick={() => { void api.app.openExternal(pageUrl) }}
+                          title={t('tools.library.openCivitai')}
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          {t('tools.library.openCivitai')}
+                        </button>
+                      )}
+                      {!entry.sha256 && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost text-[10px] py-0.5 gap-1"
+                          onClick={() => { void hashEntry(entry.id) }}
+                          disabled={hashingId === entry.id}
+                        >
+                          <RefreshCw className={cn('h-3 w-3', hashingId === entry.id && 'animate-spin')} />
+                          {t('tools.library.hashOne')}
+                        </button>
+                      )}
+                    </div>
+                    {isAdapterEntry && (
+                      <div
+                        className="mt-2 rounded-md border border-accent/30 bg-bg-1/60 p-2 space-y-2"
+                        data-testid={`model-library-lora-prompt-${index}`}
+                      >
+                        <div className="flex flex-wrap items-center gap-2 text-[10px]">
+                          <span className="rounded border border-accent/40 bg-accent-dim/40 px-1.5 py-0.5 font-semibold text-accent">
+                            {t('loraCard.promptOverrideBadge')}
+                          </span>
+                          <label className="ml-auto flex items-center gap-1 text-ink-2">
+                            <input
+                              type="checkbox"
+                              checked={overrideDraft.autoApply}
+                              onChange={(event) => updateOverrideDraft(entry, { autoApply: event.target.checked })}
+                            />
+                            {t('loraCard.promptOverrideAutoApply')}
+                          </label>
+                        </div>
+                        <textarea
+                          className="input min-h-[54px] w-full resize-y text-xs"
+                          value={overrideDraft.positivePrompt}
+                          onChange={(event) => updateOverrideDraft(entry, { positivePrompt: event.target.value })}
+                          placeholder={t('loraCard.promptOverridePositivePlaceholder')}
+                          aria-label={t('loraCard.promptOverridePositive')}
+                        />
+                        <textarea
+                          className="input min-h-[42px] w-full resize-y text-xs"
+                          value={overrideDraft.negativePrompt}
+                          onChange={(event) => updateOverrideDraft(entry, { negativePrompt: event.target.value })}
+                          placeholder={t('loraCard.promptOverrideNegativePlaceholder')}
+                          aria-label={t('loraCard.promptOverrideNegative')}
+                        />
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <input
+                            className="input h-7 w-24 text-xs"
+                            type="number"
+                            min="-1"
+                            max="2"
+                            step="0.05"
+                            value={overrideDraft.weight}
+                            onChange={(event) => updateOverrideDraft(entry, { weight: event.target.value })}
+                            placeholder={t('loraCard.promptOverrideWeightAuto')}
+                            aria-label={t('loraCard.promptOverrideWeight')}
+                          />
+                          <input
+                            className="input h-7 w-20 text-xs"
+                            type="number"
+                            min="1"
+                            max="150"
+                            step="1"
+                            value={overrideDraft.steps}
+                            onChange={(event) => updateOverrideDraft(entry, { steps: event.target.value })}
+                            placeholder={t('loraCard.promptOverrideSteps')}
+                            aria-label={t('loraCard.promptOverrideSteps')}
+                          />
+                          <input
+                            className="input h-7 w-20 text-xs"
+                            type="number"
+                            min="1"
+                            max="30"
+                            step="0.5"
+                            value={overrideDraft.cfgScale}
+                            onChange={(event) => updateOverrideDraft(entry, { cfgScale: event.target.value })}
+                            placeholder={t('loraCard.promptOverrideCfg')}
+                            aria-label={t('loraCard.promptOverrideCfg')}
+                          />
+                          <input
+                            className="input h-7 w-20 text-xs"
+                            type="number"
+                            min="1"
+                            max="12"
+                            step="1"
+                            value={overrideDraft.clipSkip}
+                            onChange={(event) => updateOverrideDraft(entry, { clipSkip: event.target.value })}
+                            placeholder={t('loraCard.promptOverrideClipSkip')}
+                            aria-label={t('loraCard.promptOverrideClipSkip')}
+                          />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <input
+                            className="input h-7 min-w-36 flex-1 text-xs"
+                            type="text"
+                            value={overrideDraft.sampler}
+                            onChange={(event) => updateOverrideDraft(entry, { sampler: event.target.value })}
+                            placeholder={t('loraCard.promptOverrideSampler')}
+                            aria-label={t('loraCard.promptOverrideSampler')}
+                          />
+                          {builtInPromptOverride && (
+                            <button
+                              type="button"
+                              className="btn btn-ghost text-[10px] py-0.5 gap-1"
+                              onClick={() => copyBuiltInToPromptOverride(entry)}
+                              title={t('tools.library.loraPromptPresetDefault')}
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              {t('tools.library.loraPromptPresetDefault')}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-ghost text-[10px] py-0.5 gap-1"
+                            onClick={() => copyNotesToPromptOverride(entry)}
+                            title={t('tools.library.loraPromptFromNotes')}
+                          >
+                            <ClipboardPaste className="h-3 w-3" />
+                            {t('tools.library.loraPromptFromNotes')}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost text-[10px] py-0.5 gap-1 ml-auto"
+                            onClick={() => { void savePromptOverride(entry) }}
+                            disabled={Boolean(overrideBusyId)}
+                          >
+                            <Save className="h-3 w-3" />
+                            {overrideBusy ? t('common.loading') : t('loraCard.promptOverrideSave')}
+                          </button>
+                          {promptOverride && (
+                            <button
+                              type="button"
+                              className="btn btn-ghost text-[10px] py-0.5 gap-1 text-err"
+                              onClick={() => { void removePromptOverride(entry) }}
+                              disabled={Boolean(overrideBusyId)}
+                              title={t('common.delete')}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {isCheckpointEntry && (
+                      <div
+                        className="mt-2 rounded-md border border-accent/30 bg-bg-1/60 p-2 space-y-2"
+                        data-testid={`model-library-checkpoint-prompt-${index}`}
+                      >
+                        <div className="flex flex-wrap items-center gap-2 text-[10px]">
+                          <span className="rounded border border-accent/40 bg-accent-dim/40 px-1.5 py-0.5 font-semibold text-accent">
+                            {t('tools.library.checkpointProfile')}
+                          </span>
+                          <select
+                            className="input h-7 w-32 text-[10px]"
+                            value={checkpointProfileDraft.family}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { family: event.target.value })}
+                            aria-label={t('tools.library.checkpointProfileFamily')}
+                          >
+                            {['pony', 'illustrious', 'noobai', 'animagine', 'sdxl', 'sd15', 'flux', 'custom'].map((family) => (
+                              <option key={family} value={family}>{family}</option>
+                            ))}
+                          </select>
+                          <select
+                            className="input h-7 w-28 text-[10px]"
+                            value={checkpointProfileDraft.mode}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { mode: event.target.value })}
+                            aria-label={t('tools.library.checkpointProfileMode')}
+                          >
+                            <option value="suggest">{t('tools.library.checkpointProfileModeSuggest')}</option>
+                            <option value="manual">{t('tools.library.checkpointProfileModeManual')}</option>
+                            <option value="auto">{t('tools.library.checkpointProfileModeAuto')}</option>
+                          </select>
+                        </div>
+                        <textarea
+                          className="input min-h-[38px] w-full resize-y text-xs"
+                          value={checkpointProfileDraft.positivePrefix}
+                          onChange={(event) => updateCheckpointProfileDraft(entry, { positivePrefix: event.target.value })}
+                          placeholder={t('tools.library.checkpointProfilePositivePrefixPlaceholder')}
+                          aria-label={t('tools.library.checkpointProfilePositivePrefix')}
+                        />
+                        <textarea
+                          className="input min-h-[38px] w-full resize-y text-xs"
+                          value={checkpointProfileDraft.positiveAppend}
+                          onChange={(event) => updateCheckpointProfileDraft(entry, { positiveAppend: event.target.value })}
+                          placeholder={t('tools.library.checkpointProfilePositiveAppendPlaceholder')}
+                          aria-label={t('tools.library.checkpointProfilePositiveAppend')}
+                        />
+                        <textarea
+                          className="input min-h-[38px] w-full resize-y text-xs"
+                          value={checkpointProfileDraft.negativeAppend}
+                          onChange={(event) => updateCheckpointProfileDraft(entry, { negativeAppend: event.target.value })}
+                          placeholder={t('tools.library.checkpointProfileNegativeAppendPlaceholder')}
+                          aria-label={t('tools.library.checkpointProfileNegativeAppend')}
+                        />
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            type="button"
+                            className="btn btn-ghost text-[10px] py-0.5 gap-1"
+                            onClick={() => resetCheckpointProfileDraft(entry)}
+                            title={t('tools.library.checkpointProfileDefault')}
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            {t('tools.library.checkpointProfileDefault')}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost text-[10px] py-0.5 gap-1 ml-auto"
+                            onClick={() => { void saveCheckpointProfile(entry) }}
+                            disabled={Boolean(checkpointProfileBusyId)}
+                          >
+                            <Save className="h-3 w-3" />
+                            {checkpointProfileBusy ? t('common.loading') : t('loraCard.promptOverrideSave')}
+                          </button>
+                          {checkpointProfile && (
+                            <button
+                              type="button"
+                              className="btn btn-ghost text-[10px] py-0.5 gap-1 text-err"
+                              onClick={() => { void removeCheckpointProfile(entry) }}
+                              disabled={Boolean(checkpointProfileBusyId)}
+                              title={t('common.delete')}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    <textarea
+                      className="input mt-2 min-h-[48px] w-full resize-y text-xs"
+                      value={notesValue}
+                      onChange={(event) => setNoteDrafts((current) => ({ ...current, [entry.id]: event.target.value }))}
+                      onBlur={() => { void saveNotes(entry) }}
+                      placeholder={t('tools.library.notesPlaceholder')}
+                    />
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-[10px] text-ink-3 min-w-0">
-                    <span className="shrink-0">{entry.source}</span>
-                    {entry.sourceMeta?.baseModel && <span className="shrink-0">{entry.sourceMeta.baseModel}</span>}
-                    <span className="font-mono truncate">{entry.sha256 ? entry.sha256.slice(0, 12) : t('tools.library.shaMissing')}</span>
-                  </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>
@@ -1410,6 +2049,157 @@ function ModelLibraryCard(): JSX.Element {
       </div>
     </div>
   )
+}
+
+interface ModelLibraryPromptOverrideDraft {
+  positivePrompt: string
+  negativePrompt: string
+  weight: string
+  sampler: string
+  steps: string
+  cfgScale: string
+  clipSkip: string
+  autoApply: boolean
+}
+
+interface ModelLibraryCheckpointProfileDraft {
+  family: string
+  mode: string
+  positivePrefix: string
+  positiveAppend: string
+  negativeAppend: string
+}
+
+function isModelLibraryAdapterEntry(entry: ModelLibraryEntry): boolean {
+  return entry.type === 'LORA' || entry.type === 'LoCon' || entry.type === 'LyCORIS'
+}
+
+function isModelLibraryCheckpointEntry(entry: ModelLibraryEntry): boolean {
+  return entry.type === 'Checkpoint'
+}
+
+function modelLibraryPromptOverrideDraft(override?: LoraPromptOverride): ModelLibraryPromptOverrideDraft {
+  return {
+    positivePrompt: override?.positivePrompt ?? '',
+    negativePrompt: override?.negativePrompt ?? '',
+    weight: override?.weight != null ? String(override.weight) : '',
+    sampler: override?.sampler ?? '',
+    steps: override?.steps != null ? String(override.steps) : '',
+    cfgScale: override?.cfgScale != null ? String(override.cfgScale) : '',
+    clipSkip: override?.clipSkip != null ? String(override.clipSkip) : '',
+    autoApply: override?.autoApply !== false
+  }
+}
+
+function modelLibraryLoraTarget(entry: ModelLibraryEntry): {
+  name: string
+  alias?: string
+  path?: string
+  sha256?: string | null
+} {
+  const name = modelLibraryAdapterName(entry)
+  return {
+    name,
+    alias: entry.sourceMeta?.name ?? entry.name,
+    path: entry.path,
+    sha256: modelLibraryEntrySha(entry)
+  }
+}
+
+function modelLibraryCheckpointProfileDraft(
+  profile: CheckpointPromptProfile | undefined,
+  entry: ModelLibraryEntry
+): ModelLibraryCheckpointProfileDraft {
+  const fallback = profile ?? defaultCheckpointPromptProfile(checkpointPromptContextFromLibraryEntry(entry))
+  return {
+    family: fallback.family ?? inferCheckpointPromptFamily(checkpointPromptContextFromLibraryEntry(entry)),
+    mode: fallback.mode,
+    positivePrefix: joinProfileTags(fallback.positivePrefix),
+    positiveAppend: joinProfileTags(fallback.positiveAppend),
+    negativeAppend: joinProfileTags(fallback.negativeAppend)
+  }
+}
+
+function findModelLibraryPromptOverride(
+  overrides: Map<string, LoraPromptOverride>,
+  entry: ModelLibraryEntry
+): LoraPromptOverride | undefined {
+  for (const key of modelLibraryPromptOverrideKeys(entry)) {
+    const hit = overrides.get(key)
+    if (hit) return hit
+  }
+  const sha = modelLibraryEntrySha(entry)
+  const adapterName = modelLibraryAdapterName(entry).toLowerCase()
+  const entryName = entry.name.toLowerCase()
+  const entryPath = entry.path.toLowerCase()
+  for (const item of overrides.values()) {
+    if (sha && item.loraSha256?.toLowerCase() === sha) return item
+    if (item.loraName.toLowerCase() === adapterName || item.loraName.toLowerCase() === entryName) return item
+    if (item.loraPath?.toLowerCase() === entryPath) return item
+  }
+  return undefined
+}
+
+function preferredModelLibraryPromptOverrideId(entry: ModelLibraryEntry): string {
+  const sha = modelLibraryEntrySha(entry)
+  return sha ? `sha256:${sha}` : `name:${modelLibraryAdapterName(entry).toLowerCase()}`
+}
+
+function modelLibraryPromptOverrideKeys(entry: ModelLibraryEntry): string[] {
+  const keys = [
+    preferredModelLibraryPromptOverrideId(entry),
+    `name:${modelLibraryAdapterName(entry).toLowerCase()}`,
+    `name:${entry.name.toLowerCase()}`
+  ]
+  if (entry.path) keys.push(`path:${entry.path.toLowerCase()}`)
+  return Array.from(new Set(keys))
+}
+
+function modelLibraryEntrySha(entry: ModelLibraryEntry): string | null {
+  const sha = entry.sha256 ?? entry.civitai?.expectedSha256 ?? entry.sourceMeta?.expectedSha256 ?? null
+  return typeof sha === 'string' && /^[a-f0-9]{64}$/i.test(sha) ? sha.toLowerCase() : null
+}
+
+function modelLibraryAdapterName(entry: ModelLibraryEntry): string {
+  const fromFile = stripModelFileExtension(entry.name)
+  if (fromFile) return fromFile
+  return stripModelFileExtension(entry.sourceMeta?.name ?? entry.name)
+}
+
+function stripModelFileExtension(value: string): string {
+  return value.trim().replace(/\.(safetensors|ckpt|pt|pth|bin)$/i, '')
+}
+
+function parseOptionalDraftNumber(value: string, min: number, max: number, integer: boolean): number | null {
+  if (!value.trim()) return null
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return null
+  const rounded = integer ? Math.round(parsed) : Math.round(parsed * 100) / 100
+  return Math.max(min, Math.min(max, rounded))
+}
+
+function modelPageUrl(entry: ModelLibraryEntry): string | null {
+  return entry.sourceMeta?.pageUrl ?? entry.civitai?.url ?? null
+}
+
+function modelPreviewSrc(entry: ModelLibraryEntry): string | null {
+  const local = entry.previewPath ?? entry.sourceMeta?.previewPath ?? null
+  if (local) return pathToFileUrl(local)
+  return entry.sourceMeta?.thumbnailUrl ?? null
+}
+
+function needsCivitaiInfo(entry: ModelLibraryEntry): boolean {
+  if (entry.sourceMeta?.provider !== 'civitai') return true
+  if (!entry.sourceMeta.modelId || !entry.sourceMeta.modelVersionId) return true
+  if (!entry.sourceMeta.description && !entry.notes) return true
+  if (!entry.previewPath && !entry.sourceMeta.previewPath && !entry.sourceMeta.thumbnailUrl) return true
+  return false
+}
+
+function pathToFileUrl(path: string): string {
+  const normalized = path.replace(/\\/g, '/')
+  const prefixed = normalized.startsWith('/') ? `file://${normalized}` : `file:///${normalized}`
+  return encodeURI(prefixed)
 }
 
 function CatalogHealthCard(): JSX.Element {
@@ -1627,6 +2417,164 @@ function ModelHealthScanCard(): JSX.Element {
       )}
     </div>
   )
+}
+
+function ModelAutoOrganizerCard(): JSX.Element {
+  const t = useT()
+  const [busy, setBusy] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [plan, setPlan] = useState<ModelAutoOrganizePlan | ModelAutoOrganizeResult | null>(null)
+
+  async function preview(): Promise<void> {
+    if (busy || applying) return
+    setBusy(true)
+    try {
+      const next = await api.tools.planModelAutoOrganize()
+      setPlan(next)
+      if (next.totals.movable === 0) {
+        toast(tStatic('tools.autoOrganize.none'), { icon: 'i' })
+      } else {
+        toast(tStatic('tools.autoOrganize.previewDone', { count: next.totals.movable }), { icon: '!' })
+      }
+    } catch (e) {
+      toast.error(tStatic('tools.autoOrganize.failed', { message: (e as Error).message }))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function apply(): Promise<void> {
+    if (busy || applying || !plan || plan.totals.movable === 0) return
+    setApplying(true)
+    try {
+      const next = await api.tools.applyModelAutoOrganize()
+      setPlan(next)
+      await refreshModelListsAfterOrganize()
+      if (next.moved.length === 0) {
+        toast(tStatic('tools.autoOrganize.none'), { icon: 'i' })
+      } else {
+        toast.success(tStatic('tools.autoOrganize.done', { count: next.moved.length }))
+      }
+    } catch (e) {
+      toast.error(tStatic('tools.autoOrganize.failed', { message: (e as Error).message }))
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  const visibleItems = plan?.items.slice(0, 60) ?? []
+
+  return (
+    <div className="card p-4 space-y-3" data-testid="model-auto-organizer-card">
+      <div className="flex items-center gap-2">
+        <Shuffle className="h-5 w-5 text-accent" />
+        <h3 className="text-sm font-semibold text-ink-1">{t('tools.autoOrganize.title')}</h3>
+      </div>
+      <p className="text-xs text-ink-3 leading-relaxed">{t('tools.autoOrganize.body')}</p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          className="btn gap-1.5"
+          onClick={() => { void preview() }}
+          disabled={busy || applying}
+          data-testid="model-auto-organize-preview"
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5', busy && 'animate-spin')} />
+          {busy ? t('tools.autoOrganize.scanning') : t('tools.autoOrganize.preview')}
+        </button>
+        <button
+          className="btn gap-1.5"
+          onClick={() => { void apply() }}
+          disabled={busy || applying || !plan || plan.totals.movable === 0}
+          data-testid="model-auto-organize-apply"
+        >
+          <Shuffle className={cn('h-3.5 w-3.5', applying && 'animate-pulse')} />
+          {applying ? t('tools.autoOrganize.applying') : t('tools.autoOrganize.apply')}
+        </button>
+      </div>
+
+      {plan && (
+        <div className="border-t border-line pt-3 space-y-3 text-xs">
+          <div className="font-mono text-[11px] text-ink-2 break-all">{plan.sourceDir}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2" data-testid="model-auto-organize-summary">
+            <Stat label={t('tools.autoOrganize.scanned')} value={String(plan.totals.scanned)} />
+            <Stat label={t('tools.autoOrganize.movable')} value={`${plan.totals.movable} / ${formatBytes(plan.totals.movableBytes)}`} />
+            <Stat label={t('tools.autoOrganize.kept')} value={String(plan.totals.kept)} />
+            <Stat label={t('tools.autoOrganize.skipped')} value={String(plan.totals.skipped)} />
+          </div>
+          {isAutoOrganizeResult(plan) && plan.moved.length > 0 && (
+            <div className="rounded-md border border-ok/30 bg-ok/10 p-2 text-ok">
+              {t('tools.autoOrganize.movedSummary', { count: plan.moved.length })}
+            </div>
+          )}
+          {visibleItems.length === 0 ? (
+            <div className="text-xs text-ink-3">{t('tools.autoOrganize.empty')}</div>
+          ) : (
+            <div className="space-y-1 max-h-64 overflow-y-auto" data-testid="model-auto-organize-list">
+              {visibleItems.map((item, index) => (
+                <div key={item.source} className="rounded bg-bg-2/60 p-2" data-testid={`model-auto-organize-row-${index}`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold shrink-0', autoOrganizeActionClass(item.action))}>
+                      {t(`tools.autoOrganize.action.${item.action}`)}
+                    </span>
+                    <span className="font-mono text-[11px] text-ink-1 truncate">{item.filename}</span>
+                    <span className="ml-auto font-mono text-[10px] text-ink-3 shrink-0">{formatBytes(item.sizeBytes)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-[10px] text-ink-3 min-w-0">
+                    <span className="shrink-0">{autoOrganizeKindLabel(item.detectedKind, item.adapterSubtype)}</span>
+                    {item.targetLabel && <span className="shrink-0">→ {item.targetLabel}</span>}
+                    <span className="truncate">{item.reason}</span>
+                  </div>
+                  {item.dest && item.dest !== item.source && (
+                    <div className="mt-1 font-mono text-[10px] text-ink-3 truncate">{item.dest}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {(plan.items.length > visibleItems.length) && (
+            <div className="text-[10px] text-ink-3">
+              {t('tools.autoOrganize.more', { count: plan.items.length - visibleItems.length })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+async function refreshModelListsAfterOrganize(): Promise<void> {
+  const [models, loras, vaes] = await Promise.all([
+    api.forge.listModels().catch(() => null),
+    api.forge.listLoras().catch(() => null),
+    api.forge.listVaes().catch(() => null)
+  ])
+  const store = useStore.getState()
+  if (models) store.setModels(models)
+  if (loras) store.setLoras(loras)
+  if (vaes) store.setVaes(vaes)
+}
+
+function isAutoOrganizeResult(
+  plan: ModelAutoOrganizePlan | ModelAutoOrganizeResult
+): plan is ModelAutoOrganizeResult {
+  return Array.isArray((plan as ModelAutoOrganizeResult).moved)
+}
+
+function autoOrganizeActionClass(action: ModelAutoOrganizePlan['items'][number]['action']): string {
+  if (action === 'move') return 'bg-ok/20 text-ok'
+  if (action === 'skip') return 'bg-warn/20 text-warn'
+  return 'bg-bg-3 text-ink-2'
+}
+
+function autoOrganizeKindLabel(
+  kind: ModelAutoOrganizePlan['items'][number]['detectedKind'],
+  adapterSubtype?: ModelAutoOrganizePlan['items'][number]['adapterSubtype']
+): string {
+  if (kind === 'lora' && adapterSubtype) return `${kind} / ${adapterSubtype}`
+  if (kind === 'checkpoint') return 'checkpoint'
+  if (kind === 'text_encoder') return 'text encoder'
+  if (kind === 'unsupported_diffusion') return 'unsupported diffusion'
+  return kind
 }
 
 function ModelInspectorCard(): JSX.Element {

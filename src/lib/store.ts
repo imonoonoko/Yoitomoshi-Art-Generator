@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type {
   ActiveLora,
   AppSettings,
+  CheckpointPromptProfile,
   CivitaiAssetType,
   CivitaiCommunityStats,
   CivitaiRecommended,
@@ -12,6 +13,7 @@ import type {
   GenerationProgress,
   HistoryItem,
   LoraCivitaiMetadata,
+  LoraPromptOverride,
   LoraUsageRecord,
   PromptCategory,
   PromptPreset,
@@ -20,7 +22,8 @@ import type {
   SdLora,
   SdModel,
   SdSampler,
-  SdVae
+  SdVae,
+  VideoOutputFormat
 } from '@shared/types'
 
 /**
@@ -28,7 +31,7 @@ import type {
  * collapsible feature panels (ControlNet, adetailer, FreeU, etc.) rather
  * than splitting into many tabs.
  */
-export type WorkspaceTab = 'txt2img' | 'img2img' | 'upscale' | 'tools'
+export type WorkspaceTab = 'txt2img' | 'img2img' | 'tags' | 'video' | 'upscale' | 'models' | 'tools'
 export type GenerationWorkspaceMode = 'create' | 'refine' | 'advanced'
 
 /**
@@ -417,11 +420,33 @@ export interface GenerationParams {
   denoisingStrength: number
 }
 
+export type VideoClosedLoopMode = 'N' | 'R-P' | 'R+P' | 'A'
+
+export interface VideoGenerationState {
+  enabled: boolean
+  sourceMode: 'txt2img' | 'img2img'
+  motionModule: string
+  format: VideoOutputFormat
+  frames: number
+  fps: number
+  loopNumber: number
+  closedLoop: VideoClosedLoopMode
+  contextBatchSize: number
+  stride: number
+  overlap: number
+  lastResult: {
+    dataUrl: string
+    filePath: string
+    format: VideoOutputFormat
+    sizeBytes: number
+    createdAt: number
+  } | null
+}
+
 export interface AppState {
   // Active workspace tab. Determines which generation endpoint is used and
-  // which side panels are visible. New tabs cost top-level UI complexity, so
-  // resist adding them — host new features as collapsible panels inside an
-  // existing tab instead.
+  // which side panels are visible. Keep top-level tabs for workspace-scale
+  // flows; smaller helpers belong inside existing panels.
   currentTab: WorkspaceTab
   setCurrentTab(t: WorkspaceTab): void
   generationMode: GenerationWorkspaceMode
@@ -457,6 +482,9 @@ export interface AppState {
 
   fabric: FabricState
   patchFabric(patch: Partial<FabricState>): void
+
+  video: VideoGenerationState
+  patchVideo(patch: Partial<VideoGenerationState>): void
 
   upscale: UpscaleState
   upscalerList: string[]                                       // populated when Forge ready
@@ -564,6 +592,8 @@ export interface AppState {
   loraMeta: Map<string, LoraCivitaiMetadata>      // by lora.name
   activeLoras: ActiveLora[]
   loraFavorites: Set<string>
+  loraPromptOverrides: Map<string, LoraPromptOverride>
+  checkpointPromptProfiles: Map<string, CheckpointPromptProfile>
   loraSuggestions: ScoredLora[]
   loraUsage: LoraUsageRecord[]
   setLoras(l: SdLora[]): void
@@ -574,6 +604,12 @@ export interface AppState {
   removeActiveLora(name: string): void
   setLoraFavorites(f: Set<string>): void
   toggleLoraFavorite(name: string): void
+  setLoraPromptOverrides(items: LoraPromptOverride[]): void
+  upsertLoraPromptOverride(item: LoraPromptOverride): void
+  deleteLoraPromptOverride(id: string): void
+  setCheckpointPromptProfiles(items: CheckpointPromptProfile[]): void
+  upsertCheckpointPromptProfile(item: CheckpointPromptProfile): void
+  deleteCheckpointPromptProfile(id: string): void
   setLoraSuggestions(s: ScoredLora[]): void
   setLoraUsage(u: LoraUsageRecord[]): void
 
@@ -610,6 +646,21 @@ export const defaultParams: GenerationParams = {
   iterations: 1,
   clipSkip: 1,
   denoisingStrength: 0.65
+}
+
+export const DEFAULT_VIDEO: VideoGenerationState = {
+  enabled: false,
+  sourceMode: 'txt2img',
+  motionModule: '',
+  format: 'GIF',
+  frames: 8,
+  fps: 8,
+  loopNumber: 0,
+  closedLoop: 'R+P',
+  contextBatchSize: 4,
+  stride: 1,
+  overlap: -1,
+  lastResult: null
 }
 
 export function normalizeClipSkip(value: unknown): number {
@@ -741,6 +792,11 @@ export const useStore = create<AppState>((set) => ({
     fabric: { ...s.fabric, ...patch }
   })),
 
+  video: DEFAULT_VIDEO,
+  patchVideo: (patch) => set((s) => ({
+    video: { ...s.video, ...patch }
+  })),
+
   upscale: DEFAULT_UPSCALE,
   upscalerList: [],
   setUpscalerList: (names) => set({ upscalerList: names }),
@@ -760,7 +816,16 @@ export const useStore = create<AppState>((set) => ({
   setSchedulers: (s) => set({ schedulers: s }),
   setVaes: (v) => set({ vaes: v }),
   setSelectedVae: (name) => set({ selectedVae: name }),
-  setSelectedModel: (title) => set({ selectedModelTitle: title }),
+  setSelectedModel: (title) => set((state) => {
+    if (state.selectedModelTitle === title) return { selectedModelTitle: title }
+    return {
+      selectedModelTitle: title,
+      recommendation: null,
+      recommendationLoading: false,
+      communityStats: null,
+      communityStatsLoading: false
+    }
+  }),
 
   recommendation: null,
   recommendationLoading: false,
@@ -872,6 +937,8 @@ export const useStore = create<AppState>((set) => ({
   loraMeta: new Map(),
   activeLoras: [],
   loraFavorites: new Set(),
+  loraPromptOverrides: new Map(),
+  checkpointPromptProfiles: new Map(),
   loraSuggestions: [],
   loraUsage: [],
   setLoras: (l) => set({ loras: l }),
@@ -911,6 +978,34 @@ export const useStore = create<AppState>((set) => ({
       if (next.has(name)) next.delete(name)
       else next.add(name)
       return { loraFavorites: next }
+    }),
+  setLoraPromptOverrides: (items) =>
+    set({ loraPromptOverrides: new Map(items.map((item) => [item.id, item])) }),
+  upsertLoraPromptOverride: (item) =>
+    set((s) => {
+      const next = new Map(s.loraPromptOverrides)
+      next.set(item.id, item)
+      return { loraPromptOverrides: next }
+    }),
+  deleteLoraPromptOverride: (id) =>
+    set((s) => {
+      const next = new Map(s.loraPromptOverrides)
+      next.delete(id)
+      return { loraPromptOverrides: next }
+    }),
+  setCheckpointPromptProfiles: (items) =>
+    set({ checkpointPromptProfiles: new Map(items.map((item) => [item.id, item])) }),
+  upsertCheckpointPromptProfile: (item) =>
+    set((s) => {
+      const next = new Map(s.checkpointPromptProfiles)
+      next.set(item.id, item)
+      return { checkpointPromptProfiles: next }
+    }),
+  deleteCheckpointPromptProfile: (id) =>
+    set((s) => {
+      const next = new Map(s.checkpointPromptProfiles)
+      next.delete(id)
+      return { checkpointPromptProfiles: next }
     }),
   setLoraSuggestions: (s) => set({ loraSuggestions: s }),
   setLoraUsage: (u) => set({ loraUsage: u }),
