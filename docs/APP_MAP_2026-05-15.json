@@ -5,7 +5,7 @@
     "name": "Yoitomoshi Art Generator",
     "version": "0.1.0",
     "repoRoot": "C:\\宵灯工房アート\\Yoitomoshi-Art-Generator",
-    "purpose": "個人ゲーム開発用のStable Diffusion WebUI Forgeフロントエンド。生成、img2img、Upscale、モデル管理、Civitai/Hugging Face連携、履歴再利用、制作ナレッジ補助をElectronアプリにまとめる。",
+    "purpose": "自分が使いやすいStable Diffusion WebUI Forge利用ツール。生成、img2img、Upscale、モデル管理、Civitai/Hugging Face連携、履歴再利用、プロンプト補助をElectronアプリにまとめる。",
     "mentalModel": "React rendererが制作UIを持ち、Zustandが現在の制作状態を保持し、typed IPCを通じてElectron mainがForge API、ローカルStorage、外部モデル検索、ファイル操作を受け持つ。runtime/とuserdata/は環境依存なのでGit管理外。",
     "stack": {
       "desktop": "Electron 33 + electron-vite",

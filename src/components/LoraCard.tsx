@@ -454,6 +454,8 @@ export function LoraCard({ lora, compact = false, badge, badgeTooltip }: Props):
                 onChange={(e) => setDraftPositive(e.target.value)}
                 placeholder={t('loraCard.promptOverridePositivePlaceholder')}
                 className="input min-h-14 text-[11px] leading-relaxed resize-y"
+                data-prompt-dictionary-autocomplete="lora-positive"
+                data-testid="lora-prompt-override-positive"
               />
             </label>
             <label className="block space-y-1">
@@ -463,6 +465,8 @@ export function LoraCard({ lora, compact = false, badge, badgeTooltip }: Props):
                 onChange={(e) => setDraftNegative(e.target.value)}
                 placeholder={t('loraCard.promptOverrideNegativePlaceholder')}
                 className="input min-h-10 text-[11px] leading-relaxed resize-y"
+                data-prompt-dictionary-autocomplete="lora-negative"
+                data-testid="lora-prompt-override-negative"
               />
             </label>
             <div className="flex items-center gap-1.5">

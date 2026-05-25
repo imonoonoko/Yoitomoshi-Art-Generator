@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Animadex API 連携 要件・実装設計 2026-05-26</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101318;
+      --panel: #171c24;
+      --panel2: #202733;
+      --line: #313b49;
+      --text: #eef3f8;
+      --muted: #aeb9c7;
+      --ok: #83d892;
+      --warn: #f2cc68;
+      --bad: #ff9494;
+      --info: #91c3ff;
+      --accent: #d7a66e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.68;
+    }
+    header, main {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+    header { padding-top: 42px; }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 32px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 36px 0 14px;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+    p { margin: 8px 0; }
+    a { color: #9dc9ff; }
+    code {
+      background: #0b0e13;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 0.94em;
+    }
+    pre {
+      overflow-x: auto;
+      background: #0b0e13;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 24px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      vertical-align: top;
+    }
+    th {
+      background: #242c38;
+      color: #f6f8fb;
+      text-align: left;
+    }
+    td { background: var(--panel); }
+    ul, ol { margin: 8px 0 18px 22px; padding: 0; }
+    li { margin: 6px 0; }
+    .lead {
+      max-width: 980px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .verdict {
+      margin-top: 22px;
+      padding: 16px;
+      background: #1e261d;
+      border: 1px solid #3b5b3b;
+      border-radius: 8px;
+    }
+    .verdict strong { color: #dfffe5; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .k {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .v {
+      margin-top: 4px;
+      font-size: 21px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    .info { color: var(--info); }
+    .accent { color: var(--accent); }
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      background: var(--panel2);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .note {
+      border-left: 4px solid var(--accent);
+      background: #181c22;
+      padding: 10px 12px;
+      color: var(--muted);
+    }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin: 14px 0 24px;
+    }
+    .step {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--panel);
+      min-height: 84px;
+    }
+    .step strong { display: block; margin-bottom: 4px; }
+    @media (max-width: 880px) {
+      header, main { padding: 20px; }
+      .grid, .flow { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="pill">調査日: 2026-05-26 / 対象: Yoitomoshi Forge Studio + Animadex + CivitAI</p>
+    <h1>Animadex API 連携 要件・実装設計</h1>
+    <p class="lead">
+      Anima向けキャラクター・絵師検索エンジン Animadex を、Yoitomoshi Forge Studio の Prompt Helper、
+      Prompt Composer、Model Library、CivitAI導線へ接続するための要件定義と実装方針。
+      <code>$define-requirements</code> の軽量フローで、目的、範囲、非目標、受け入れ条件、リスク、実装手順を整理した。
+    </p>
+
+    <div class="verdict">
+      <strong>結論:</strong>
+      まずは「Animadexを生成エンジンとして扱う」のではなく、
+      <strong>外部知識ソースから prompt / character trigger / common tags / CivitAI LoRA候補を引く補助API</strong>として統合するのが最も相性がよい。
+      現行Yoitomoshi Forgeは公式Anima Baseを通常checkpointとして扱わない設計なので、
+      生成実行は既存Forgeのまま、Animadex由来の候補は「Animaでの知識可視化から得た制作ヒント」として表示する。
+      将来のForge NeoまたはComfyUI経路では、同じクライアントをAnima専用Preflightに昇格できる。
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="k">採用判定</div>
+        <div class="v ok">Use</div>
+        <p class="k">Prompt / LoRA探索補助として有用。</p>
+      </div>
+      <div class="card">
+        <div class="k">MVP範囲</div>
+        <div class="v info">検索 + 挿入</div>
+        <p class="k">API検索、候補表示、Prompt Composer slot反映。</p>
+      </div>
+      <div class="card">
+        <div class="k">直接依存リスク</div>
+        <div class="v warn">中</div>
+        <p class="k">公開APIは安定契約ではないためcache/fallback必須。</p>
+      </div>
+      <div class="card">
+        <div class="k">現行ForgeでのAnima生成</div>
+        <div class="v bad">非目標</div>
+        <p class="k">Anima生成はComfyUI / Forge Neo側の課題。</p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <h2>1. 前提と補正</h2>
+    <table>
+      <thead>
+        <tr><th>ユーザー向け紹介文</th><th>実装判断での扱い</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>「3.4万人のキャラクターと1.5万人の絵師タグを完全網羅」</td>
+          <td>
+            実測APIでは <code>/api/characters/facets</code> が <code>total=34301</code>、
+            <code>/api/artists/facets</code> が <code>total=15879</code> を返した。
+            ただし「完全網羅」ではなく、Danbooru由来データと生成済みサンプル範囲の検索インデックスとして扱う。
+          </td>
+        </tr>
+        <tr>
+          <td>「キャラ崩れによる無駄な生成コストを削減」</td>
+          <td>
+            正しい。特に trigger、作品名、共通タグ、サンプル画像を事前確認できるため、YoitomoshiのPrompt Helperに向く。
+            ただしサンプルはone-shot生成なので、正確性保証ではなく「候補の強さ」の目安にする。
+          </td>
+        </tr>
+        <tr>
+          <td>「CivitAIとの自動連携」</td>
+          <td>
+            Animadex側はキャラクターに紐づくLoRAを返す。
+            Yoitomoshi側では既存のCivitAI検索・download・source metadata保存へ橋渡しし、直接ダウンロード前にCivitAI詳細を再確認する。
+          </td>
+        </tr>
+        <tr>
+          <td>「VRAM 8GB程度で動作」</td>
+          <td>
+            ここはレポート上では断言しない。
+            Anima公式はComfyUI native supportと推奨設定を示すが、8GB実用性は解像度、sampler、quant/low bits、Forge Neo/ComfyUI構成で変わる。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>2. Animadex側の確認結果</h2>
+    <table>
+      <thead>
+        <tr><th>項目</th><th>確認内容</th><th>Yoitomoshiで使う意味</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>公開サイト</td>
+          <td><a href="https://animadex.net/" target="_blank" rel="noopener">animadex.net</a> は、34,000件超のcharactersと15,000件超のartistsを検索できると説明している。</td>
+          <td>ユーザーがブラウザで確認できる外部参照として、候補カードから開く価値がある。</td>
+        </tr>
+        <tr>
+          <td>公開API</td>
+          <td>
+            現行実装は <code>/api/characters/search</code>、<code>/api/artists/search</code>、
+            <code>/api/copyrights/search</code>、<code>/api/&lt;mode&gt;/facets</code>、
+            <code>/api/&lt;mode&gt;/facet/&lt;name&gt;</code> を持つ。
+            Live GETでは <code>Cache-Control: public, max-age=60</code> を確認。
+          </td>
+          <td>main processからfetchする薄いclientで十分。Rendererから直接叩かずIPCで型とcacheを挟む。</td>
+        </tr>
+        <tr>
+          <td>GitHub</td>
+          <td>
+            <a href="https://github.com/zetaneko/AnimaDex" target="_blank" rel="noopener">zetaneko/AnimaDex</a>
+            はMITで公開済み。確認commitは <code>af0cee9</code>。
+            READMEはFlask backend、vanilla JS frontend、SQLite storage、Windows用install/runを示す。
+          </td>
+          <td>API変更時は公開実装を見て追従できる。将来dataset公開後はローカルmirror/importも現実的。</td>
+        </tr>
+        <tr>
+          <td>CivitAI LoRA同期</td>
+          <td>
+            AnimaDexはCivitAI APIで <code>types=LORA</code>、<code>tag=character</code>、
+            <code>baseModels=Anima</code> を取得し、キャラslugへfuzzy matchしている。
+          </td>
+          <td>Yoitomoshi側はAnimadexの一致結果をそのまま信用しすぎず、CivitAI model idで詳細を再取得してdownload候補化する。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>2.1 現行APIの最小契約</h3>
+    <pre><code>GET https://animadex.net/api/characters/search?q=hatsune%20miku&amp;page=1&amp;sort=count
+GET https://animadex.net/api/characters/search?q=asuka&amp;page=1&amp;sort=count&amp;loras=1
+GET https://animadex.net/api/artists/search?q=takeuchi&amp;page=1&amp;sort=score
+GET https://animadex.net/api/characters/facets
+GET https://animadex.net/api/characters/facet/copyright?q=vocaloid</code></pre>
+    <table>
+      <thead>
+        <tr><th>mode</th><th>主要query</th><th>主な戻り値</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>characters</code></td>
+          <td><code>q</code>, <code>page</code>, <code>sort=count|az|random</code>, facets, <code>loras=1</code></td>
+          <td><code>slug</code>, <code>name</code>, <code>copyright_name</code>, <code>trigger</code>, <code>tags</code>, <code>count</code>, <code>thumb_url</code>, <code>img_url</code>, <code>loras[]</code></td>
+        </tr>
+        <tr>
+          <td><code>artists</code></td>
+          <td><code>q</code>, <code>page</code>, <code>sort=count|az|score|random</code>, facets</td>
+          <td><code>slug</code>, <code>name</code>, <code>trigger</code>, <code>score</code>, <code>thumb_url</code>, <code>img_url</code></td>
+        </tr>
+        <tr>
+          <td><code>copyrights</code></td>
+          <td><code>q</code>, <code>page</code>, <code>sort=count|az|random</code></td>
+          <td><code>slug</code>, <code>name</code>, <code>count</code>, <code>thumb_url</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>3. 目的</h2>
+    <p>
+      Yoitomoshi Forge Studio上で、キャラクター名、作品名、見た目、絵師名から
+      <strong>使えるprompt候補、Anima用trigger、共通タグ、関連LoRA、サンプル画像</strong>を短時間で引けるようにする。
+      既存のPrompt Helperが自然文メモからルールベースに候補を出すのに対し、Animadex連携は
+      「Animaが実際にどのタグをどれくらい持っていそうか」を外部インデックスとして補う。
+    </p>
+
+    <h2>4. スコープ</h2>
+    <table>
+      <thead>
+        <tr><th>優先度</th><th>範囲</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill">MVP</span></td>
+          <td>Animadex検索IPC</td>
+          <td>
+            <code>electron/animadex-api.ts</code> を追加し、character / artist / copyright検索をmain processで実行。
+            timeout、schema normalize、query cache、stale fallbackを実装する。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="pill">MVP</span></td>
+          <td>Prompt Helper連携</td>
+          <td>
+            <code>PromptHelperPanel</code> に「Animadexで探す」導線を追加。
+            結果カードから <code>trigger</code>、<code>tags</code>、artist tokenをPromptまたはPrompt Composer slotへ送る。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="pill">MVP</span></td>
+          <td>CivitAI LoRA bridge</td>
+          <td>
+            Animadexの <code>loras[]</code> を既存CivitAI APIへ橋渡しし、詳細表示、外部ページopen、download候補化を行う。
+            ダウンロードは既存の安全境界とmanifestを使う。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="pill">P1</span></td>
+          <td>Prompt Composer / Pro Prompt Slots</td>
+          <td>
+            character triggerを主題slot、外観タグを服/小物・表情/ポーズslot、artistを質感/画風slotへ分配する。
+            Anima向けprompt順は既存のモデル別slot orderへ追加する。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="pill">P1</span></td>
+          <td>Model Library / Preflight</td>
+          <td>
+            checkpoint prompt profileに <code>Anima</code> familyを追加する場合、Animadex検索を関連キャラ/LoRA探索として表示。
+            現行Forgeでは「Anima用知識であり生成互換は別」と明示する。
+          </td>
+        </tr>
+        <tr>
+          <td><span class="pill">Later</span></td>
+          <td>ローカルmirror/import</td>
+          <td>
+            フルDBまたはCSV公開後、<code>userdata/animadex/</code> にローカルインデックスを作る。
+            サイト負荷とAPI変更リスクを下げ、offline検索を可能にする。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>5. 非目標</h2>
+    <ul>
+      <li>現行 <code>runtime/forge</code> で公式Anima Baseを直接生成可能にすることは、この機能の非目標。</li>
+      <li>Animadexの全画像を自動ダウンロード、転載、再配布することはしない。</li>
+      <li>キャラクター再現の正確性を保証しない。候補カードに「sample-based / verify visually」を明示する。</li>
+      <li>起動時にAnimadexやCivitAIへ自動大量アクセスしない。検索はユーザー操作時だけ。</li>
+      <li>商用利用可否の判断を自動化しない。Anima本体と派生モデルの非商用条件は別警告にする。</li>
+    </ul>
+
+    <h2>6. 既存機能とのシナジー</h2>
+    <table>
+      <thead>
+        <tr><th>既存機能</th><th>接続案</th><th>価値</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Prompt Helper</td>
+          <td>自然文やキャラ名からAnimadex候補を検索し、positive / negative / warningの横へ「外部知識候補」を追加。</td>
+          <td>ローカルルールだけでは弱い固有名詞・作品名・衣装タグを補える。</td>
+        </tr>
+        <tr>
+          <td>Prompt Composer</td>
+          <td>検索結果のタグをslot単位で挿入。品質/Score、主題、服/小物、質感/画風へ分配。</td>
+          <td>ただタグを末尾に貼るのではなく、Yoitomoshiのprompt構造へ吸収できる。</td>
+        </tr>
+        <tr>
+          <td>Prompt Library / Tags Workspace</td>
+          <td>よく使うAnimadex候補をcustom libraryへ保存。source.kindは既存型へ <code>animadex</code> 追加を検討。</td>
+          <td>毎回ネット検索せず、制作語彙として育てられる。</td>
+        </tr>
+        <tr>
+          <td>CivitAI search / download</td>
+          <td>AnimadexのLoRA URLからmodel idを取り、CivitAI APIで詳細・primary file・license系metadataを再取得。</td>
+          <td>LoRA候補探しと安全なdownload manifestを一つの流れにできる。</td>
+        </tr>
+        <tr>
+          <td>Model Library</td>
+          <td>Anima系checkpoint / LoRAに「Animadexでキャラ探索」ボタン。関連LoRAをcheckpoint profileへ保存。</td>
+          <td>モデル管理から制作準備までがつながる。</td>
+        </tr>
+        <tr>
+          <td>History / Next Image</td>
+          <td>生成履歴にAnimadex source metadataを保存し、同じキャラ・作品・artistで再探索できるようにする。</td>
+          <td>「この方向で続ける」の次の一枚に外部キャラ知識を足せる。</td>
+        </tr>
+        <tr>
+          <td>Forge Neo / ComfyUI V2構想</td>
+          <td>Anima familyのpreflightとして、3ファイルbundle、推奨prompt order、Animadex検索をまとめる。</td>
+          <td>将来Anima生成経路を作った時に、UIの知識層を再利用できる。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>7. 推奨アーキテクチャ</h2>
+    <div class="flow">
+      <div class="step">
+        <strong>1. Renderer UI</strong>
+        <span class="k">Prompt Helper / Composer / Model Libraryから検索要求</span>
+      </div>
+      <div class="step">
+        <strong>2. IPC</strong>
+        <span class="k"><code>animadex:search</code> で型付き境界を通す</span>
+      </div>
+      <div class="step">
+        <strong>3. Main client</strong>
+        <span class="k"><code>electron/animadex-api.ts</code> がfetch、normalize、cache</span>
+      </div>
+      <div class="step">
+        <strong>4. Suggestion adapter</strong>
+        <span class="k">trigger/tags/lorasをYoitomoshi用候補へ変換</span>
+      </div>
+      <div class="step">
+        <strong>5. Existing actions</strong>
+        <span class="k">Prompt挿入、slot挿入、CivitAI詳細取得、download</span>
+      </div>
+    </div>
+
+    <h3>7.1 追加ファイル案</h3>
+    <table>
+      <thead>
+        <tr><th>ファイル</th><th>役割</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>electron/animadex-api.ts</code></td>
+          <td>Animadex HTTP client。baseUrl、timeout、cache、schema normalize、error分類、rate-limit backoff。</td>
+        </tr>
+        <tr>
+          <td><code>src/shared/types.ts</code></td>
+          <td><code>AnimadexCharacterResult</code>、<code>AnimadexArtistResult</code>、<code>AnimadexLoraRef</code>、<code>AnimadexSearchRequest</code>、<code>AnimadexSearchResult</code> を追加。</td>
+        </tr>
+        <tr>
+          <td><code>src/shared/ipc-channels.ts</code></td>
+          <td><code>animadexSearch</code>、<code>animadexFacets</code>、将来用 <code>animadexOpenExternal</code> など。</td>
+        </tr>
+        <tr>
+          <td><code>electron/preload.ts</code></td>
+          <td><code>window.api.animadex.search()</code> を公開。</td>
+        </tr>
+        <tr>
+          <td><code>electron/ipc-handlers.ts</code></td>
+          <td>入力検証、設定読み込み、client呼び出し、cache保存。外部URLは許可ドメインを限定。</td>
+        </tr>
+        <tr>
+          <td><code>src/lib/animadex-suggest.ts</code></td>
+          <td>Animadex結果をPrompt Composer slot、Prompt Helper候補、CivitAI bridge候補へ変換する純粋関数。</td>
+        </tr>
+        <tr>
+          <td><code>src/components/AnimadexSearchPanel.tsx</code></td>
+          <td>Prompt Helper / Model Libraryから再利用できる検索カードUI。data-testidを固定。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>7.2 cache設計</h3>
+    <p>
+      <code>userdata/animadex/cache.json</code> またはquery単位の小ファイルに、
+      query hash、mode、params、fetchedAt、expiresAt、result summaryを保存する。
+      既定TTLは検索結果24時間、facets 7日、失敗時はstale cacheを警告付きで返す。
+      画像本体は自動保存せず、thumbnail URLだけ保持する。
+    </p>
+
+    <h2>8. UI要件</h2>
+    <table>
+      <thead>
+        <tr><th>画面</th><th>表示</th><th>操作</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Prompt Helper</td>
+          <td>
+            入力欄の下に「Animadex」検索セクション。mode切替は Characters / Artists / Series。
+            結果カードにthumb、name、series、count、trigger、tags、LoRA有無、source badge。
+          </td>
+          <td>
+            <code>triggerを追加</code>、<code>tagsを追加</code>、<code>slotへ送る</code>、
+            <code>CivitAI LoRAを見る</code>、<code>Danbooruを開く</code>。
+          </td>
+        </tr>
+        <tr>
+          <td>Prompt Composer</td>
+          <td>slot draftの横にAnimadex候補chipを出す。artistは <code>@artist name</code> を明示。</td>
+          <td>slot別挿入、全slotプレビュー、Anima prompt orderで整形。</td>
+        </tr>
+        <tr>
+          <td>Model Library</td>
+          <td>Anima系またはAnima LoRA候補のカードに「Animadexで探索」。</td>
+          <td>関連LoRAをcheckpoint profileの <code>relatedModels.loras</code> へ保存。</td>
+        </tr>
+        <tr>
+          <td>Preflight</td>
+          <td>現行ForgeでAnima用候補を使う場合は「知識参照のみ」の警告。Forge Neo / ComfyUIならAnima bundle確認へ昇格。</td>
+          <td>不足しているText Encoder / VAE / Anima checkpointを別runtimeの準備項目として表示。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>9. 受け入れ条件</h2>
+    <ol>
+      <li><code>hatsune miku</code> をCharacters検索し、trigger、series、tags、thumbnailを表示できる。</li>
+      <li><code>asuka</code> をLoRAありで検索し、Animadex由来LoRAを表示し、CivitAIページを開ける。</li>
+      <li>検索結果の <code>trigger</code> と <code>tags</code> を既存promptへ追記でき、既存promptを上書きしない。</li>
+      <li>Prompt Composer slot挿入ONの場合、結果が主題・服/小物・質感/画風などのslotへ入る。</li>
+      <li>Animadexが落ちている、schemaが変わった、rate-limitされた場合でもアプリ全体は壊れず、stale cacheまたは明確なエラーを返す。</li>
+      <li>CivitAI downloadは既存download manifest、allowed domain、SHA検証の流れを使い、Animadex URLから直接任意ファイルを保存しない。</li>
+      <li>起動時にはAnimadexへアクセスしない。ユーザー検索または明示更新時だけ通信する。</li>
+      <li>DOM QAは表示文言ではなく <code>data-testid</code> で検索、結果カード、挿入、エラー状態を確認する。</li>
+    </ol>
+
+    <h2>10. 実装手順</h2>
+    <table>
+      <thead>
+        <tr><th>段階</th><th>作業</th><th>検証</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>0. Contract spike</td>
+          <td>Animadex APIのlive smokeを小スクリプトで固定し、schema型を決める。GitHub実装とlive応答の差を記録。</td>
+          <td>Node fetchでcharacters/artists/copyrights検索が通る。schema validatorが不正値を落とす。</td>
+        </tr>
+        <tr>
+          <td>1. IPC client</td>
+          <td><code>animadex-api.ts</code>、shared types、IPC、preloadを追加。cacheとtimeoutを実装。</td>
+          <td><code>npm.cmd run typecheck</code>、<code>qa:dom:api</code>。</td>
+        </tr>
+        <tr>
+          <td>2. Reusable panel</td>
+          <td><code>AnimadexSearchPanel</code> を作り、Prompt Helperに組み込む。</td>
+          <td>検索結果カード、追加ボタン、エラー/空状態のDOM QA。</td>
+        </tr>
+        <tr>
+          <td>3. Prompt adapter</td>
+          <td><code>animadex-suggest.ts</code> でtrigger/tags/artistをPrompt Composer slotへ分配。</td>
+          <td><code>prompt-composer</code>、<code>prompt-helper-review</code> 系DOM QA。</td>
+        </tr>
+        <tr>
+          <td>4. CivitAI bridge</td>
+          <td>LoRA URLからmodel idを解析し、既存CivitAI APIで詳細取得、download候補化。</td>
+          <td>CivitAIページopen、download fixture、source metadata保存確認。</td>
+        </tr>
+        <tr>
+          <td>5. Model Library / Preflight</td>
+          <td>Anima系profileと関連LoRA保存を追加。現行Forgeでは生成互換警告を出す。</td>
+          <td><code>model-profile-pro</code>、<code>model-library-recipe</code>、<code>workspace-preflight</code>。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>11. リスクと停止条件</h2>
+    <table>
+      <thead>
+        <tr><th>リスク</th><th>対策</th><th>停止条件</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Animadex APIが公式安定契約ではない</td>
+          <td>main process clientに閉じ込める。schema normalizeとcache fallback。baseUrlを設定化。</td>
+          <td>APIが頻繁に変わり、1週間以内に追従不能な破壊変更が続く場合はlocal dataset待ちへ切替。</td>
+        </tr>
+        <tr>
+          <td>サイト負荷・rate limit</td>
+          <td>起動時アクセス禁止、debounce、1 query cache、manual refresh、User-Agent明示。</td>
+          <td>運営がAPI利用を明示的に拒否した場合は即停止し、ブラウザopenだけにする。</td>
+        </tr>
+        <tr>
+          <td>LoRA fuzzy matchの誤一致</td>
+          <td>CivitAI側のmodel id、title、baseModel、trainedWordsを再確認し、ユーザー承認後にdownload。</td>
+          <td>誤一致率が高く、キャラ名だけで安全に提示できない場合は「外部ページを開く」に縮小。</td>
+        </tr>
+        <tr>
+          <td>作品・キャラ・絵師名の権利/規約</td>
+          <td>候補はprompt補助であり、商用可否を保証しない。Anima非商用警告をPreflightへ出す。</td>
+          <td>公開配布や商用制作サポートへ広げる場合はライセンス/利用規約の別レビューを必須化。</td>
+        </tr>
+        <tr>
+          <td>現行Forgeとの誤解</td>
+          <td>「Animadex候補はAnima向け知識。現行Forgeで再現保証なし」とUIに出す。</td>
+          <td>ユーザーがAnima生成機能と誤認するUIになる場合はラベルと導線を再設計。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>12. 推奨MVP仕様</h2>
+    <div class="note">
+      最初の実装は、Prompt Helper内の折りたたみパネルとして始める。
+      トップレベルタブを増やさず、既存のPrompt/Model/CivitAI導線を強くする。
+      成功したらPrompt Composer slot挿入とModel Library profileへ拡張する。
+    </div>
+    <ul>
+      <li>検索UI: mode、query、LoRAありのみ、sort、page。</li>
+      <li>候補カード: thumb、name、series/artist、count/score、trigger、top tags、LoRA count、source links。</li>
+      <li>挿入操作: trigger追加、tags追加、slotへ送る、custom libraryへ保存。</li>
+      <li>CivitAI操作: LoRA詳細取得、CivitAIで開く、既存download modalへ送る。</li>
+      <li>安全表示: source badge、Anima専用注意、sample accuracy注意、非商用注意。</li>
+      <li>保存: query cache、最近使ったAnimadex候補、history source metadata。</li>
+    </ul>
+
+    <h2>13. 検証計画</h2>
+    <ul>
+      <li>Docs-only段階: <code>git diff --check</code>。</li>
+      <li>実装段階: <code>npm.cmd run typecheck</code>。</li>
+      <li>IPC追加後: <code>npm.cmd run qa:dom:api -- --port=9338</code>。</li>
+      <li>Prompt UI追加後: <code>npm.cmd run qa:dom:prompt-helper-review -- --port=9338</code> と <code>npm.cmd run qa:dom:prompt-composer -- --port=9338</code>。</li>
+      <li>Model/CivitAI連携後: <code>npm.cmd run qa:dom:model-profile-pro -- --port=9338</code>、<code>npm.cmd run qa:dom:model-library-recipe -- --port=9338</code>。</li>
+      <li>外部API smoke: <code>hatsune miku</code>、<code>asuka</code>、<code>takeuchi</code>、空結果、network error、stale cache。</li>
+    </ul>
+
+    <h2>14. Sources</h2>
+    <table>
+      <thead>
+        <tr><th>Source</th><th>用途</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="https://www.reddit.com/r/StableDiffusion/comments/1tlbh78/i_made_an_anima_ai_character_artist_search_engine/" target="_blank" rel="noopener">Reddit: Animadex announcement</a></td>
+          <td>機能説明、49,000 samples、GitHub/dataset公開予定、精度注意、利用者反応。</td>
+        </tr>
+        <tr>
+          <td><a href="https://animadex.net/" target="_blank" rel="noopener">Animadex public site</a></td>
+          <td>公開UI、件数表示、検索機能、CivitAI LoRA表示。</td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/zetaneko/AnimaDex" target="_blank" rel="noopener">GitHub: zetaneko/AnimaDex</a></td>
+          <td>API route、Flask/SQLite構成、MIT license、pipeline、CivitAI sync。</td>
+        </tr>
+        <tr>
+          <td><a href="https://huggingface.co/circlestone-labs/Anima" target="_blank" rel="noopener">Hugging Face: circlestone-labs/Anima</a></td>
+          <td>Anima公式構成、ComfyUI native support、必要ファイル、prompting、ライセンス。</td>
+        </tr>
+        <tr>
+          <td><code>docs/AI_PROJECT_MAP.md</code>、<code>docs/maps/02-prompt-management-flow.md</code>、<code>docs/maps/03-lora-civitai-model-flow.md</code></td>
+          <td>Yoitomoshi側のPrompt、Model Library、CivitAI、IPC設計の既存契約。</td>
+        </tr>
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>

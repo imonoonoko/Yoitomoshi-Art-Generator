@@ -102,17 +102,21 @@ export class ForgeManager extends EventEmitter {
     // Going straight to launch.py with the right env avoids the whole chain.
     const extraArgs = this.opts.extraArgs ? this.opts.extraArgs.split(/\s+/).filter(Boolean) : []
     const addSkipInstall = this.shouldAddSkipInstall(extraArgs)
-    const args = [
+    const baseArgs = [
       '--nowebui',
-      '--api-log',
       '--port', String(this.opts.port),
       '--skip-version-check',
       ...(addSkipInstall ? ['--skip-install'] : []),
+      ...(addSkipInstall ? ['--skip-torch-cuda-test'] : []),
+      '--disable-console-progressbars',
+      '--no-prompt-history',
       ...extraArgs
     ]
+    const args = this.dedupeArgs(baseArgs)
     if (addSkipInstall) {
-      console.log('[forge] install checks skipped; marker is current')
+      console.log('[forge] install/CUDA checks skipped; marker is current')
     }
+    const hfCacheDir = join(webuiDir, 'models', 'diffusers')
 
     const env = {
       ...process.env,
@@ -130,10 +134,21 @@ export class ForgeManager extends EventEmitter {
       PY_PIP: join(pyDir, 'Scripts'),
       SKIP_VENV: '1',
       PIP_INSTALLER_LOCATION: join(pyDir, 'get-pip.py'),
-      TRANSFORMERS_CACHE: join(sysDir, 'transformers-cache'),
+      HF_HOME: hfCacheDir,
+      HF_HUB_CACHE: hfCacheDir,
+      HF_ASSETS_CACHE: hfCacheDir,
+      HF_DATASETS_CACHE: hfCacheDir,
       // launch.py reads COMMANDLINE_ARGS from env — same mechanism A1111 uses.
       COMMANDLINE_ARGS: args.join(' '),
-      PYTHONUNBUFFERED: '1'
+      PYTHONUNBUFFERED: '1',
+      PYTHONIOENCODING: 'utf-8',
+      PIP_DISABLE_PIP_VERSION_CHECK: '1',
+      GRADIO_ANALYTICS_ENABLED: 'False',
+      HF_HUB_DISABLE_TELEMETRY: '1',
+      DISABLE_TELEMETRY: 'YES',
+      USE_TF: '0',
+      TRANSFORMERS_NO_TF: '1',
+      TRANSFORMERS_NO_FLAX: '1'
     }
 
     try {
@@ -352,6 +367,30 @@ export class ForgeManager extends EventEmitter {
     return files
   }
 
+  private dedupeArgs(args: string[]): string[] {
+    const out: string[] = []
+    const flagsWithValue = new Set(['--port'])
+    const seenFlags = new Set<string>()
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i]
+      if (!arg.startsWith('--')) {
+        out.push(arg)
+        continue
+      }
+      if (seenFlags.has(arg)) {
+        if (flagsWithValue.has(arg)) i += 1
+        continue
+      }
+      seenFlags.add(arg)
+      out.push(arg)
+      if (flagsWithValue.has(arg) && i + 1 < args.length) {
+        out.push(args[i + 1])
+        i += 1
+      }
+    }
+    return out
+  }
+
   private writeInstallReadyMarker(): void {
     try {
       writeFileSync(
@@ -472,7 +511,8 @@ export class ForgeManager extends EventEmitter {
             kind: 'ready',
             port,
             url: `http://127.0.0.1:${port}`,
-            brokenExtensions: this.brokenExtsArr()
+            brokenExtensions: this.brokenExtsArr(),
+            logTail: this.logTail.slice(-80)
           })
           return
         }
@@ -488,7 +528,7 @@ export class ForgeManager extends EventEmitter {
         })
         return
       }
-      setTimeout(tick, 750)
+      setTimeout(tick, 300)
     }
     tick()
   }

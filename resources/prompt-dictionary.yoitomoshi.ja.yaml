@@ -1,0 +1,241 @@
+# Yoitomoshi Prompt Daijiten starter dictionary.
+# This is original Yoitomoshi-authored content, not a copy of an external prompt dictionary.
+# It uses the same schema as prompt-library.yoitomoshi.ja.yaml so the existing
+# Prompt Library, Prompt Dictionary panel, autocomplete, and JSON import pipeline
+# can all share one searchable tag source.
+
+- name: "大辞典: 人物"
+  groups:
+    - name: 顔・表情
+      color: rgba(238, 126, 153, .35)
+      tags:
+        gentle smile: 穏やかに微笑んだ表情。柔らかい印象にしたい時の基本タグ。
+        soft smile: 控えめな笑顔。落ち着いたポートレートや静かな雰囲気向け。
+        bright smile: 明るくはっきりした笑顔。元気で親しみやすい印象。
+        faint smile: かすかな微笑み。ミステリアス、上品、儚い表情に使う。
+        serious expression: 真剣な表情。戦闘、緊張感、仕事中の雰囲気向け。
+        confident expression: 自信のある表情。強いキャラクター性を出す。
+        shy expression: 恥ずかしそうな表情。照れ、控えめなキャラ、距離感の演出。
+        surprised expression: 驚いた表情。目を開いたリアクションや物語性に使う。
+        sleepy expression: 眠そうな表情。朝、夜更かし、ゆるい日常に合う。
+        tearful eyes: 涙ぐんだ目。泣き顔の手前、感情のこもった場面向け。
+        looking at viewer: 視線をこちらへ向ける。ポートレートの基本。
+        looking away: 視線を外す。自然な一瞬、内省的な空気を作る。
+        looking back: 振り返ってこちらを見る。後ろ姿や物語性のある構図向け。
+        eye contact: 目線が合っている状態。印象を強くしたい時に使う。
+        half-closed eyes: 半目。眠さ、色気、落ち着き、退屈さの表現。
+
+    - name: 髪・目
+      color: rgba(238, 126, 153, .35)
+      tags:
+        long hair: 長い髪。女性キャラ、風になびく表現、シルエット作りに使う。
+        short hair: 短い髪。活発、すっきりした印象。
+        bob cut: ボブカット。丸みのある髪型、日常キャラ向け。
+        twin tails: ツインテール。左右に分けた髪。かわいさや記号性が強い。
+        ponytail: ポニーテール。動き、スポーティ、清潔感のある髪型。
+        side ponytail: サイドポニーテール。片側にまとめた髪で個性を出す。
+        messy hair: 少し乱れた髪。寝起き、動き、ラフな雰囲気。
+        ahoge: アホ毛。コミカルさやキャラ記号に使う。
+        hair between eyes: 目の間に髪がかかる。アニメ調の顔周りを作る定番。
+        hair ornament: 髪飾り。リボン、花、ピンなどの小物を出しやすくする。
+        shining eyes: きらきらした目。感情や可愛さを強調。
+        detailed eyes: 目の描き込みを増やす。顔アップや高品質仕上げ向け。
+        gradient eyes: グラデーションのある瞳。アニメ塗りや幻想的な目に使う。
+        heterochromia: オッドアイ。左右で瞳の色が違うキャラクター。
+        eyes visible through hair: 髪越しに目が見える表現。前髪が長いキャラ向け。
+
+    - name: 体型・シルエット
+      color: rgba(238, 126, 153, .35)
+      tags:
+        slender body: 細身の体型。すらっとしたシルエット。
+        petite body: 小柄な体型。全体のサイズ感を小さめに寄せる。
+        tall woman: 背の高い女性。大人っぽい立ち姿に向く。
+        athletic body: 運動している体型。スポーツ、戦闘、引き締まった印象。
+        curvy figure: 曲線的な体型。腰や胸のラインを強めたい時に使う。
+        narrow waist: くびれた腰。シルエットを強調する補助タグ。
+        wide hips: 腰回りを広めにする。体型のメリハリを出す。
+        large breasts: 大きな胸。おっぱいのボリュームを強めたい時の基本タグ。
+        medium breasts: 中くらいの胸。誇張しすぎない自然な体型。
+        small breasts: 小さめの胸。細身、控えめな体型表現。
+        cleavage: 胸元の谷間。衣装やポーズと合わせて使う。
+        sideboob: 横から見える胸元。露出衣装や横向き構図向け。
+        underboob: 下側が見える胸元。露出の強い衣装向け。成人キャラ前提で使う。
+        bouncing breasts: 胸が揺れる表現。動きのあるおっぱい描写、motion linesと相性がよい。
+        breast awe: 胸に視線や驚きが向くニュアンス。コミカルな反応や強調表現向け。
+
+- name: "大辞典: ポーズ"
+  groups:
+    - name: 基本ポーズ
+      color: rgba(133, 199, 255, .35)
+      tags:
+        standing: 立っているポーズ。全身構図の基本。
+        sitting: 座っているポーズ。日常、室内、落ち着いたシーン向け。
+        kneeling: 膝をついたポーズ。祈り、戦闘後、儀式的な場面。
+        walking: 歩いている。日常や旅の途中の雰囲気。
+        running: 走っている。動き、緊急感、スポーツに使う。
+        jumping: ジャンプ。元気さや浮遊感を出す。
+        leaning forward: 前のめり。勢い、覗き込み、親密な距離感。
+        leaning back: 後ろに寄りかかる。余裕、リラックス、挑発的な印象。
+        arms crossed: 腕組み。自信、警戒、強い態度。
+        hands on hips: 腰に手を当てる。堂々とした立ち姿。
+        hand on cheek: 頬に手を添える。考え事、かわいさ、ポートレート向け。
+        hand on chest: 胸元に手を当てる。感情、誓い、上品なポーズ。
+        outstretched hand: 手を差し出す。誘い、魔法、ドラマ性のある構図。
+        peace sign: ピースサイン。明るい記念写真風。
+        waving: 手を振る。挨拶、別れ、日常シーン。
+
+    - name: 動き・演出
+      color: rgba(133, 199, 255, .35)
+      tags:
+        dynamic pose: 動きの強いポーズ。アクションやキービジュアル向け。
+        action pose: 行動中のポーズ。戦闘、スポーツ、ダンスに使う。
+        dancing: 踊っている。リズム、ステージ、軽やかな動き。
+        floating: 浮いている。魔法、夢、無重力、幻想表現。
+        hair flowing: 髪がなびく。風や動きを自然に出す。
+        clothes fluttering: 服がはためく。風、速度、ドラマチックな演出。
+        motion lines: 動きを示す線。おっぱいや髪、腕の動きを漫画的に強調する時にも使える。
+        wind: 風。髪、スカート、リボンの動きを作る補助。
+        dramatic pose: 見栄を切るようなポーズ。表紙、宣伝絵、強い印象に向く。
+        reaching out: 手を伸ばす。距離感、物語性、奥行きの演出。
+
+- name: "大辞典: 衣装"
+  groups:
+    - name: 日常衣装
+      color: rgba(255, 196, 89, .35)
+      tags:
+        casual clothes: 普段着。日常シーンの基本。
+        school uniform: 学校制服。学生キャラクター、学園背景と合わせる。
+        sailor uniform: セーラー服。日本の学校制服風。
+        blazer uniform: ブレザー制服。現代学園ものに使いやすい。
+        hoodie: パーカー。ラフ、若さ、ストリート感。
+        oversized hoodie: 大きめパーカー。ゆるいシルエットや可愛さに使う。
+        cardigan: カーディガン。柔らかい日常感。
+        pleated skirt: プリーツスカート。制服や日常衣装でよく使う。
+        long skirt: ロングスカート。落ち着いた雰囲気。
+        denim jacket: デニムジャケット。カジュアルで少し硬めの質感。
+        apron: エプロン。料理、カフェ、作業中の雰囲気。
+        pajamas: パジャマ。寝室、朝、リラックスした場面。
+
+    - name: 和風・ファンタジー
+      color: rgba(255, 196, 89, .35)
+      tags:
+        kimono: 着物。和風衣装の基本。
+        yukata: 浴衣。夏祭り、温泉、夜景と相性がよい。
+        hakama: 袴。神社、剣道、和風学生、巫女系に使う。
+        miko outfit: 巫女装束。神社、儀式、和風ファンタジー向け。
+        shrine maiden: 巫女。キャラクター属性として使いやすい。
+        fantasy outfit: ファンタジー衣装。異世界、冒険者、魔法使い向け。
+        mage robe: 魔法使いのローブ。魔法学校や儀式シーンに使う。
+        armor: 鎧。戦士、騎士、戦闘シーン。
+        light armor: 軽装鎧。動きやすい冒険者風。
+        cloak: マント。旅、魔法、ドラマチックなシルエット。
+        ornate dress: 装飾の多いドレス。王族、舞踏会、豪華な絵向け。
+        gothic dress: ゴシックドレス。黒、レース、重厚な雰囲気。
+
+    - name: 素材・質感
+      color: rgba(255, 196, 89, .35)
+      tags:
+        silk fabric: シルクの布地。光沢があり上品な衣装に使う。
+        lace trim: レースの縁取り。ドレス、下着風衣装、繊細な装飾。
+        sheer fabric: 透け感のある布。軽い衣装、幻想的な雰囲気。
+        leather jacket: 革ジャケット。硬い質感、ストリート、戦闘寄り。
+        metallic armor: 金属鎧。光沢と硬さを強調。
+        embroidered pattern: 刺繍模様。和服、民族衣装、豪華な布に使う。
+        floral pattern: 花柄。かわいい服、着物、ワンピース向け。
+        plaid pattern: チェック柄。制服、スカート、日常衣装。
+        transparent sleeves: 透け袖。軽い布感や上品な露出。
+        frills: フリル。可愛さ、ドレス、ロリータ調の装飾。
+
+- name: "大辞典: 画面設計"
+  groups:
+    - name: 構図
+      color: rgba(124, 140, 255, .35)
+      tags:
+        portrait composition: 顔や上半身を中心にしたポートレート構図。
+        full body composition: 全身が入る構図。服装やポーズを見せたい時に使う。
+        close-up portrait: 顔のアップ。目、表情、髪の描写を強める。
+        cowboy shot: 太もも付近までの構図。キャラと衣装を両方見せやすい。
+        dutch angle: 斜めに傾いた構図。緊張感や違和感を出す。
+        over the shoulder: 肩越し構図。会話、振り返り、映画的な見せ方。
+        from above: 上から見下ろす構図。小ささ、可愛さ、俯瞰。
+        from below: 下から見上げる構図。迫力、自信、巨大感。
+        symmetrical framing: 左右対称の画面。静謐、神聖、整った印象。
+        foreground blur: 手前をぼかす。奥行きと写真感を出す。
+        layered depth: 前景・中景・背景の層を作る。密度の高い画面向け。
+
+    - name: 光・色
+      color: rgba(124, 140, 255, .35)
+      tags:
+        warm rim light: 暖色のリムライト。輪郭を柔らかく浮かせる。
+        cool rim light: 寒色のリムライト。夜、SF、静かな空気向け。
+        soft ambient light: 柔らかい環境光。影を強くしすぎない。
+        hard sunlight: 強い日差し。夏、屋外、影のコントラスト。
+        dappled sunlight: 木漏れ日。森、公園、自然な模様の光。
+        neon glow: ネオンの光。夜の街、サイバー、派手な色。
+        candle glow: ろうそくの光。室内、神秘、温かい暗さ。
+        moonlit scene: 月明かりの場面。夜、青い光、静けさ。
+        pastel palette: パステル調の配色。柔らかく可愛い画面。
+        limited color palette: 色数を絞った画面。統一感を出す。
+        complementary colors: 補色配色。印象を強くする色設計。
+
+- name: "大辞典: 背景"
+  groups:
+    - name: 日常
+      color: rgba(95, 214, 180, .35)
+      tags:
+        cozy bedroom: 居心地の良い寝室。朝、夜、生活感に使う。
+        messy bedroom: 少し散らかった寝室。生活感、作業部屋、親密な空間。
+        sunlit classroom: 日差しの入る教室。学園もの、青春感。
+        quiet library: 静かな図書館。読書、知的、落ち着いた雰囲気。
+        small cafe: 小さなカフェ。日常、会話、柔らかい照明。
+        train interior: 電車内。通学、移動、現代日本の雰囲気。
+        rainy street: 雨の街路。反射、傘、寂しさ、映画感。
+        night city street: 夜の街。ネオン、濡れた路面、都会感。
+        rooftop at sunset: 夕方の屋上。青春、風、空の広さ。
+        convenience store at night: 夜のコンビニ。日常と孤独感の両方に使える。
+
+    - name: 幻想・物語
+      color: rgba(95, 214, 180, .35)
+      tags:
+        ancient temple: 古代寺院。儀式、冒険、神秘的な背景。
+        ruined city: 廃墟の街。ポストアポカリプス、戦闘後、寂しさ。
+        crystal cave: 水晶洞窟。ファンタジー、透明感、青い光。
+        floating islands: 浮遊島。空、冒険、壮大なファンタジー。
+        magic circle: 魔法陣。魔法発動、召喚、儀式演出。
+        enchanted garden: 魔法の庭。花、光、幻想的な日常。
+        royal hall: 王宮の大広間。豪華、格式、ドレスと相性がよい。
+        starry sky: 星空。夜、静けさ、ロマンチックな雰囲気。
+        aurora sky: オーロラの空。寒色、幻想、広い風景。
+        dreamscape: 夢のような空間。現実感を弱めたい時に使う。
+
+- name: "大辞典: 失敗回避"
+  groups:
+    - name: 人体・顔
+      color: rgba(255, 96, 96, .35)
+      tags:
+        bad hands: 手の崩れを避ける基本ネガティブタグ。
+        extra fingers: 指が多くなる破綻を避ける。
+        missing fingers: 指が足りない破綻を避ける。
+        fused fingers: 指がくっつく破綻を避ける。
+        bad anatomy: 人体構造の崩れを避ける基本タグ。
+        deformed body: 体が歪む破綻を避ける。
+        long neck: 首が長くなりすぎる破綻を避ける。
+        asymmetric eyes: 左右の目がズレる破綻を避ける。
+        deformed face: 顔の崩れを避ける。
+        cross-eyed: 視線が寄りすぎる破綻を避ける。
+        bad teeth: 歯の崩れを避ける。
+
+    - name: 画質・不要物
+      color: rgba(255, 96, 96, .35)
+      tags:
+        lowres: 低解像度感を避ける。
+        blurry: ぼやけを避ける。
+        jpeg artifacts: JPEG圧縮ノイズを避ける。
+        watermark: 透かし文字を避ける。
+        signature: 署名を避ける。
+        text: 不要な文字を避ける。
+        logo: ロゴを避ける。
+        cropped: 体や顔が不自然に切れるのを避ける。
+        out of frame: 画面外にはみ出す破綻を避ける。
+        duplicate character: 同じ人物が意図せず増える破綻を避ける。
+        multiple views: 複数視点・分割絵のような破綻を避ける。

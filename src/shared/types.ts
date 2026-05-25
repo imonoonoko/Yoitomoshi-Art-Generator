@@ -3,7 +3,7 @@
 export type ForgeStatus =
   | { kind: 'stopped' }
   | { kind: 'starting'; phase: string; logTail: string[] }
-  | { kind: 'ready'; port: number; url: string; brokenExtensions: string[] }
+  | { kind: 'ready'; port: number; url: string; brokenExtensions: string[]; logTail?: string[] }
   | { kind: 'error'; message: string; logTail: string[] }
 
 export interface StartupMetrics {
@@ -252,6 +252,32 @@ export type CheckpointPromptFamily =
   | 'custom'
 
 export type CheckpointPromptProfileMode = 'manual' | 'suggest' | 'auto'
+export type CheckpointPromptStyle = 'tag' | 'natural' | 'structured' | 'hybrid'
+export type CheckpointNegativeStrategy = 'classic' | 'minimal' | 'positive-replacement'
+
+export interface CheckpointRecommendedAspectRatio {
+  label: string
+  width: number
+  height: number
+}
+
+export type CheckpointRelatedModelKind = 'lora' | 'vae' | 'controlnet'
+
+export interface CheckpointRelatedModelReference {
+  kind: CheckpointRelatedModelKind
+  name: string
+  path?: string | null
+  sha256?: string | null
+  role?: string | null
+  weight?: number | null
+  notes?: string[]
+}
+
+export interface CheckpointRelatedModels {
+  loras: CheckpointRelatedModelReference[]
+  vaes: CheckpointRelatedModelReference[]
+  controlNets: CheckpointRelatedModelReference[]
+}
 
 export interface CheckpointPromptProfile {
   /** Stable storage key. Prefer sha256 when available, otherwise checkpoint name fallback. */
@@ -260,14 +286,29 @@ export interface CheckpointPromptProfile {
   checkpointName?: string
   checkpointPath?: string
   checkpointSha256?: string | null
+  baseModel?: string | null
   family: CheckpointPromptFamily
+  promptStyle?: CheckpointPromptStyle
+  negativeStrategy?: CheckpointNegativeStrategy
   /** Tags placed at the beginning of the positive prompt. */
   positivePrefix: string[]
   /** Tags appended after the user's positive prompt. */
   positiveAppend: string[]
   /** Tags appended to the negative prompt. */
   negativeAppend: string[]
-  /** manual = saved for button use only; suggest = Preflight suggests; auto = reserved for future explicit auto mode. */
+  /** Optional generation defaults to apply/suggest with this checkpoint. */
+  sampler?: string
+  steps?: number | null
+  cfgScale?: number | null
+  width?: number | null
+  height?: number | null
+  clipSkip?: number | null
+  recommendedAspectRatios?: CheckpointRecommendedAspectRatio[]
+  recommendedLoraCount?: { min: number; max: number } | null
+  relatedModels?: CheckpointRelatedModels
+  compatibilityNotes?: string[]
+  recipeNotes?: string[]
+  /** manual = saved for button use only; suggest = Preflight suggests; auto = apply before generation. */
   mode: CheckpointPromptProfileMode
   updatedAt: number
 }
@@ -458,6 +499,7 @@ export interface HistoryItem {
   createdAt: number
   label?: HistoryLabel | null
   tagReview?: HistoryTagReview | null
+  proRecipeReview?: HistoryProRecipeReview | null
   dynamicPrompt?: HistoryDynamicPromptMeta | null
   prompt: string
   negativePrompt: string
@@ -525,12 +567,30 @@ export interface HistoryDynamicPromptMeta {
   usedWildcards: string[]
 }
 
-export type HistoryLabel = 'favorite' | 'candidate' | 'rejected' | 'asset'
+export type HistoryLabel = 'favorite' | 'candidate' | 'rejected' | 'asset' | 'social' | 'reference'
 
 export interface HistoryTagReview {
   acceptedTags: string[]
   rejectedTags: string[]
   sourceModel: 'pixai-onnx' | 'manual'
+  updatedAt: number
+}
+
+export interface HistoryProRecipeReview {
+  rating?: number | null
+  strengths: string[]
+  issues: string[]
+  nextActions: string[]
+  scores?: {
+    thumbnail?: number | null
+    composition?: number | null
+    lighting?: number | null
+    color?: number | null
+    anatomy?: number | null
+    styleConsistency?: number | null
+    reusePotential?: number | null
+  }
+  parentHistoryId?: string | null
   updatedAt: number
 }
 
@@ -558,9 +618,77 @@ export interface QuickPreset {
   order: number
 }
 
+export type PromptComposerSlotKey =
+  | 'qualityPrefix'
+  | 'subject'
+  | 'composition'
+  | 'expressionPose'
+  | 'lighting'
+  | 'color'
+  | 'clothingProps'
+  | 'background'
+  | 'textureStyle'
+  | 'finishing'
+  | 'avoidFailures'
+
+export type PromptComposerSlots = Partial<Record<PromptComposerSlotKey, string>>
+
+export interface PromptComposerSlotTemplate {
+  id: string
+  name: string
+  slots: PromptComposerSlots
+  family: CheckpointPromptFamily | null
+  promptStyle: CheckpointPromptStyle | null
+  negativeStrategy: CheckpointNegativeStrategy | null
+  notes: string
+  createdAt: number
+  updatedAt: number
+  lastUsedAt: number | null
+}
+
+export interface PromptComposerSlotTemplateSaveInput {
+  id?: string
+  name: string
+  slots: PromptComposerSlots
+  family?: CheckpointPromptFamily | null
+  promptStyle?: CheckpointPromptStyle | null
+  negativeStrategy?: CheckpointNegativeStrategy | null
+  notes?: string
+  lastUsedAt?: number | null
+}
+
+export type PromptTagPolarity = 'positive' | 'negative' | 'both'
+
+export type PromptTagSourceKind =
+  | 'built-in'
+  | 'manual'
+  | 'import'
+  | 'civitai'
+  | 'tagger'
+  | 'history'
+  | 'migration'
+
+export interface PromptTagSource {
+  kind: PromptTagSourceKind
+  model?: string
+  confidence?: number
+  at?: string
+}
+
+export interface PromptTagUsage {
+  count: number
+  lastUsedAt: number | null
+}
+
 export interface PromptGroupTag {
   en: string
   ja: string
+  canonical?: string
+  aliases?: string[]
+  polarity?: PromptTagPolarity
+  modelFamilies?: string[]
+  source?: PromptTagSource[]
+  usage?: PromptTagUsage
 }
 
 export interface PromptGroup {
@@ -574,6 +702,90 @@ export interface PromptCategory {
   groups: PromptGroup[]
   /** True for user-added categories from custom-prompt-library.json. */
   editable?: boolean
+}
+
+export interface PromptLibraryDocumentV2 {
+  schemaVersion: 2
+  updatedAt: string
+  categories: PromptCategory[]
+}
+
+export interface PromptDictionarySearchRequest {
+  query: string
+  limit?: number
+}
+
+export interface PromptDictionaryEntry {
+  en: string
+  ja: string
+  meaning?: string
+  aliases: string[]
+  category: string
+  group: string
+  polarity: PromptTagPolarity
+  sourceKind: 'built-in' | 'custom'
+  sourceLabel: string
+  score: number
+}
+
+export interface PromptDictionarySearchResult {
+  query: string
+  total: number
+  returned: number
+  searchableCount: number
+  entries: PromptDictionaryEntry[]
+}
+
+export type PromptTagTranslationProvider = 'google' | 'mymemory'
+
+export interface PromptTagTranslationRequest {
+  text: string
+  provider: PromptTagTranslationProvider
+  from?: 'en'
+  to?: 'ja'
+}
+
+export interface PromptTagTranslationResult {
+  text: string
+  provider: PromptTagTranslationProvider
+  sourceText: string
+}
+
+export type PromptTextTranslationProvider = 'deep-translator-google'
+export type PromptTextTranslationSource = 'ja' | 'auto'
+export type PromptTextTranslationTarget = 'en'
+export type PromptTextTranslationMode = 'whole' | 'segments'
+
+export interface PromptTextTranslationRuntimeStatus {
+  python: string | null
+  pythonExists: boolean
+  helperPath: string
+  helperExists: boolean
+  runtimeRoot: string
+  dependencyRoot: string
+  dependencyRootExists: boolean
+  deepTranslatorReady: boolean
+  preparing: boolean
+  warnings: string[]
+}
+
+export interface PromptTextTranslationRequest {
+  text: string
+  provider?: PromptTextTranslationProvider
+  source?: PromptTextTranslationSource
+  target?: PromptTextTranslationTarget
+  mode?: PromptTextTranslationMode
+}
+
+export interface PromptTextTranslationResult {
+  translatedText: string
+  provider: PromptTextTranslationProvider
+  sourceText: string
+  source: PromptTextTranslationSource
+  target: PromptTextTranslationTarget
+  mode: PromptTextTranslationMode
+  cacheHit: boolean
+  warnings: string[]
 }
 
 /** UI display language. Selected from the settings modal; persisted to disk. */
@@ -839,6 +1051,8 @@ export interface ModelSourceMetadata {
   filePath?: string
   description?: string | null
   tags?: string[]
+  trainedWords?: string[]
+  recommendedPrompts?: string[]
 }
 
 export interface ModelLibraryEntry {
@@ -1161,6 +1375,27 @@ export type WorkspaceImageReference =
       lastModifiedAt?: number | null
     }
 
+export type ReferenceBoardKind = 'pose' | 'color' | 'character' | 'style' | 'material' | 'other'
+
+export type ReferenceBoardSourceType = 'history' | 'input' | 'last' | 'file' | 'manual'
+
+export interface ReferenceBoardItem {
+  id: string
+  kind: ReferenceBoardKind
+  imageDataUrl: string | null
+  filename?: string | null
+  sourceType: ReferenceBoardSourceType
+  sourceLabel?: string | null
+  sourceHistoryId?: string | null
+  sourcePath?: string | null
+  note: string
+  createdAt: number
+}
+
+export interface ReferenceBoardState {
+  items: ReferenceBoardItem[]
+}
+
 export interface WorkspaceImageReferences {
   inputImage?: WorkspaceImageReference | null
   inpaintMask?: WorkspaceImageReference | null
@@ -1170,6 +1405,7 @@ export interface WorkspaceImageReferences {
   controlnetUnits?: Array<WorkspaceImageReference | null>
   fabricPositive?: Array<WorkspaceImageReference | null>
   fabricNegative?: Array<WorkspaceImageReference | null>
+  referenceBoard?: Array<WorkspaceImageReference | null>
 }
 
 export interface WorkspaceSnapshot {
@@ -1205,6 +1441,7 @@ export interface WorkspaceSnapshot {
   controlnet: Record<string, unknown>
   regionalPrompter?: Record<string, unknown>
   fabric?: Record<string, unknown>
+  referenceBoard?: ReferenceBoardState
   adetailer: Record<string, unknown>
   dynThres: Record<string, unknown>
   freeu: Record<string, unknown>
@@ -1261,10 +1498,115 @@ export interface ModelLibraryRecoveryResult {
   hashAlreadyRunning: boolean
 }
 
+export type PersonalHealthSeverity = 'info' | 'warn' | 'error'
+export type PersonalHealthRecoveryStatus = 'applied' | 'skipped' | 'failed'
+
+export interface PersonalHealthIssue {
+  id: string
+  area: 'settings' | 'process' | 'download' | 'library' | 'startup' | 'forge'
+  severity: PersonalHealthSeverity
+  title: string
+  detail: string
+  action?: string
+}
+
+export interface PersonalHealthProcess {
+  pid: number
+  name: string
+  commandLine: string
+}
+
+export interface PersonalHealthStartupSignal {
+  id: 'python' | 'extensions' | 'controlnet' | 'model' | 'api'
+  label: string
+  severity: PersonalHealthSeverity
+  confidence: 'low' | 'medium' | 'high'
+  evidence: string[]
+}
+
+export interface PersonalEnvironmentHealthReport {
+  checkedAt: number
+  settings: {
+    path: string
+    exists: boolean
+    parseOk: boolean
+    normalizedChanged: boolean
+    inlineSecretPresent: boolean
+    forgePath: string
+    forgePathExists: boolean
+    webuiExists: boolean
+    launchPyExists: boolean
+    forgePort: number
+    autoStartForge: boolean
+    forgeExtraArgs: string
+    issues: string[]
+  }
+  processes: {
+    currentPid: number
+    forgeManagedByThisApp: boolean
+    relatedForgeProcesses: PersonalHealthProcess[]
+    relatedElectronProcesses: PersonalHealthProcess[]
+  }
+  downloads: {
+    total: number
+    running: number
+    staleRunning: number
+    failed: number
+    partialIssues: number
+    orphanPartials: number
+  }
+  library: {
+    entries: number
+    missingFiles: number
+    shaMissing: number
+    partialDownloads: number
+    issues: number
+  }
+  startup: {
+    recentSamples: number
+    forgeReadyAvgMs: number | null
+    forgeReadyMinMs: number | null
+    forgeReadyMaxMs: number | null
+    rendererLoadedAvgMs: number | null
+    slowForgeReady: boolean
+    signals: PersonalHealthStartupSignal[]
+  }
+  issues: PersonalHealthIssue[]
+}
+
+export interface PersonalHealthRecoveryAction {
+  id: string
+  area: PersonalHealthIssue['area']
+  status: PersonalHealthRecoveryStatus
+  title: string
+  detail: string
+}
+
+export interface PersonalEnvironmentRecoveryResult {
+  checkedAt: number
+  settingsNormalized: boolean
+  modelLibrary: ModelLibraryRecoveryResult
+  actions: PersonalHealthRecoveryAction[]
+  report: PersonalEnvironmentHealthReport
+}
+
 export interface UpscaleComparisonCandidate {
   denoise: number
   tileControlNetEnabled: boolean
   imageDataUrl: string
+  method?: 'simple' | 'diffusion' | 'ultimate'
+  scale?: number
+  upscaler?: string | null
+  tileWidth?: number | null
+  tileHeight?: number | null
+  tileOverlap?: number | null
+  ultimateMaskBlur?: number | null
+  ultimatePadding?: number | null
+  ultimateRedrawMode?: 0 | 1 | 2 | null
+  ultimateSeamsFixType?: 0 | 1 | 2 | 3 | null
+  tileControlNetModule?: string | null
+  tileControlNetModel?: string | null
+  tileControlNetWeight?: number | null
 }
 
 export interface UpscaleComparisonSaveRequest {

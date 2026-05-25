@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stable Diffusion Pro AI Illustration Workflow Research - 2026-05-25</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d0e11;
+      --panel: #15171d;
+      --panel-2: #1b1e26;
+      --ink: #f4f5f7;
+      --muted: #b7becd;
+      --soft: #8790a3;
+      --line: #2b303d;
+      --accent: #75d0ff;
+      --accent-2: #b9e06f;
+      --warn: #f0c56d;
+      --bad: #ff8d8d;
+      --code: #101217;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.74 "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif;
+    }
+    main {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 38px 0 56px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 22px;
+      margin-bottom: 26px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 29px;
+      letter-spacing: 0;
+      line-height: 1.32;
+    }
+    h2 {
+      margin: 36px 0 12px;
+      font-size: 20px;
+      border-left: 4px solid var(--accent);
+      padding-left: 10px;
+    }
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 15px;
+      color: #e1e8f7;
+    }
+    p { margin: 8px 0; }
+    a { color: #9bdcff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: #edf4ff;
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      overflow-wrap: anywhere;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+    }
+    th {
+      background: #202432;
+      color: #f0f4ff;
+      text-align: left;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    td { background: var(--panel); }
+    ul, ol { margin: 8px 0 16px; padding-left: 22px; }
+    li { margin: 4px 0; }
+    .lead {
+      max-width: 980px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel-2);
+      color: #dce4f4;
+      padding: 3px 9px;
+      font-size: 12px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin: 14px 0;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 13px;
+    }
+    .card h3 { margin-top: 0; }
+    .callout {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent-2);
+      background: #121721;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 14px 0;
+    }
+    .warn { border-left-color: var(--warn); }
+    .risk { border-left-color: var(--bad); }
+    .muted { color: var(--muted); }
+    .small { color: var(--soft); font-size: 12px; }
+    .prio {
+      display: inline-block;
+      min-width: 42px;
+      color: #0b1116;
+      background: var(--accent-2);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .prio.p1 { background: var(--warn); }
+    .prio.p2 { background: #9fb4ff; }
+    .tag {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 6px;
+      margin: 1px 3px 1px 0;
+      background: #11151d;
+      color: #dde9ff;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    @media (max-width: 760px) {
+      main { width: min(100% - 22px, 1180px); padding-top: 24px; }
+      h1 { font-size: 23px; }
+      th { white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Stable DiffusionでプロのAIイラストレーター品質に近づくための制作・実装レポート</h1>
+    <p class="lead">
+      SNSで目立つ「凄いAIイラスト」は、単発の魔法プロンプトではなく、モデル選定、参照画像、LoRA、構図制御、候補出し、手直し、アップスケール、メタデータ再利用を組み合わせた制作工程から生まれる。
+      このレポートは 2026-05-25 時点の公式情報、一次情報、Civitai公開APIの観測、Yoitomoshi Art Generatorの現行設計をもとに、今日から使う制作手順と、Yoitomoshiに実装すべき「プロ仕様」要件へ変換したもの。
+    </p>
+    <div class="meta">
+      <span class="pill">確認日: 2026-05-25 JST</span>
+      <span class="pill">対象: Yoitomoshi Art Generator / Forge版</span>
+      <span class="pill">用途: 個人制作・SNS投稿・再現可能な制作ワークフロー</span>
+      <span class="pill">Skill: define-requirements</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>結論</h2>
+    <div class="callout">
+      <p>
+        プロっぽいAIイラスト生成で最も効くのは、プロンプトを長くすることではなく、<strong>「目的別のモデルプロファイル」「参照画像と構図制御」「候補比較」「手直し工程」「レシピ保存」</strong>を一つの制作ラインにすること。
+        Yoitomoshiでは、既存の Prompt Composer、History、Model Library、LoRA提案、Upscale、Metadataをつなぎ、<strong>Pro Recipe Workflow</strong>として扱うのが最短。
+      </p>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>優先</th>
+          <th>やること</th>
+          <th>理由</th>
+          <th>Yoitomoshiでの実装先</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="prio">P0</span></td>
+          <td>プロ用レシピ保存: model / VAE / LoRA / prompt / negative / sampler / seed / ControlNet / upscale / inpaint履歴を一枚のカードにする</td>
+          <td>SNS品質は再現・改善・派生が前提。偶然の一枚を次の制作に使えない状態が最大のロス。</td>
+          <td>History / Metadata / Preset / Prompt Helper</td>
+        </tr>
+        <tr>
+          <td><span class="prio">P0</span></td>
+          <td>モデル別Prompt Composer: SDXL系タグ型、Flux/Qwen/SD3.5系自然文型を切り替える</td>
+          <td>最新モデルほど「品質タグの山」より、主題、構図、光、色、質感、意図の明確化が効く。</td>
+          <td>PromptComposerPanel / checkpoint-prompt-profile</td>
+        </tr>
+        <tr>
+          <td><span class="prio">P0</span></td>
+          <td>候補出しと選別: 小さく速く複数生成し、サムネイルで採点、勝ち案だけ修正する</td>
+          <td>プロ品質は一発生成ではなく、ラフ出し、選別、修正、仕上げの工程で決まる。</td>
+          <td>PreviewPanel / HistoryGallery / batch generate</td>
+        </tr>
+        <tr>
+          <td><span class="prio p1">P1</span></td>
+          <td>参照ボード: 構図、ポーズ、顔、服、色、スタイルの参照画像を分けて保持する</td>
+          <td>「好きな絵柄に近づける」には、言葉だけでなく視覚条件を管理する必要がある。</td>
+          <td>img2img / ControlNet / IP-Adapter候補 / Reference-only</td>
+        </tr>
+        <tr>
+          <td><span class="prio p1">P1</span></td>
+          <td>Civitaiレシピ観測: 公開APIから流行モデル、baseModel、trainedWords、画像metaを安全フィルタ付きで収集</td>
+          <td>流行は固定ではない。月次で観測して、モデル選びとプロンプト辞書に反映する方が長持ちする。</td>
+          <td>Model Library / Civitai cache / Prompt Library</td>
+        </tr>
+        <tr>
+          <td><span class="prio p2">P2</span></td>
+          <td>外部バックエンド実験: FLUX.2 / Qwen / Hunyuan / Z-Image系はForge互換を見ながら隔離して検証</td>
+          <td>最新の高品質・編集系モデルはForge直結よりDiffusers/ComfyUI先行が多い。既存Forge版を壊さない隔離が必要。</td>
+          <td>Tools / optional backend adapter</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>なぜSNSの絵が強く見えるのか</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>1. モデル選定が目的別</h3>
+        <p>人物、背景、厚塗り、アニメ塗り、線画、写真風、文字入り、編集、速度で使うモデルを変えている。万能モデル一つで全部を狙わない。</p>
+      </div>
+      <div class="card">
+        <h3>2. 参照画像を使っている</h3>
+        <p>ポーズ、構図、顔、服、配色、ライティングは、プロンプトだけでなく ControlNet、IP-Adapter、img2img、inpaintで固定している。</p>
+      </div>
+      <div class="card">
+        <h3>3. LoRAを少数精密に使う</h3>
+        <p>人気の絵は、checkpointに合うLoRAを1から3個程度、適切な重みで使うことが多い。重ねすぎると破綻しやすい。</p>
+      </div>
+      <div class="card">
+        <h3>4. 候補を大量に捨てている</h3>
+        <p>投稿された一枚だけを見ると一発生成に見えるが、実際は10から100枚の候補から、構図・顔・手・色・背景が揃ったものを選ぶ。</p>
+      </div>
+      <div class="card">
+        <h3>5. 仕上げ工程がある</h3>
+        <p>目、手、顔、髪、服の境界、背景ノイズは、ADetailer、inpaint、upscale、外部ペイント補正で詰めている。</p>
+      </div>
+      <div class="card">
+        <h3>6. レシピを再利用している</h3>
+        <p>モデル名、hash、seed、sampler、CFG、LoRA、prompt、negative、解像度、upscale設定を残し、成功レシピを派生させている。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>最新モデル動向</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>系統</th>
+          <th>2026-05時点の要点</th>
+          <th>制作上の意味</th>
+          <th>Yoitomoshi方針</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>SDXL / Illustrious / Pony / Anima系コミュニティモデル</td>
+          <td>Civitaiの公開API観測では、月次のstyle LoRAや画像metaに Anima / Illustrious / ZImage / Flux 系のbaseModelが混在している。アニメ・イラスト向けはコミュニティ側の更新が速い。</td>
+          <td>絵柄狙いでは、公式baseよりも用途特化checkpointとLoRAの相性が大きい。流行モデル名を固定せず、baseModelとtrainedWordsを収集する。</td>
+          <td>Forge既存経路の主戦場。Model Libraryに「baseModel互換」「推奨LoRA」「代表プロンプト」「安全フィルタ」を持たせる。</td>
+        </tr>
+        <tr>
+          <td>Stable Diffusion 3.5</td>
+          <td>Stability AIは Large、Large Turbo、Mediumを公開。Largeは1MPのプロ用途、Turboは4 steps、Mediumは0.25から2MPかつ消費者向けハードを狙うと説明している。</td>
+          <td>Prompt adherenceは強いが、曖昧なプロンプトでは出力の幅が大きくなる。具体的な主題、構図、質感、色指定が重要。</td>
+          <td>Forgeで直接扱う場合は実機互換とVRAMを個別検証。プロファイル化して「自然文寄り」「短いnegativeに依存しない」扱いにする。</td>
+        </tr>
+        <tr>
+          <td>FLUX.2 / FLUX.1 Kontext</td>
+          <td>BFLは新規案件にはFLUX.2を推奨。FLUX.2はmulti-reference、4MP出力、色指定、構造化prompt、編集を強く押している。FLUX.2 [klein] 4BはApache 2.0、約13GB VRAM目安。</td>
+          <td>「好きな絵」「同じキャラ」「特定配色」「文字入り」には参考になる。ただしnegative prompt文化とは違い、肯定形の指示と構造化promptが重要。</td>
+          <td>ForgeのFlux対応は活用しつつ、最新FLUX.2はDiffusers/ComfyUI先行を想定し、Toolsに実験導線を隔離する。</td>
+        </tr>
+        <tr>
+          <td>Qwen-Image / Qwen-Image-Edit</td>
+          <td>Qwen-Imageは文字描画、正確な編集、prompt enhancementを重視。Qwen-Image-2512やEdit-2511では複数画像編集と一貫性改善が強調されている。</td>
+          <td>「文字が入るイラスト」「素材・看板・UI付きビジュアル」「複数参照からの編集」は、Stable Diffusion系だけより新世代モデルの設計が参考になる。</td>
+          <td>即採用より、Prompt Composerの「prompt rewriting」「多言語prompt強化」「編集指示テンプレート」に思想を取り込む。</td>
+        </tr>
+        <tr>
+          <td>HunyuanImage 3.0</td>
+          <td>TencentはHunyuanImage 3.0をネイティブマルチモーダル、80B total / 13B active、Instructでは画像理解、編集、multi-image fusionを掲げる。</td>
+          <td>高品質編集と推論能力の方向性は重要だが、個人PCのForge統合とは距離がある。</td>
+          <td>標準機能にはしない。プロンプト補助・参照画像整理・編集手順の設計参考に留める。</td>
+        </tr>
+        <tr>
+          <td>Z-Image Turbo</td>
+          <td>Z-Image Turboは6B、8 NFE、16GB未満の消費者GPU互換、英中テキスト描画と指示追従を売りにする。</td>
+          <td>軽量高速かつ文字・指示追従を狙うモデルが増えており、SDXLだけの前提は古くなっている。</td>
+          <td>Model LibraryのbaseModel分類を拡張し、Forge非対応モデルを「観測対象」として分ける。</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="callout warn">
+      <p>
+        注意: 最新モデルの多くはDiffusers/ComfyUI/独自APIで先に動く。Yoitomoshi Forge版では、既存のForge生成経路を壊さず、最新モデルは「情報収集」「レシピ観測」「任意の外部バックエンド」から段階導入する。
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>プロ品質の制作手順</h2>
+    <ol>
+      <li><strong>絵の目的を決める。</strong> SNSアイコン、縦長投稿、表紙、キャラ設定画、背景込み一枚絵、商品風ビジュアルで、比率と評価基準が変わる。</li>
+      <li><strong>モデルを先に決める。</strong> checkpoint、VAE、clip skip、推奨解像度、LoRA互換、得意な絵柄を確認してからpromptを書く。</li>
+      <li><strong>参照を分解する。</strong> 好きな絵を丸ごと真似るのではなく、構図、ポーズ、色、線、塗り、質感、光、背景密度に分解して言語化する。</li>
+      <li><strong>Promptは視覚仕様書にする。</strong> 主題、構図、表情、服、背景、光、配色、質感、画風、仕上げだけを書く。効かない品質タグを積み増さない。</li>
+      <li><strong>初回は速く広く出す。</strong> 低めの解像度またはTurbo/LCM系で20枚程度出し、サムネイルで強い構図だけ残す。</li>
+      <li><strong>勝ち案を手直しする。</strong> seed固定、inpaint、ADetailer、ControlNet、img2img弱denoiseで顔、手、服、背景だけを詰める。</li>
+      <li><strong>仕上げ解像度にする。</strong> Hires fixまたはUpscaleで1.5から2倍、denoiseは絵柄維持なら低め、描き込み追加なら中程度にする。</li>
+      <li><strong>レシピを保存する。</strong> 成功した画像はプロンプト、negative、model hash、LoRA、seed、sampler、steps、CFG、upscale、修正履歴を必ず残す。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Prompt設計</h2>
+    <p>
+      2026年時点では、モデルごとに効くprompt文化が分かれている。SDXL系アニメcheckpointはタグ型が強いことが多い。一方、FLUX.2、Qwen、SD3.5系では自然文、具体的な構図、肯定形の指示、構造化promptが重要になる。
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>部品</th>
+          <th>書く内容</th>
+          <th>悪い例</th>
+          <th>良い方向</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>主題</td>
+          <td>誰が、どこで、何をしているか</td>
+          <td><code>girl, masterpiece</code></td>
+          <td><code>teen fantasy illustrator character, looking back over her shoulder, standing on a rainy station platform</code></td>
+        </tr>
+        <tr>
+          <td>構図</td>
+          <td>画角、距離、余白、視線誘導、比率</td>
+          <td><code>beautiful composition</code></td>
+          <td><code>vertical poster composition, three-quarter body, face in upper third, strong silhouette</code></td>
+        </tr>
+        <tr>
+          <td>光</td>
+          <td>光源、方向、硬さ、色温度、影</td>
+          <td><code>good lighting</code></td>
+          <td><code>cool blue backlight from vending machines, soft warm key light on face, wet ground reflections</code></td>
+        </tr>
+        <tr>
+          <td>色</td>
+          <td>主色、副色、アクセント、彩度</td>
+          <td><code>colorful</code></td>
+          <td><code>muted navy and pale cyan palette, one crimson ribbon as accent color</code></td>
+        </tr>
+        <tr>
+          <td>画風</td>
+          <td>線、塗り、筆致、質感、媒体</td>
+          <td><code>professional art</code></td>
+          <td><code>clean anime line art, soft cel shading, subtle watercolor texture in background</code></td>
+        </tr>
+        <tr>
+          <td>仕上げ</td>
+          <td>粒状感、シャープさ、被写界深度、印刷感</td>
+          <td><code>8k, ultra detailed, best quality</code>だけ</td>
+          <td><code>crisp eyelashes and hair strands, controlled bloom, no over-sharpened skin</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>モデル別のPrompt方針</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>モデル系統</th>
+          <th>推奨prompt</th>
+          <th>negativeの扱い</th>
+          <th>Composerに必要なモード</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>SD1.5 / SDXLアニメ系</td>
+          <td>タグ型、danbooru系語彙、品質タグ、LoRA triggerを整理して使う</td>
+          <td>bad anatomy、extra fingersなどが効くことがあるが、過積載は避ける</td>
+          <td>タグ重複整理、LoRA trigger挿入、negativeプリセット</td>
+        </tr>
+        <tr>
+          <td>SD3.5</td>
+          <td>具体的な自然文、画角、主題、スタイル、光、色を明示</td>
+          <td>短く。曖昧な否定ではなく欲しい状態を書く</td>
+          <td>自然文テンプレート、目的別スロット、長文圧縮</td>
+        </tr>
+        <tr>
+          <td>FLUX.2</td>
+          <td>構造化prompt、肯定形、比率と構図、色指定、参照画像</td>
+          <td>多くのFLUX系ではnegativeに頼らない。不要物は肯定形へ置換</td>
+          <td>positive replacement、structured prompt、reference slot</td>
+        </tr>
+        <tr>
+          <td>Qwen / Hunyuan / Z-Image系</td>
+          <td>説明的な自然文、編集指示、文字・配置、プロンプト強化</td>
+          <td>モデル実装ごとに差が大きい。公式例をプロファイル化</td>
+          <td>prompt rewrite、編集指示テンプレート、多言語補助</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>設定の目安</h2>
+    <p class="muted">
+      数値は固定の正解ではない。checkpoint、LoRA、Forge/拡張、VRAMで変わるため、Yoitomoshiではモデルプロファイルとして保存し、履歴から改善する。
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>用途</th>
+          <th>初期解像度</th>
+          <th>steps / CFG</th>
+          <th>仕上げ</th>
+          <th>注意</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>SDXLアニメ縦長</td>
+          <td>832x1216 / 896x1152 / 1024x1536周辺</td>
+          <td>25から35 steps、CFG 4.5から7前後を起点</td>
+          <td>1.5から2.0倍、denoise 0.25から0.45</td>
+          <td>LoRA重みは0.5から0.9程度から試し、複数LoRAは破綻を確認する</td>
+        </tr>
+        <tr>
+          <td>構図探索</td>
+          <td>768x1024 / 832x1216</td>
+          <td>高速samplerまたは少stepで候補を広く出す</td>
+          <td>勝ちseedだけ高品質化</td>
+          <td>最初から高解像度にしない。候補比較に時間を使う</td>
+        </tr>
+        <tr>
+          <td>顔・手修正</td>
+          <td>元画像維持</td>
+          <td>inpaintでdenoise低から中</td>
+          <td>ADetailerまたは部分inpaint</td>
+          <td>顔だけ良くして全体の光や輪郭が浮かないようにする</td>
+        </tr>
+        <tr>
+          <td>FLUX.2 [klein] 4B</td>
+          <td>1024x1024など</td>
+          <td>公式例は4 steps、guidance 1.0</td>
+          <td>multi-reference editingを活用</td>
+          <td>4Bでも約13GB VRAM目安。8GB前提のYoitomoshi標準には重い</td>
+        </tr>
+        <tr>
+          <td>SD3.5 Turbo</td>
+          <td>1MP前後</td>
+          <td>公式例は4 steps、guidance 0.0</td>
+          <td>候補出し向き</td>
+          <td>Forge実機互換と画質傾向を別途検証する</td>
+        </tr>
+        <tr>
+          <td>Qwen-Image-2512</td>
+          <td>公式例は1328x1328、928x1664など複数比率</td>
+          <td>公式例は50 steps、true_cfg_scale 4.0</td>
+          <td>文字・編集・prompt enhance</td>
+          <td>Forge標準ではなくDiffusers系検証対象</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>評価基準</h2>
+    <p>「好き」「凄い」を制作で再現するには、評価語を分解する。Yoitomoshiの履歴レビューには次の採点軸を持たせるとよい。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>観点</th>
+          <th>見るポイント</th>
+          <th>失敗例</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>サムネイル強度</td>
+          <td>小さく見ても主題、顔、シルエット、色が分かる</td>
+          <td>背景密度だけ高く、何を見せたいか曖昧</td>
+        </tr>
+        <tr>
+          <td>構図</td>
+          <td>視線誘導、余白、比率、前景中景背景の整理</td>
+          <td>人物が中央に立つだけ、手足が切れる、背景に埋もれる</td>
+        </tr>
+        <tr>
+          <td>光</td>
+          <td>光源が明確、顔と焦点に必要な明度差がある</td>
+          <td>全体が均一、顔が暗い、ハイライトが無秩序</td>
+        </tr>
+        <tr>
+          <td>色</td>
+          <td>主色、副色、アクセントが整理されている</td>
+          <td>彩度が全部高い、服と背景が同系色で潰れる</td>
+        </tr>
+        <tr>
+          <td>人体・顔</td>
+          <td>目線、手、指、肩、首、髪の流れ、衣装の接続</td>
+          <td>手指、耳、髪飾り、袖口、武器の握りが破綻</td>
+        </tr>
+        <tr>
+          <td>絵柄一貫性</td>
+          <td>線、塗り、質感、顔パーツ、背景描写が同じ世界にある</td>
+          <td>顔だけ別モデル、背景だけ写真風、服だけ過剰写実</td>
+        </tr>
+        <tr>
+          <td>再現性</td>
+          <td>レシピから近い品質を再生成できる</td>
+          <td>モデルhashやLoRA triggerが残っていない</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Yoitomoshi向け要求定義</h2>
+    <h3>Goal</h3>
+    <p>
+      Yoitomoshi Art Generatorを、単にStable Diffusionを起動するUIではなく、プロAIイラスト制作のための「レシピ化、候補選別、参照制御、仕上げ、再利用」ツールにする。
+    </p>
+
+    <h3>Target users</h3>
+    <ul>
+      <li>自分の好きな絵柄を安定して出したい個人制作者。</li>
+      <li>SNS投稿向けに、縦長・サムネイル映え・キャラ一貫性を重視するユーザー。</li>
+      <li>Forgeを裏で使いつつ、Gradio UIではなく独自UIで制作を完結したいユーザー。</li>
+    </ul>
+
+    <h3>Scope</h3>
+    <ul>
+      <li>成功画像を再利用可能なPro Recipeとして保存、比較、派生できる。</li>
+      <li>checkpointごとにprompt形式、推奨解像度、sampler、CFG、VAE、LoRA互換、trigger wordsを扱える。</li>
+      <li>Prompt Composerが、タグ型と自然文型の両方を支援する。</li>
+      <li>候補出し、採点、勝ち案のinpaint/upscale送信が一続きになる。</li>
+      <li>Civitai公開APIから安全フィルタ付きでモデル/LoRA/画像metaを観測し、モデル選びと辞書改善へ使う。</li>
+    </ul>
+
+    <h3>Non-goals</h3>
+    <ul>
+      <li>SNS画像や特定作家の絵を無断でスクレイピングして複製すること。</li>
+      <li>Forgeを捨ててComfyUI専用アプリへ作り替えること。</li>
+      <li>有料APIやクラウドGPUを前提にすること。</li>
+      <li>成人向け、違法、権利侵害、本人同意のない人物再現を推奨すること。</li>
+      <li>「このモデルを入れれば必ずプロ品質になる」という固定解を作ること。</li>
+    </ul>
+
+    <h3>User stories</h3>
+    <ul>
+      <li>ユーザーとして、好きな画像を選んだら、その生成レシピと改善メモを保存して次回のprompt作成に使いたい。</li>
+      <li>ユーザーとして、checkpointを選んだ時点で、そのモデルに合うprompt形式、LoRA、解像度、negative方針を知りたい。</li>
+      <li>ユーザーとして、20枚の候補を素早く並べ、良いものだけをinpaint/upscaleへ送りたい。</li>
+      <li>ユーザーとして、構図・ポーズ・配色・顔の参照を分けて管理し、どの制御に使うか選びたい。</li>
+      <li>ユーザーとして、Civitaiで流行しているLoRAやbaseModelを安全に調べ、手元のモデルライブラリと照合したい。</li>
+    </ul>
+
+    <h3>Acceptance criteria</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>要件</th>
+          <th>受け入れ条件</th>
+          <th>検証</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Pro Recipe保存</td>
+          <td>生成画像ごとにmodel hash、prompt、negative、params、LoRA、ControlNet、upscale、inpaint履歴、ユーザー評価が保存される</td>
+          <td>履歴JSONとUI表示、metadata復元DOM QA</td>
+        </tr>
+        <tr>
+          <td>モデルプロファイル</td>
+          <td>checkpoint選択時にbaseModel、推奨解像度、prompt形式、VAE、clip skip、sampler、CFG、LoRA互換注意が表示される</td>
+          <td>typecheck、Model Library DOM QA、fixtureモデルで表示確認</td>
+        </tr>
+        <tr>
+          <td>Prompt Composer強化</td>
+          <td>タグ型と自然文型を切り替え、主題、構図、光、色、質感、参照、negative置換を組み立てられる</td>
+          <td><code>qa:dom:prompt-composer</code>、prompt format QA</td>
+        </tr>
+        <tr>
+          <td>候補比較</td>
+          <td>batch候補をサムネイルで比較し、星/採用/破棄/修正メモを付けられる</td>
+          <td>History review QA、保存復元テスト</td>
+        </tr>
+        <tr>
+          <td>Civitai観測</td>
+          <td>公開APIからmodels/images/model-versions/by-hashを取得し、nsfw=false、baseModel、type、trainedWords、stats、画像metaを保存できる</td>
+          <td>API mock、rate limit/error fixture、破損レスポンス耐性</td>
+        </tr>
+        <tr>
+          <td>安全と権利</td>
+          <td>人物・作家名・NSFW・POI・ライセンス注意がUIに出る。無断複製を推奨しない</td>
+          <td>copy review、フィルタfixture、ライセンス表示確認</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>実装ロードマップ</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>段階</th>
+          <th>内容</th>
+          <th>触る主領域</th>
+          <th>リスク</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Phase A</td>
+          <td>HistoryのtagReviewを拡張し、Pro Recipe評価、採用/破棄、改善メモ、SNS用途タグを保存</td>
+          <td><code>src/shared/types.ts</code>, <code>electron/storage.ts</code>, <code>HistoryGallery</code>, <code>PromptHelperPanel</code></td>
+          <td>既存履歴JSONの後方互換</td>
+        </tr>
+        <tr>
+          <td>Phase B</td>
+          <td>checkpoint-prompt-profileを拡張し、モデル別prompt形式、推奨params、LoRA互換をUI表示</td>
+          <td><code>src/lib/checkpoint-prompt-profile.ts</code>, <code>PromptPanel</code>, <code>ModelLibraryWorkspace</code></td>
+          <td>手元モデル名とCivitai baseModelの揺れ</td>
+        </tr>
+        <tr>
+          <td>Phase C</td>
+          <td>Prompt Composerに「プロ仕様スロット」を追加。主題、構図、光、色、質感、参照、仕上げをモデル別に出し分け</td>
+          <td><code>PromptComposerPanel.tsx</code>, <code>src/lib/prompt-composer.ts</code>, translation runtime</td>
+          <td>UIが重くなる。折りたたみとプリセット化が必要</td>
+        </tr>
+        <tr>
+          <td>Phase D</td>
+          <td>候補比較ボード。複数生成結果を横並びで採点し、勝ち案をinpaint/upscaleへ送る</td>
+          <td><code>PreviewPanel</code>, <code>HistoryGallery</code>, <code>UpscaleWorkspace</code></td>
+          <td>画像base64と履歴更新の負荷</td>
+        </tr>
+        <tr>
+          <td>Phase E</td>
+          <td>Civitai trend/recipe importer。公開APIでbaseModel、trainedWords、画像meta、hash照合を収集</td>
+          <td><code>electron/civitai-api.ts</code>, <code>ModelLibraryWorkspace</code>, <code>ToolsWorkspace</code></td>
+          <td>API変更、rate limit、NSFW/POI/ライセンス扱い</td>
+        </tr>
+        <tr>
+          <td>Phase F</td>
+          <td>外部モデル実験導線。FLUX.2/Qwen/Hunyuan/Z-ImageをForge標準から分離して調査対象にする</td>
+          <td>Tools optional backend, docs, runtime profile</td>
+          <td>VRAM、依存、ライセンス、既存Forge統合との境界</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>制作プリセット案</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>プリセット</th>
+          <th>目的</th>
+          <th>Prompt骨子</th>
+          <th>仕上げ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>縦長SNS一枚絵</td>
+          <td>スマホで強いキャラ絵</td>
+          <td>主題、上半身/全身、背景の奥行き、顔の明度、アクセント色、風/小物</td>
+          <td>顔inpaint、髪と手の修正、2倍upscale、SNS crop確認</td>
+        </tr>
+        <tr>
+          <td>キャラ設定画</td>
+          <td>同じキャラを再利用</td>
+          <td>正面/横/背面、服装、髪、目、固有小物、白または単色背景</td>
+          <td>reference seed保存、LoRA候補、パーツ名タグ化</td>
+        </tr>
+        <tr>
+          <td>背景込み表紙</td>
+          <td>物語性のある一枚</td>
+          <td>キャラ、場所、時間帯、光源、前景小物、遠景、タイトル用余白</td>
+          <td>構図ControlNet、背景だけinpaint、余白確認</td>
+        </tr>
+        <tr>
+          <td>絵柄探索</td>
+          <td>好きな方向性を見つける</td>
+          <td>同一主題で、線、塗り、色、光、質感だけ変える</td>
+          <td>履歴にstyleタグを付け、成功スタイルをPrompt Library化</td>
+        </tr>
+        <tr>
+          <td>文字入り告知</td>
+          <td>看板、ポスター、SNS告知</td>
+          <td>短い文字列、表示位置、フォント性格、色、素材、背景との関係</td>
+          <td>FLUX/Qwen系検証、文字部分だけ編集、最終手修正前提</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>リスクと判断</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>流行モデルの陳腐化</h3>
+        <p>モデル名を固定でおすすめにするとすぐ古くなる。Civitai API、Hugging Face metadata、手元生成結果から月次で更新する。</p>
+      </div>
+      <div class="card">
+        <h3>互換性の混乱</h3>
+        <p>SDXL、Illustrious、Pony、Anima、Flux、SD3.5、QwenはLoRAやprompt文化が違う。baseModel互換の警告が必要。</p>
+      </div>
+      <div class="card">
+        <h3>権利・倫理</h3>
+        <p>好きな絵柄研究は、特定作家の複製や無断学習の推奨にしない。分解した特徴、許諾モデル、自作参照、公開レシピを使う。</p>
+      </div>
+      <div class="card">
+        <h3>8GB VRAM制約</h3>
+        <p>FLUX.2 [klein] 4Bでも約13GB目安。Yoitomoshiの既定は8GB安定を守り、重いモデルは任意実験にする。</p>
+      </div>
+      <div class="card">
+        <h3>UI肥大化</h3>
+        <p>プロ仕様を全部トップに出すと使いにくい。既存タブ内の折りたたみ、モーダル、保存済みプリセットで段階表示する。</p>
+      </div>
+      <div class="card">
+        <h3>API依存</h3>
+        <p>CivitaiやHugging Faceの仕様、rate limit、認証、NSFW分離は変わる。取得失敗でも生成UIを止めない。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>すぐ使うチェックリスト</h2>
+    <ul>
+      <li>最初に「投稿先」「比率」「何を見せたいか」を1行で書く。</li>
+      <li>checkpointごとに成功promptを3つだけ保存し、そこから派生する。</li>
+      <li>LoRAは1から3個に抑え、baseModel互換とtrigger wordを必ず確認する。</li>
+      <li>構図が弱い時はpromptを増やす前に、比率、参照画像、ControlNet、seed候補を変える。</li>
+      <li>顔だけ良い画像より、サムネイルで強い画像を採用する。</li>
+      <li>upscale前に、手、顔、目線、服の接続、背景の破綻を直す。</li>
+      <li>成功画像は必ずレシピ化し、失敗画像にも「何が弱いか」をタグで残す。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>調査メモ</h2>
+    <ul>
+      <li>Civitai公開APIを 2026-05-25 に確認。<code>models</code>、<code>images</code>、<code>model-versions/by-hash</code>系の公開仕様を、YoitomoshiのModel Library / History改善に使える。</li>
+      <li>月次のCivitai style LoRA観測では、Anima / Illustrious / ZImage / Flux系baseModelが混在。これは固定推奨ではなく、今後も観測対象にするべきシグナル。</li>
+      <li>Forge READMEでは、Flux BNB NF4 / GGUFとLoRA対応が明記される一方、Flux ControlNetやAPIの改善余地も記載されている。Yoitomoshiで最新Flux系を扱う時は、実機確認を必須にする。</li>
+      <li>FLUX.2、Qwen、Hunyuan、Z-ImageはStable Diffusionという名前ではないが、制作品質の期待値を更新している。Yoitomoshiはまずワークフロー思想を取り込み、runtime統合は分離して検証する。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>参照情報</h2>
+    <ul>
+      <li><a href="https://stability.ai/news-updates/introducing-stable-diffusion-3-5">Stability AI: Introducing Stable Diffusion 3.5</a></li>
+      <li><a href="https://huggingface.co/stabilityai/stable-diffusion-3.5-large">Hugging Face: stabilityai/stable-diffusion-3.5-large</a></li>
+      <li><a href="https://huggingface.co/stabilityai/stable-diffusion-3.5-large-turbo">Hugging Face: stabilityai/stable-diffusion-3.5-large-turbo</a></li>
+      <li><a href="https://docs.bfl.ai/flux_2/flux2_overview">Black Forest Labs: FLUX.2 Overview</a></li>
+      <li><a href="https://docs.bfl.ai/guides/prompting_unified_building">Black Forest Labs: Building a Good Prompt</a></li>
+      <li><a href="https://docs.bfl.ai/guides/prompting_unified_style">Black Forest Labs: Style, Aesthetics &amp; Text</a></li>
+      <li><a href="https://docs.bfl.ai/guides/prompting_unified_technical">Black Forest Labs: Technical Parameters</a></li>
+      <li><a href="https://huggingface.co/black-forest-labs/FLUX.2-klein-4B">Hugging Face: black-forest-labs/FLUX.2-klein-4B</a></li>
+      <li><a href="https://huggingface.co/black-forest-labs/FLUX.2-klein-9B">Hugging Face: black-forest-labs/FLUX.2-klein-9B</a></li>
+      <li><a href="https://huggingface.co/docs/diffusers/using-diffusers/controlnet">Hugging Face Diffusers: ControlNet</a></li>
+      <li><a href="https://huggingface.co/docs/diffusers/using-diffusers/ip_adapter">Hugging Face Diffusers: IP-Adapter</a></li>
+      <li><a href="https://github.com/lllyasviel/stable-diffusion-webui-forge">GitHub: stable-diffusion-webui-forge</a></li>
+      <li><a href="https://github.com/civitai/civitai/wiki/REST-API-Reference/de63434512878133a5788a25f4b94af0c06de4bc">Civitai REST API Reference</a></li>
+      <li><a href="https://github.com/QwenLM/Qwen-Image">GitHub: QwenLM/Qwen-Image</a></li>
+      <li><a href="https://huggingface.co/tencent/HunyuanImage-3.0">Hugging Face: tencent/HunyuanImage-3.0</a></li>
+      <li><a href="https://huggingface.co/kp-forks/Z-Image-Turbo">Hugging Face: Z-Image-Turbo</a></li>
+    </ul>
+    <p class="small">
+      価格、ライセンス、API仕様、モデル互換性は変わる。実装前には各公式ページと実機生成で再確認する。
+    </p>
+  </section>
+</main>
+</body>
+</html>

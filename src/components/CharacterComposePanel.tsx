@@ -487,6 +487,8 @@ export function CharacterComposePanel({ onGenerate }: { onGenerate(): Promise<vo
             value={characterPrompt}
             onChange={(e) => setCharacterPrompt(e.target.value)}
             placeholder={t('characterCompose.promptPlaceholder')}
+            data-prompt-dictionary-autocomplete="character-prompt"
+            data-testid="character-compose-prompt"
           />
         </label>
 

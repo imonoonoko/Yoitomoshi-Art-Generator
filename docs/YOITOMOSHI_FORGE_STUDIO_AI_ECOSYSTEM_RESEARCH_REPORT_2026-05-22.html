@@ -1,0 +1,887 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yoitomoshi Forge Studio AI Ecosystem Research - 2026-05-22</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0c10;
+      --panel: #14151c;
+      --panel-2: #191b24;
+      --line: #2a2d3a;
+      --ink: #f4f6fb;
+      --muted: #aab1c3;
+      --soft: #7e879f;
+      --accent: #8b83ff;
+      --accent-2: #5cc8ff;
+      --good: #72d99e;
+      --warn: #f0c36a;
+      --bad: #ff8b8b;
+      --code: #10121a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.72 "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif;
+    }
+    main {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 36px 0 52px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 29px;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 34px 0 12px;
+      font-size: 20px;
+      border-left: 4px solid var(--accent);
+      padding-left: 10px;
+    }
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 15px;
+      color: #dfe3ff;
+    }
+    p { margin: 8px 0; }
+    a { color: #b7b3ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: #e7eaff;
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 12px;
+    }
+    pre {
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: auto;
+      padding: 14px;
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      overflow-wrap: anywhere;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+    }
+    th {
+      background: #1d2030;
+      color: #eef0ff;
+      text-align: left;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    td { background: var(--panel); }
+    ul, ol { margin: 8px 0 16px; padding-left: 22px; }
+    li { margin: 4px 0; }
+    .lead {
+      max-width: 940px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel-2);
+      color: #d8ddf0;
+      padding: 3px 9px;
+      font-size: 12px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin: 14px 0;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 13px;
+    }
+    .card h3 { margin-top: 0; }
+    .callout {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent-2);
+      background: #121722;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 14px 0;
+    }
+    .risk { border-left-color: var(--bad); }
+    .win { border-left-color: var(--good); }
+    .warn { border-left-color: var(--warn); }
+    .muted { color: var(--muted); }
+    .small { color: var(--soft); font-size: 12px; }
+    .tag {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 6px;
+      margin: 1px 3px 1px 0;
+      background: #11141e;
+      color: #dfe5ff;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .priority {
+      font-weight: 700;
+      color: var(--good);
+    }
+    .priority.mid { color: var(--warn); }
+    .priority.low { color: #a8c7ff; }
+    @media (max-width: 760px) {
+      main { width: min(100% - 22px, 1180px); padding-top: 24px; }
+      h1 { font-size: 23px; }
+      th { white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Yoitomoshi Forge Studio AIエコシステム横断調査</h1>
+    <p class="lead">
+      Stable Diffusion / Forge / ComfyUI / 拡張機能 / 最新モデル / LoRA・LyCORIS / VAE /
+      Civitai / AIイラストコミュニティから、Yoitomoshi Forge Studioに取り込める要素を
+      実装候補へ変換した調査レポート。確認日は 2026-05-22。
+    </p>
+    <div class="meta">
+      <span class="pill">対象: Yoitomoshi Art Generator / Forge Studio</span>
+      <span class="pill">優先: ローカル実装で再現できる機能</span>
+      <span class="pill">一次情報優先、二次情報は採用理由を明示</span>
+      <span class="pill">既存のタグライブラリ強化レポートと併用</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>結論</h2>
+    <div class="callout win">
+      <p>
+        いま最も費用対効果が高いのは、Forgeの生成本体を大きく作り直すことではなく、
+        <strong>モデルファミリー別の制作プロファイル</strong>、<strong>LoRA/タグ/翻訳の知識化</strong>、
+        <strong>Civitaiメタデータの検証付き取り込み</strong>、<strong>ComfyUI側への新世代モデル避難経路</strong>を整えること。
+      </p>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>優先</th>
+          <th>取り込む要素</th>
+          <th>理由</th>
+          <th>主な実装面</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="priority">P0</span></td>
+          <td>モデルファミリー別プロファイル</td>
+          <td>SD1.5、SDXL、Pony、Illustrious、NoobAI、SD3.5、FLUX系で推奨タグ、CFG、ステップ、VAE、Clip Skip、LoRA互換性が異なる。</td>
+          <td>Model Library、生成設定プリセット、Prompt Helper、Tag管理</td>
+        </tr>
+        <tr>
+          <td><span class="priority">P0</span></td>
+          <td>LoRAカードの「発火語・補助語・ネガ語・互換ベース」抽出</td>
+          <td>Civitai/モデルカードにある trigger words と推奨プロンプトを、生成直前に使える形へ落とすと初心者の失敗が減る。</td>
+          <td>Model Library、Civitai連携、Promptタグ管理</td>
+        </tr>
+        <tr>
+          <td><span class="priority">P0</span></td>
+          <td>タグチップからの辞書追加・翻訳・お気に入り化</td>
+          <td>既に実装済みの赤枠導線と相性がよい。生成結果から知識を戻す循環ができる。</td>
+          <td>PromptTagChips、Prompt Library、翻訳IPC</td>
+        </tr>
+        <tr>
+          <td><span class="priority mid">P1</span></td>
+          <td>ControlNet / IP-Adapter / Reference / ADetailer のテンプレート化</td>
+          <td>Forgeは既にControlNet、IP-Adapter、Reference-only、ADetailer系の運用と親和性が高い。UI側で「どの用途に何を使うか」を隠蔽できる。</td>
+          <td>Tools、img2img、Inpaint、ControlNet panel</td>
+        </tr>
+        <tr>
+          <td><span class="priority mid">P1</span></td>
+          <td>VAE/decoder健全性チェック</td>
+          <td>SDXL fp16 VAEのNaN、TAESD系の高速プレビュー、FLUX/SD3.5の専用構成など、画質・速度・失敗原因に直結する。</td>
+          <td>Model preflight、生成前警告、モデル詳細</td>
+        </tr>
+        <tr>
+          <td><span class="priority mid">P1</span></td>
+          <td>FLUX.2 / SD3.5 はComfyUI側ワークフローを第一候補</td>
+          <td>Forge READMEではFlux.1系の低ビット対応は強いが、SD3.5/FLUX.2はComfyUI/Diffusers側の一次情報が先行している。</td>
+          <td>ComfyUI V2、外部runtime、モデル導入ガイド</td>
+        </tr>
+        <tr>
+          <td><span class="priority low">P2</span></td>
+          <td>コミュニティ由来タグの多様性ガード</td>
+          <td>Civitai由来プロンプトは便利だが、人気語の反復で出力が均質化しやすい。探索モードや代替タグ提案が必要。</td>
+          <td>Prompt Helper、タグ推薦、履歴レビュー</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>カバレッジ監査</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>要求領域</th>
+          <th>このレポートでの該当箇所</th>
+          <th>主な情報源</th>
+          <th>取り込み判断</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Stable Diffusion</td>
+          <td>現在の技術地図、モデルファミリー別プロファイル</td>
+          <td>Stability AI SD3.5、SDXL Hugging Face model card、Forge README</td>
+          <td>SDXLを現行主軸、SD3.5はComfyUI経由で検証。</td>
+        </tr>
+        <tr>
+          <td>拡張機能</td>
+          <td>拡張機能とワークフロー、機能候補バックログ</td>
+          <td>ControlNet、ADetailer、Dynamic Prompts、Regional Prompter、Forge FreeU、BFL Tools</td>
+          <td>拡張名ではなくタスクテンプレートとしてUI化。</td>
+        </tr>
+        <tr>
+          <td>最新モデル</td>
+          <td>現在の技術地図、モデルファミリー別プロファイル、未確定・採用保留</td>
+          <td>BFL FLUX.2 docs/model card、ComfyUI FLUX.2 guide、SD3.5公式、Pony/Illustrious/NoobAI model cards</td>
+          <td>Forge直結とComfyUI実験経路を分ける。</td>
+        </tr>
+        <tr>
+          <td>LoRA系</td>
+          <td>LoRA / LyCORIS / 学習・メタデータ、Civitai連携</td>
+          <td>A1111 Extra Networks、LyCORIS、kohya sd-scripts、Diffusers adapters、Civitai</td>
+          <td>ファイル管理から制作資産管理へ引き上げる。</td>
+        </tr>
+        <tr>
+          <td>VAE</td>
+          <td>VAE / Decoder / 速度と画質、機能候補AI-ECO-06</td>
+          <td>SDXL-VAE-FP16-Fix、Diffusers AutoencoderTiny、SDXL model card</td>
+          <td>モデルpreflightで不足・NaNリスク・高速preview用途を案内。</td>
+        </tr>
+        <tr>
+          <td>Civitai</td>
+          <td>Civitai連携、AIイラストコミュニティからの学び、参照リンク</td>
+          <td>Civitai API移行告知、Civitai由来prompt研究、コミュニティ実務投稿</td>
+          <td>hash/modelVersionId基準で検証付き取り込み。</td>
+        </tr>
+        <tr>
+          <td>AIイラストコミュニティ</td>
+          <td>AIイラストコミュニティからの学び、モデルファミリー別プロファイル</td>
+          <td>Danbooru系タグ文化、Civitai、Reddit実務知、arXiv prompt分析</td>
+          <td>定番タグだけでなく多様性ガードと探索導線を入れる。</td>
+        </tr>
+        <tr>
+          <td>Yoitomoshiへ取り入れられる要素</td>
+          <td>結論、機能候補バックログ、実装順序</td>
+          <td>上記の一次・二次情報と既存Yoitomoshi機能の照合</td>
+          <td>P0/P1/P2に分解し、QA可能な受け入れ条件へ変換。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>現在の技術地図</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>領域</th>
+          <th>確認した一次情報</th>
+          <th>Yoitomoshiへの解釈</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Forge</td>
+          <td>
+            Forge READMEは、SD WebUI 1.10.1ベース、Flux BNB NF4/GGUF対応、LoRA対応、ControlNet/IP-Adapter/Reference/ADetailer系の状態表を持つ。
+            <a href="https://github.com/lllyasviel/stable-diffusion-webui-forge/blob/main/README.md">Forge README</a>
+          </td>
+          <td>
+            YoitomoshiのForge UIは、SD1.5/SDXL/Flux.1系の実生成とA1111互換API操作に向く。新世代モデルはForgeに直載せする前に互換性判定が必要。
+          </td>
+        </tr>
+        <tr>
+          <td>Stable Diffusion 3.5</td>
+          <td>
+            Stability AIはSD3.5 Large / Large Turbo / Mediumを2024-10に公開し、consumer hardware、Community License、Hugging Face配布を掲げている。
+            <a href="https://stability.ai/news-updates/introducing-stable-diffusion-3-5">Stability AI SD3.5</a>
+          </td>
+          <td>
+            直接Forge対応を前提にせず、ComfyUIまたはDiffusersワークフロー経由の検証対象にする。導入UIではライセンスと必要テキストエンコーダを明示する。
+          </td>
+        </tr>
+        <tr>
+          <td>SDXL</td>
+          <td>
+            SDXL 1.0はbase + refinerの構成を持ち、base単体でも利用可能。
+            <a href="https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0">SDXL model card</a>
+          </td>
+          <td>
+            Yoitomoshiでは現行の汎用制作軸として最優先。VAE、refiner有無、1024px基準、LoRA互換をプロファイル化する。
+          </td>
+        </tr>
+        <tr>
+          <td>FLUX.1 / FLUX.2</td>
+          <td>
+            BFL公式情報ではFLUX.2が最新世代、FLUX.2 [dev]は32Bの生成・編集・参照合成モデル、FLUX.2 [klein] 4BはApache 2.0系として案内されている。
+            <a href="https://huggingface.co/black-forest-labs/FLUX.2-dev">FLUX.2 dev model card</a> /
+            <a href="https://help.bfl.ai/articles/9364115800-flux-models-overview">BFL model overview</a>
+          </td>
+          <td>
+            Forge側はFlux.1低ビット運用、ComfyUI側はFLUX.2/klein検証という二段構えが現実的。FLUX.2はVRAM、ライセンス、NSFW/IPフィルタ条件もUIで扱う。
+          </td>
+        </tr>
+        <tr>
+          <td>Civitai</td>
+          <td>
+            旧GitHub WikiのREST API Referenceは、2026-04-30編集でdeveloper.civitai.comへ移行・旧Wiki非推奨と明記。
+            <a href="https://github.com/civitai/civitai/wiki/REST-API-Reference">Civitai REST API notice</a>
+          </td>
+          <td>
+            既存のAPI連携は壊れやすい前提で、取得元、取得日、endpoint、fallbackを保存する。モデルID/Version ID/Hashで検証する。
+          </td>
+        </tr>
+        <tr>
+          <td>ComfyUI</td>
+          <td>
+            ComfyUI公式Docsは、ノードでAIモデルと操作を組み合わせるワークフローと、FLUX.2 Klein guide / partner API nodesを案内している。
+            <a href="https://docs.comfy.org/">ComfyUI docs</a> /
+            <a href="https://docs.comfy.org/tutorials/flux/flux-2-klein">FLUX.2 Klein guide</a>
+          </td>
+          <td>
+            YoitomoshiのComfyUI V2は、Forgeの互換待ちを避ける実験場にする。Forge UIへ戻すには「プリセット化済みワークフロー」だけを露出する。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>モデルファミリー別プロファイル</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>ファミリー</th>
+          <th>プロンプト特性</th>
+          <th>導入候補</th>
+          <th>注意点</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>SD1.5</td>
+          <td>短いタグ、ネガティブ品質タグ、ControlNet/ADetailer/LoRA資産が最大。</td>
+          <td>軽量・高速・既存LoRA資産向けの標準プロファイル。</td>
+          <td>512px基準。高解像はHires/Upscale前提。</td>
+        </tr>
+        <tr>
+          <td>SDXL</td>
+          <td>自然言語とタグの混在、1024px基準、refiner任意。</td>
+          <td>汎用・商用寄りの主軸。VAEチェックとベース互換LoRA表示を追加。</td>
+          <td>SD1.5 LoRAとの誤使用を防ぐ。</td>
+        </tr>
+        <tr>
+          <td>Pony Diffusion V6 XL</td>
+          <td>
+            公式モデルカードはClip Skip 2と、<span class="tag">score_9</span>
+            <span class="tag">score_8_up</span>などの品質タグを強調。
+            <a href="https://huggingface.co/LyliaEngine/Pony_Diffusion_V6_XL">Pony model card</a>
+          </td>
+          <td>Prompt Helperに「Pony prefix」プリセットを追加。source/rating/score系タグをカテゴリ化。</td>
+          <td>通常SDXLとは品質タグ体系が違う。LoRAの互換ベース表示が必須。</td>
+        </tr>
+        <tr>
+          <td>Illustrious XL</td>
+          <td>
+            OnomaAIのモデルカードはDanbooru2023、品質タグ、構図タグ、研究目的・ライセンス条件を記載。
+            <a href="https://huggingface.co/OnomaAIResearch/Illustrious-xl-early-release-v0">Illustrious model card</a>
+          </td>
+          <td>Danbooruタグ + 自然言語の混合プロファイル。日本語翻訳付きタグ辞書と相性がよい。</td>
+          <td>公開版/派生版/ライセンスが混在するため、公式・派生・Civitai mirrorを分けて表示。</td>
+        </tr>
+        <tr>
+          <td>NoobAI XL</td>
+          <td>
+            Laxhar/RunwareモデルカードはDanbooru/e621、v-pred系設定、Euler、品質prefix、解像度候補を案内。
+            <a href="https://huggingface.co/Laxhar/noobai-XL-1.1/blob/main/README.md">NoobAI 1.1</a> /
+            <a href="https://huggingface.co/Runware/NoobAI-XL-VPred-1.0/blob/main/README.md">NoobAI VPred</a>
+          </td>
+          <td>モデルごとに「eps/v-pred」「sampler固定」「prefix/negative」を保存する。</td>
+          <td>v-pred系はサンプラーや実装差で壊れやすい。Forge直載せよりComfyUI検証を先にする。</td>
+        </tr>
+        <tr>
+          <td>SD3.5</td>
+          <td>MMDiT、複数テキストエンコーダ、プロンプト追従・文字表現が強み。</td>
+          <td>ComfyUI V2にSD3.5ワークフローを追加し、Forge側には導入ガイドとモデル管理だけ置く。</td>
+          <td>Forge互換は一次情報だけでは断定しない。導入時に必要ファイルの不足をpreflightで検出。</td>
+        </tr>
+        <tr>
+          <td>FLUX.1 / FLUX.2</td>
+          <td>自然言語、参照画像、編集、Redux/Fill/Kontext/Kleinなど用途別に分岐。</td>
+          <td>FLUX.1はForge低ビット、FLUX.2はComfyUI。モデルカードからライセンス・フィルタ条件・参照画像数を取り込む。</td>
+          <td>BFL公式でFLUX.1 Depth/Cannyは非推奨扱い。新規実装ではFill/Redux/Kontext/FLUX.2へ寄せる。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>拡張機能とワークフロー</h2>
+    <div class="grid">
+      <article class="card">
+        <h3>ControlNet / IP-Adapter / Reference</h3>
+        <p>
+          ControlNet WebUI拡張は、ControlNet/T2I Adapter、Pixel Perfect、Hires対応、Control Mode、Reference-onlyを提供している。
+          <a href="https://github.com/Mikubill/sd-webui-controlnet">sd-webui-controlnet</a>
+        </p>
+        <p><strong>取り込み:</strong> 「ポーズ固定」「線画から」「構図参照」「顔/画風参照」という日本語タスクボタンにまとめる。</p>
+      </article>
+      <article class="card">
+        <h3>ADetailer</h3>
+        <p>
+          ADetailerは検出モデルでマスクを作り、生成後に自動inpaintする拡張。
+          <a href="https://github.com/Bing-su/adetailer">ADetailer</a>
+        </p>
+        <p><strong>取り込み:</strong> 顔・手・目の自動補修を「仕上げ」パネルへ。検出モデル未導入時は明確に不足表示。</p>
+      </article>
+      <article class="card">
+        <h3>Dynamic Prompts</h3>
+        <p>
+          sd-dynamic-promptsはランダム/組み合わせ生成のテンプレート言語と深いwildcard構造を提供する。
+          <a href="https://github.com/adieyal/sd-dynamic-prompts">sd-dynamic-prompts</a>
+        </p>
+        <p><strong>取り込み:</strong> Prompt Helperの「探索」モード。履歴レビューと結合して良い組み合わせだけライブラリ化。</p>
+      </article>
+      <article class="card">
+        <h3>Regional Prompter</h3>
+        <p>
+          領域ごとにpromptを分けるワークフローは、複数人物、衣装差分、背景/前景分離に効く。
+          <a href="https://github.com/hako-mikan/sd-webui-regional-prompter">Regional Prompter</a>
+        </p>
+        <p><strong>取り込み:</strong> 将来の「複数人物構図」テンプレート候補。まずは仕様だけ記録し、Forge互換を個別確認する。</p>
+      </article>
+      <article class="card">
+        <h3>FreeU / Forge内蔵実験機能</h3>
+        <p>
+          Forge READMEにはFreeU V2の実装例と、UnetPatcher経由の統合例がある。
+          <a href="https://github.com/lllyasviel/stable-diffusion-webui-forge/blob/main/README.md">Forge README</a>
+        </p>
+        <p><strong>取り込み:</strong> 上級者向けの折りたたみ設定。デフォルトONにはしない。</p>
+      </article>
+      <article class="card">
+        <h3>FLUX Tools / Kontext</h3>
+        <p>
+          BFL公式はFill/Reduxを継続対象、Depth/Cannyは非推奨としている。Kontextは画像+テキストの編集に向く。
+          <a href="https://bfl.ai/blog/24-11-21-tools">FLUX.1 Tools</a> /
+          <a href="https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev">FLUX.1 Kontext</a>
+        </p>
+        <p><strong>取り込み:</strong> ComfyUI側の「画像編集」ワークフローとして実装し、ForgeのControlNetとは別扱いにする。</p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>LoRA / LyCORIS / 学習・メタデータ</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>要素</th>
+          <th>外部根拠</th>
+          <th>実装方針</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Extra Networks</td>
+          <td>
+            A1111 WikiはLoRAを <code>models/Lora</code> に置き、<code>&lt;lora:filename:multiplier&gt;</code> で使うと説明。
+            <a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/Features">A1111 Features</a>
+          </td>
+          <td>Yoitomoshiではクリック挿入だけでなく、推奨weight、互換ベース、trigger wordsをカードに常時表示する。</td>
+        </tr>
+        <tr>
+          <td>LyCORIS</td>
+          <td>
+            LyCORISはLoCon/LoHa/LoKr等のPEFT手法を含み、WebUI 1.5以降ではbuilt-in LoRA構文で扱えると説明。
+            <a href="https://github.com/KohakuBlueleaf/LyCORIS">LyCORIS</a>
+          </td>
+          <td>拡張子だけで判断せず、metadataからnetwork typeを読む。未対応typeは生成前に警告する。</td>
+        </tr>
+        <tr>
+          <td>kohya sd-scripts</td>
+          <td>
+            sd-scriptsはSD1.x/2.x、SDXL、SD3/3.5、FLUX.1、LUMINA、HunyuanImage等の学習/生成/ユーティリティを扱う。
+            <a href="https://github.com/kohya-ss/sd-scripts">kohya-ss/sd-scripts</a>
+          </td>
+          <td>学習そのものをYoitomoshi本体へ入れるより、caption/tagger/metadata確認とLoRA運用支援を先に入れる。</td>
+        </tr>
+        <tr>
+          <td>Diffusers adapters</td>
+          <td>
+            DiffusersはLoRA、IP-Adapter、ControlNetなどadapterのロードと組み合わせを公式Docsで扱う。
+            <a href="https://huggingface.co/docs/diffusers/main/using-diffusers/loading_adapters">Diffusers adapters</a>
+          </td>
+          <td>ForgeとComfyUIのどちらでも、内部表現は「adapter asset」として統一し、UIは用途別に出す。</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      <p>
+        実装上の中核は、LoRAを単なるファイルではなく
+        <span class="tag">baseModel</span><span class="tag">modelVersionId</span><span class="tag">sha256</span>
+        <span class="tag">triggerWords</span><span class="tag">recommendedPrompts</span>
+        <span class="tag">negativeHints</span><span class="tag">license</span> を持つ制作資産として扱うこと。
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>VAE / Decoder / 速度と画質</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>項目</th>
+          <th>確認情報</th>
+          <th>Yoitomoshiでの扱い</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>SDXL VAE fp16 fix</td>
+          <td>
+            madebyollinのSDXL-VAE-FP16-Fixは、SDXL VAEをfp16でNaNを出さず動かす目的の派生VAE。
+            <a href="https://huggingface.co/madebyollin/sdxl-vae-fp16-fix">sdxl-vae-fp16-fix</a>
+          </td>
+          <td>SDXLプロファイルで推奨候補に出す。<code>--no-half-vae</code>が必要なケースを検知して説明する。</td>
+        </tr>
+        <tr>
+          <td>TAESD / AutoencoderTiny</td>
+          <td>
+            Diffusers DocsはTAESDをStable Diffusion VAEの小型蒸留版として、ほぼ即時のlatent decodeに使えると説明。
+            <a href="https://huggingface.co/docs/diffusers/main/en/api/models/autoencoder_tiny">AutoencoderTiny</a>
+          </td>
+          <td>本番出力ではなく、プレビュー高速化や履歴一覧の軽量サムネイル検証候補にする。</td>
+        </tr>
+        <tr>
+          <td>FLUX / SD3.5専用構成</td>
+          <td>FLUX.2やSD3.5はモデルごとにテキストエンコーダ、VAE/decoder、量子化ファイル、フィルタ条件が異なる。</td>
+          <td>「Checkpointだけ入れれば動く」というUIにしない。必要ファイルをpreflightで一覧化する。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Civitai連携</h2>
+    <div class="callout warn">
+      <p>
+        Civitaiは旧Wiki API Referenceをdeveloper.civitai.comへ移行している。Yoitomoshi側はendpoint固定の実装を避け、
+        API取得結果を保存する時に <code>sourceUrl</code>、<code>fetchedAt</code>、<code>apiVersion</code>、<code>modelId</code>、
+        <code>modelVersionId</code>、<code>sha256</code> を残すべき。
+      </p>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>機能</th>
+          <th>取り込むデータ</th>
+          <th>UI</th>
+          <th>安全策</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>モデルカード取り込み</td>
+          <td>モデル名、Version名、Base Model、creator、description、trigger words、recommended resources、files/hash、license。</td>
+          <td>Model Libraryの詳細パネルに「Civitai由来」セクション。</td>
+          <td>hash一致時だけ「このローカルファイルに対応」と表示。</td>
+        </tr>
+        <tr>
+          <td>推奨プロンプト抽出</td>
+          <td>description内の明示的なPositive/Recommended/Example promptセクション。</td>
+          <td>Prompt Helperに「モデル推奨」チップとして表示。</td>
+          <td>自由文から勝手に発火語を作らない。既存のdry-run previewを維持。</td>
+        </tr>
+        <tr>
+          <td>画像メタデータ学習</td>
+          <td>公開画像のprompt、negative、sampler、steps、CFG、seed、resources。</td>
+          <td>「参考画像から設定を読む」ビュー。保存前に出典とNSFW/ライセンス注意を表示。</td>
+          <td>API/HTML構造変更に備えてparserを分離。ユーザーのCivitai APIキーは環境変数または安全な設定ストアへ。</td>
+        </tr>
+        <tr>
+          <td>タグトレンド</td>
+          <td>タグ名、カテゴリ、件数、モデルファミリー、期間。</td>
+          <td>タグライブラリの「候補」タブ。</td>
+          <td>人気語だけに寄せすぎない。代替タグと探索テンプレートを併記。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>AIイラストコミュニティからの学び</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>観察</th>
+          <th>根拠</th>
+          <th>実装へ変換</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>タグ体系はモデルと文化圏で違う</td>
+          <td>Danbooru系はcharacter/copyright/artist/general/meta/ratingのような分類を持ち、Pony/Illustrious/NoobAIはこの文化圏の影響が大きい。</td>
+          <td>Promptタグ管理に「人物/衣服/構図」だけでなく、model-family、source、rating、quality、artist-styleを持たせる。</td>
+        </tr>
+        <tr>
+          <td>人気プロンプトは均質化を招く</td>
+          <td>
+            Civitai由来の600万超プロンプト分析は、人気タグの反復でプロンプトが均質化し、視覚的多様性とも相関すると報告。
+            <a href="https://arxiv.org/abs/2504.14125">arXiv:2504.14125</a>
+          </td>
+          <td>「定番」だけでなく「探索」「差分」「反対方向」チップを出す。履歴レビューで似た出力が続いたら別系統タグを提案。</td>
+        </tr>
+        <tr>
+          <td>LoRA運用では発火語の分類が重要</td>
+          <td>Civitai/Redditの実務投稿では、base trigger、helper words、negative words、version別管理の需要が強い。</td>
+          <td>LoRA詳細に「必須」「補助」「避ける」「weight候補」を分けて保存。生成前に不足をチェック。</td>
+        </tr>
+        <tr>
+          <td>二次情報は速いが壊れやすい</td>
+          <td>Reddit/ブログは実機トラブルや運用ノウハウの発見に強いが、仕様断定には向かない。</td>
+          <td>レポート内では「一次情報」「コミュニティ実務」「未検証」を分ける。実装時は公式DocsまたはローカルQAで確定する。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>機能候補バックログ</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>候補</th>
+          <th>優先</th>
+          <th>受け入れ条件</th>
+          <th>検証</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AI-ECO-01</td>
+          <td>Model Family Profile: SD1.5/SDXL/Pony/Illustrious/NoobAI/SD3.5/FLUX</td>
+          <td>P0</td>
+          <td>モデル選択時に推奨解像度、prefix、negative、Clip Skip、VAE、sampler、LoRA互換がUIへ反映される。</td>
+          <td><code>npm.cmd run typecheck</code>、モデル選択DOM QA、プリセット保存/復元QA</td>
+        </tr>
+        <tr>
+          <td>AI-ECO-02</td>
+          <td>LoRA Metadata Inspector</td>
+          <td>P0</td>
+          <td>safetensors metadata、Civitai modelVersionId/hash、trigger words、recommendedPromptsを表示し、promptへ個別挿入できる。</td>
+          <td>fixture LoRA metadata、Civitai取得mock、DOM QA</td>
+        </tr>
+        <tr>
+          <td>AI-ECO-03</td>
+          <td>Prompt Tag Knowledge Loop</td>
+          <td>P0</td>
+          <td>生成promptのタグチップから、辞書追加・日本語訳・お気に入り・カテゴリ指定ができ、autocompleteにも反映される。</td>
+          <td><code>npm.cmd run qa:dom:prompt-tag-library -- --port=9338</code></td>
+        </tr>
+        <tr>
+          <td>AI-ECO-04</td>
+          <td>Free Translation Provider Setting</td>
+          <td>P0</td>
+          <td>Google web endpoint相当/MyMemory等の無料翻訳を設定から選び、失敗時は手入力へ自然に戻れる。</td>
+          <td>IPC unit、DOM QA、ネットワーク失敗mock</td>
+        </tr>
+        <tr>
+          <td>AI-ECO-05</td>
+          <td>Control Task Templates</td>
+          <td>P1</td>
+          <td>ポーズ固定、線画、深度、構図参照、顔参照、inpaint補修をタスクから選べる。</td>
+          <td>ControlNet API surface QA、img2img/inpaint smoke</td>
+        </tr>
+        <tr>
+          <td>AI-ECO-06</td>
+          <td>VAE / Decoder Preflight</td>
+          <td>P1</td>
+          <td>モデルファミリーに対してVAE/decoder/encoder不足、fp16リスク、推奨差し替えを生成前に表示する。</td>
+          <td>model preflight QA、設定保存QA</td>
+        </tr>
+        <tr>
+          <td>AI-ECO-07</td>
+          <td>FLUX.2 / SD3.5 ComfyUI Workflow Pack</td>
+          <td>P1</td>
+          <td>ForgeではなくComfyUI V2経由で、必要ファイル・VRAM目安・ライセンスを表示して起動できる。</td>
+          <td>ComfyUI V2 preflight、workflow JSON parse、生成smokeは小サイズから</td>
+        </tr>
+        <tr>
+          <td>AI-ECO-08</td>
+          <td>Diversity Guard</td>
+          <td>P2</td>
+          <td>履歴内で類似prompt/同一人気タグが続いた時、代替タグ・構図・レンズ・配色を提案する。</td>
+          <td>history review fixture、Prompt Helper QA</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>実装順序</h2>
+    <ol>
+      <li><strong>短期:</strong> 既に始まっているタグチップ辞書追加・翻訳・お気に入り化を安定化し、設定画面に翻訳プロバイダ選択を露出する。</li>
+      <li><strong>短期:</strong> Model Libraryへモデルファミリーの手動分類と推奨prefix/negative/解像度を持たせる。</li>
+      <li><strong>中期:</strong> Civitai/LoRA metadataからtrigger wordsとrecommended promptsを取得し、dry-run previewで保存する。</li>
+      <li><strong>中期:</strong> VAE/decoder preflightを追加し、SDXL fp16 fixやTAESD系を用途別に案内する。</li>
+      <li><strong>中期:</strong> ControlNet/ADetailerを「タスクテンプレート」へ変換し、初心者が拡張名を知らなくても使えるようにする。</li>
+      <li><strong>後期:</strong> FLUX.2/SD3.5はComfyUI V2に安全なワークフローパックとして追加し、Forge側にはモデル導入・実行経路だけを出す。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>未確定・採用保留</h2>
+    <div class="callout risk">
+      <ul>
+        <li>「Stable Diffusion 4」系の記事は、今回の確認範囲ではStability AI一次情報で裏取りできなかったため採用しない。</li>
+        <li>Civitai APIは公式ドキュメント移行中。endpointの長期安定性を前提にせず、取得失敗時のfallbackとキャッシュを実装する。</li>
+        <li>FLUX.2は魅力が大きいが、Forge直結は未検証。最初はComfyUI V2でワークフロー検証する。</li>
+        <li>無料翻訳は規約・レート制限・品質差がある。自動翻訳は下書き扱いにし、ユーザー編集を正とする。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>参照リンク</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>分類</th>
+          <th>リンク</th>
+          <th>用途</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Forge</td>
+          <td><a href="https://github.com/lllyasviel/stable-diffusion-webui-forge/blob/main/README.md">Stable Diffusion WebUI Forge README</a></td>
+          <td>Forgeの対応範囲、Flux低ビット、ControlNet/IP-Adapter/ADetailer状態、FreeU統合例。</td>
+        </tr>
+        <tr>
+          <td>Stability AI</td>
+          <td><a href="https://stability.ai/news-updates/introducing-stable-diffusion-3-5">Introducing Stable Diffusion 3.5</a></td>
+          <td>SD3.5の公式リリース、variant、ライセンス概要。</td>
+        </tr>
+        <tr>
+          <td>SDXL</td>
+          <td><a href="https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0">SDXL base model card</a></td>
+          <td>SDXL base/refiner構成と利用条件。</td>
+        </tr>
+        <tr>
+          <td>BFL</td>
+          <td><a href="https://help.bfl.ai/articles/9364115800-flux-models-overview">FLUX Models Overview</a> / <a href="https://huggingface.co/black-forest-labs/FLUX.2-dev">FLUX.2 dev</a></td>
+          <td>FLUX.2最新世代、dev/klein、ライセンス、生成・編集・参照機能。</td>
+        </tr>
+        <tr>
+          <td>BFL Tools</td>
+          <td><a href="https://bfl.ai/blog/24-11-21-tools">Introducing FLUX.1 Tools</a> / <a href="https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev">FLUX.1 Kontext dev</a></td>
+          <td>Fill/Redux/Kontext、Depth/Canny非推奨、画像編集ワークフロー。</td>
+        </tr>
+        <tr>
+          <td>Civitai</td>
+          <td><a href="https://github.com/civitai/civitai/wiki/REST-API-Reference">REST API Reference migration notice</a></td>
+          <td>APIドキュメント移行、既存endpoint利用時の注意。</td>
+        </tr>
+        <tr>
+          <td>ControlNet</td>
+          <td><a href="https://github.com/Mikubill/sd-webui-controlnet">sd-webui-controlnet</a></td>
+          <td>ControlNet、T2I Adapter、Reference-only、Pixel Perfect、Control Mode。</td>
+        </tr>
+        <tr>
+          <td>ADetailer</td>
+          <td><a href="https://github.com/Bing-su/adetailer">ADetailer</a></td>
+          <td>自動検出、マスク、inpaint補修。</td>
+        </tr>
+        <tr>
+          <td>Dynamic Prompts</td>
+          <td><a href="https://github.com/adieyal/sd-dynamic-prompts">sd-dynamic-prompts</a></td>
+          <td>wildcard、組み合わせ、探索プロンプト。</td>
+        </tr>
+        <tr>
+          <td>LyCORIS</td>
+          <td><a href="https://github.com/KohakuBlueleaf/LyCORIS">LyCORIS</a></td>
+          <td>LoCon/LoHa/LoKrなどLoRA派生の扱い。</td>
+        </tr>
+        <tr>
+          <td>Training</td>
+          <td><a href="https://github.com/kohya-ss/sd-scripts">kohya-ss/sd-scripts</a></td>
+          <td>LoRA学習、SDXL/SD3.5/FLUX.1対応、タグ付けユーティリティ。</td>
+        </tr>
+        <tr>
+          <td>Diffusers</td>
+          <td><a href="https://huggingface.co/docs/diffusers/main/using-diffusers/loading_adapters">Loading adapters</a> / <a href="https://huggingface.co/docs/diffusers/main/en/api/models/autoencoder_tiny">AutoencoderTiny</a></td>
+          <td>Adapter統合とTAESD/AutoencoderTiny。</td>
+        </tr>
+        <tr>
+          <td>VAE</td>
+          <td><a href="https://huggingface.co/madebyollin/sdxl-vae-fp16-fix">SDXL-VAE-FP16-Fix</a></td>
+          <td>SDXL fp16 VAE NaN対策。</td>
+        </tr>
+        <tr>
+          <td>Anime models</td>
+          <td><a href="https://huggingface.co/LyliaEngine/Pony_Diffusion_V6_XL">Pony Diffusion V6 XL</a> / <a href="https://huggingface.co/OnomaAIResearch/Illustrious-xl-early-release-v0">Illustrious XL</a> / <a href="https://huggingface.co/Laxhar/noobai-XL-1.1/blob/main/README.md">NoobAI XL</a></td>
+          <td>モデルファミリー別prompt、品質タグ、ライセンス、推奨設定。</td>
+        </tr>
+        <tr>
+          <td>Community research</td>
+          <td><a href="https://arxiv.org/abs/2504.14125">Exploring Language Patterns of Prompts in TTI</a></td>
+          <td>Civitai由来prompt反復・均質化と多様性ガードの根拠。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer class="small">
+    作成: 2026-05-22。外部リンクは確認時点の情報。仕様・ライセンス・API挙動は更新されるため、実装時は該当一次情報とローカルQAで再確認する。
+  </footer>
+</main>
+</body>
+</html>

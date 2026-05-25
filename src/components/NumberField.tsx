@@ -10,6 +10,7 @@ interface Props {
   onChange(v: number): void
   className?: string
   hint?: string
+  testId?: string
 }
 
 /**
@@ -24,7 +25,8 @@ export function NumberField({
   step = 1,
   onChange,
   className,
-  hint
+  hint,
+  testId
 }: Props): JSX.Element {
   const [draft, setDraft] = useState(String(value))
 
@@ -62,6 +64,7 @@ export function NumberField({
         <input
           className="input rounded-none border-x-0 text-center font-mono"
           value={draft}
+          data-testid={testId}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {

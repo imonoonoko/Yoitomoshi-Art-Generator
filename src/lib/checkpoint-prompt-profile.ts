@@ -1,7 +1,9 @@
 import type {
   CheckpointPromptFamily,
+  CheckpointNegativeStrategy,
   CheckpointPromptProfile,
   CheckpointPromptProfileMode,
+  CheckpointPromptStyle,
   CivitaiRecommended,
   ModelLibraryEntry,
   SdModel
@@ -23,6 +25,15 @@ export interface CheckpointPromptFormatResult {
   changed: boolean
   modelChanged: boolean
   addedTokens: string[]
+}
+
+export interface CheckpointPromptProfileParamPatch {
+  sampler?: string
+  steps?: number
+  cfgScale?: number
+  width?: number
+  height?: number
+  clipSkip?: number
 }
 
 const DEFAULT_POSITIVE_PREFIX: Record<CheckpointPromptFamily, string[]> = {
@@ -124,7 +135,15 @@ export function defaultCheckpointPromptProfile(context: CheckpointPromptContext)
     checkpointName: context.name ?? stripModelFileExtension(title),
     checkpointPath: context.path ?? undefined,
     checkpointSha256: validSha256(context.sha256),
+    baseModel: context.baseModel ?? undefined,
     family,
+    promptStyle: defaultCheckpointPromptStyle(family),
+    negativeStrategy: defaultCheckpointNegativeStrategy(family),
+    recommendedAspectRatios: defaultCheckpointAspectRatios(family),
+    recommendedLoraCount: defaultCheckpointLoraCount(family),
+    relatedModels: { loras: [], vaes: [], controlNets: [] },
+    compatibilityNotes: defaultCheckpointCompatibilityNotes(family, context.baseModel),
+    recipeNotes: [],
     positivePrefix: DEFAULT_POSITIVE_PREFIX[family],
     positiveAppend: [],
     negativeAppend: [],
@@ -135,6 +154,29 @@ export function defaultCheckpointPromptProfile(context: CheckpointPromptContext)
 
 export function checkpointPromptProfileSuggests(profile: CheckpointPromptProfile | null | undefined): boolean {
   return profile != null && profile.mode !== 'manual'
+}
+
+export function checkpointPromptProfileParamsPatch(
+  profile: CheckpointPromptProfile | null | undefined
+): CheckpointPromptProfileParamPatch {
+  const patch: CheckpointPromptProfileParamPatch = {}
+  if (!profile) return patch
+  if (profile.sampler?.trim()) patch.sampler = profile.sampler.trim()
+  if (profile.steps != null) patch.steps = Math.round(profile.steps)
+  if (profile.cfgScale != null) patch.cfgScale = profile.cfgScale
+  if (profile.width != null) patch.width = Math.round(profile.width)
+  if (profile.height != null) patch.height = Math.round(profile.height)
+  if (profile.clipSkip != null) patch.clipSkip = Math.max(1, Math.round(profile.clipSkip))
+  return patch
+}
+
+export function checkpointPromptProfileParamsChanged(
+  params: Partial<CheckpointPromptProfileParamPatch>,
+  profile: CheckpointPromptProfile | null | undefined
+): boolean {
+  const patch = checkpointPromptProfileParamsPatch(profile)
+  return (Object.entries(patch) as Array<[keyof CheckpointPromptProfileParamPatch, string | number]>)
+    .some(([key, value]) => params[key] !== value)
 }
 
 export function formatPromptForCheckpoint(
@@ -167,6 +209,67 @@ export function formatPromptForCheckpoint(
 
 export function normalizeCheckpointProfileMode(value: string): CheckpointPromptProfileMode {
   return value === 'manual' || value === 'auto' || value === 'suggest' ? value : 'suggest'
+}
+
+export function normalizeCheckpointPromptStyle(value: string): CheckpointPromptStyle {
+  return value === 'tag' || value === 'natural' || value === 'structured' || value === 'hybrid'
+    ? value
+    : 'tag'
+}
+
+export function normalizeCheckpointNegativeStrategy(value: string): CheckpointNegativeStrategy {
+  return value === 'classic' || value === 'minimal' || value === 'positive-replacement'
+    ? value
+    : 'classic'
+}
+
+export function defaultCheckpointPromptStyle(family: CheckpointPromptFamily): CheckpointPromptStyle {
+  if (family === 'flux') return 'natural'
+  if (family === 'custom') return 'hybrid'
+  return 'tag'
+}
+
+export function defaultCheckpointNegativeStrategy(family: CheckpointPromptFamily): CheckpointNegativeStrategy {
+  return family === 'flux' ? 'positive-replacement' : 'classic'
+}
+
+function defaultCheckpointAspectRatios(family: CheckpointPromptFamily): CheckpointPromptProfile['recommendedAspectRatios'] {
+  if (family === 'sd15') {
+    return [
+      { label: 'Portrait', width: 512, height: 768 },
+      { label: 'Square', width: 768, height: 768 }
+    ]
+  }
+  if (family === 'flux') {
+    return [
+      { label: 'Square', width: 1024, height: 1024 },
+      { label: 'Portrait', width: 896, height: 1152 }
+    ]
+  }
+  return [
+    { label: 'Portrait', width: 832, height: 1216 },
+    { label: 'Poster', width: 1024, height: 1536 },
+    { label: 'Square', width: 1024, height: 1024 }
+  ]
+}
+
+function defaultCheckpointLoraCount(family: CheckpointPromptFamily): CheckpointPromptProfile['recommendedLoraCount'] {
+  if (family === 'flux') return { min: 0, max: 2 }
+  if (family === 'custom') return null
+  return { min: 1, max: 3 }
+}
+
+function defaultCheckpointCompatibilityNotes(family: CheckpointPromptFamily, baseModel?: string | null): string[] {
+  const notes: string[] = []
+  if (baseModel) notes.push(`baseModel: ${baseModel}`)
+  if (family === 'flux') {
+    notes.push('Use natural-language prompts and avoid relying on classic negative tags.')
+  } else if (family === 'pony') {
+    notes.push('Keep Pony score/source tags near the beginning of the prompt.')
+  } else if (family === 'illustrious' || family === 'noobai' || family === 'animagine') {
+    notes.push('Use tag-style prompts and verify LoRA base-model compatibility.')
+  }
+  return notes
 }
 
 export function normalizeCheckpointProfileFamily(value: string): CheckpointPromptFamily {

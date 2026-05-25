@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yoitomoshi Tag Library Research - 2026-05-22</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0c10;
+      --panel: #14151c;
+      --panel-2: #191b24;
+      --line: #2a2d3a;
+      --ink: #f4f6fb;
+      --muted: #a6adbd;
+      --soft: #7c86a2;
+      --accent: #8b83ff;
+      --good: #74d99f;
+      --warn: #f0c36a;
+      --bad: #ff8b8b;
+      --code: #10121a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.7 "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif;
+    }
+    main {
+      width: min(1120px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 36px 0 48px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 32px 0 12px;
+      font-size: 19px;
+      border-left: 4px solid var(--accent);
+      padding-left: 10px;
+    }
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 15px;
+      color: #dfe3ff;
+    }
+    p { margin: 8px 0; }
+    a { color: #b7b3ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: #e7eaff;
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 12px;
+    }
+    pre {
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: auto;
+      padding: 14px;
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      color: #d9dcff;
+      background: #1b1d28;
+      font-weight: 650;
+    }
+    tr:last-child td { border-bottom: 0; }
+    ul, ol { padding-left: 21px; }
+    li { margin: 5px 0; }
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .card h3 { margin-top: 0; }
+    .tag {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 1px 8px;
+      margin: 2px;
+      color: #dce1f7;
+      background: #202333;
+      font-size: 12px;
+    }
+    .decision {
+      border: 1px solid rgba(116, 217, 159, .45);
+      background: rgba(116, 217, 159, .08);
+    }
+    .warn {
+      border: 1px solid rgba(240, 195, 106, .45);
+      background: rgba(240, 195, 106, .08);
+    }
+    .bad {
+      border: 1px solid rgba(255, 139, 139, .45);
+      background: rgba(255, 139, 139, .08);
+    }
+    .source-list li { margin-bottom: 8px; }
+    .small { font-size: 12px; color: var(--muted); }
+    @media (max-width: 820px) {
+      main { width: min(100% - 24px, 1120px); padding-top: 24px; }
+      .grid { grid-template-columns: 1fr; }
+      table { font-size: 12px; }
+      th, td { padding: 8px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Yoitomoshi タグライブラリ強化リサーチ</h1>
+    <p class="meta">作成日: 2026-05-22 / 対象: Yoitomoshi Art Generator Forge版 / 参考: imonoonoko/Tag-Manager</p>
+    <p>
+      結論: 次の強化は、タグ追加ボタン単体の改善ではなく、
+      <strong>タグを「chip一覧」から「モデル別・出典付き・alias対応のプロンプト知識ベース」へ拡張する</strong>方向が最も効果的です。
+      Tag-Manager の思想は有用ですが、Tkinter/SQLite UIを移植するより、Yoitomoshiの既存React/Electron構造に合わせて段階的に取り込むべきです。
+    </p>
+  </header>
+
+  <section>
+    <h2>要約</h2>
+    <div class="grid">
+      <div class="card decision">
+        <h3>最優先</h3>
+        <p>
+          <code>custom-prompt-library.json</code> を失わない移行を先に入れ、タグスキーマv2を作る。
+          canonical名、翻訳、alias、カテゴリ、positive/negative、出典、モデル適性、使用履歴を分けて持つ。
+        </p>
+      </div>
+      <div class="card">
+        <h3>UI方針</h3>
+        <p>
+          タグ追加は常時小さい「+」だけにせず、グループヘッダーに明確な追加ボタン、検索からの即追加、複数行貼り付け、候補付きtoken inputを併用する。
+        </p>
+      </div>
+      <div class="card warn">
+        <h3>注意点</h3>
+        <p>
+          Tag-Managerにはデータ消失とAIダウンロード修正の未マージPRが残る。Yoitomoshiでは保存前バックアップ、dry-run import、migration testを必須にする。
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>現状把握</h2>
+    <h3>Yoitomoshi側</h3>
+    <table>
+      <thead>
+        <tr><th>領域</th><th>現在できていること</th><th>強化余地</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Prompt Library</td>
+          <td><code>resources/prompt-library*.ja.yaml</code> を読み、built-in + user customをマージ表示。お気に入り、最近使ったタグ、カテゴリ/グループ/タグ追加、複数タグ貼り付けに対応。</td>
+          <td>canonical/alias/implicationがなく、類似語や表記ゆれの統合はできない。カテゴリは表示分類で、モデル別の推奨語彙とは分離されていない。</td>
+        </tr>
+        <tr>
+          <td>Promptタグ管理タブ</td>
+          <td><code>PromptTagsWorkspace.tsx</code> にライブラリ、quick add、positive/negative編集、整形がまとまっている。</td>
+          <td>右側の編集面と左側のライブラリがまだ「タグ知識ベース編集」にはなっていない。追加・編集・重複解決・出典確認が分散している。</td>
+        </tr>
+        <tr>
+          <td>Civitai連携</td>
+          <td>LoRA/モデル情報からtrigger、description、recommended prompt候補を抽出する処理がある。Civitaiタグ一覧APIの取得口もある。</td>
+          <td>Civitaiタグはモデル発見向けのタグで、生成プロンプト用タグとは意味が違う。出典と用途を分けて保存する必要がある。</td>
+        </tr>
+        <tr>
+          <td>Tagger連携</td>
+          <td>Forge側Taggerモデルと <code>selected_tags.csv</code> を使う推論経路、History review、Prompt Helper連携がある。</td>
+          <td>tagger結果を「候補」としてライブラリへ昇格するレビューフローがまだ弱い。score、model名、採用/拒否履歴を保存したい。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Tag-Manager側</h3>
+    <table>
+      <thead>
+        <tr><th>観点</th><th>参考にする価値</th><th>Yoitomoshiへの落とし込み</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>タグDB</td>
+          <td>SQLiteで <code>tag</code>, <code>jp</code>, <code>favorite</code>, <code>category</code>, <code>is_negative</code>, <code>recent_tags</code> を管理。</td>
+          <td>Yoitomoshiは既にJSON/YAML中心なのでSQLite移植は不要。代わりにJSON schema version + migration + backupを入れる。</td>
+        </tr>
+        <tr>
+          <td>AI予測</td>
+          <td>使用頻度、カテゴリ履歴、context tags、類似タグ提案、Hugging Face遅延読み込みの発想がある。</td>
+          <td>ローカルLLM/重いMLは先送り。まずはルールベース + Civitai/Tagger/履歴からの軽量推薦にする。</td>
+        </tr>
+        <tr>
+          <td>Import/Export</td>
+          <td>JSON/CSV export、包括的個人データexport、backup作成がある。</td>
+          <td>Yoitomoshiではタグライブラリ専用のexport/importとdry-runを先に入れる。LoRA設定や履歴とは切り分ける。</td>
+        </tr>
+        <tr>
+          <td>未完成リスク</td>
+          <td>GitHub上で未マージPR <code>Fix data loss and ai download bug</code> が残っている。</td>
+          <td>データ消失対策を最初の受け入れ条件にする。保存前バックアップ、atomic write、migration fixtureを必須化する。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>2026-05-22時点の外部ベストプラクティス</h2>
+    <table>
+      <thead>
+        <tr><th>分野</th><th>調査結果</th><th>採用判断</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>タグ入力UI</td>
+          <td>WAI-ARIA Comboboxは、入力欄と候補popup、Enter/Escape/Arrowの操作を明確に定義している。Primerは「値がリストである入力」にはtoken inputを使い、Autocompleteと組み合わせる想定を示している。</td>
+          <td>タグ追加フォームは、自由入力 + 候補選択 + token削除を同じ部品として設計する。見た目だけの小ボタンではなく、キーボードで完結できる追加導線にする。</td>
+        </tr>
+        <tr>
+          <td>大量候補</td>
+          <td>MUI Autocompleteはfree solo、creatable、multiple values、virtualization、listbox roleなどを明文化している。</td>
+          <td>YoitomoshiではMUI導入は不要だが、設計原則は使う。候補数が増えるため、検索・virtual list・候補の「Add ...」行を想定する。</td>
+        </tr>
+        <tr>
+          <td>タグ知識ベース</td>
+          <td>Danbooru系はtag category、alias、implication、related tagsを分ける。aliasはcanonical化、implicationは関連タグ自動追加に使える。</td>
+          <td>alias/implicationをYoitomoshi内のローカル知識として持つ。外部booruに書き戻すのではなく、prompt assemblyの補助として使う。</td>
+        </tr>
+        <tr>
+          <td>Civitai</td>
+          <td>公開APIは2026年4月にdeveloper portalへ移動した案内があり、現行の <code>/api/v1/tags</code> はライブ確認でタグ名とモデル検索リンクを返した。</td>
+          <td>Civitaiタグは「モデル検索・分類用」として保存し、生成プロンプトタグとは別フィールドにする。API失敗時のcache/fallbackを前提にする。</td>
+        </tr>
+        <tr>
+          <td>画像tagger</td>
+          <td>PixAI Tagger ONNXは13,461タグ、general/character別thresholdを提示。WD EVA02 v3はrating/character/general tagを扱い、Danbooru画像で学習している。</td>
+          <td>tagger出力はscore/threshold/model/sourceを付けて「候補」として保存する。自動でライブラリに確定追加しない。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>推奨するタグスキーマv2</h2>
+    <p>
+      現在の <code>{ en, ja }</code> は表示には軽い一方、今後のLoRA/モデル別自動整形・tagger候補・表記ゆれ統合には不足します。
+      既存データを失わないため、v1を読み込んでv2へ変換し、保存はv2、UIは互換表示にします。
+    </p>
+    <pre><code>{
+  "schemaVersion": 2,
+  "categories": [
+    {
+      "id": "people",
+      "label": { "ja": "人物", "en": "People" },
+      "groups": [
+        {
+          "id": "character-count",
+          "label": { "ja": "キャラクター", "en": "Character count" },
+          "tags": [
+            {
+              "id": "tag_1girl",
+              "canonical": "1girl",
+              "aliases": ["one girl", "girl solo"],
+              "label": { "ja": "1人の女の子" },
+              "polarity": "positive",
+              "type": "danbooru-general",
+              "modelFamilies": ["sd15", "sdxl", "illustrious", "noobai", "animagine"],
+              "source": [
+                { "kind": "built-in", "confidence": 1.0 },
+                { "kind": "tagger", "model": "wd-eva02-large-tagger-v3", "confidence": 0.93 }
+              ],
+              "usage": { "count": 0, "lastUsedAt": null }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}</code></pre>
+    <table>
+      <thead>
+        <tr><th>フィールド</th><th>目的</th><th>最初の実装範囲</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>canonical</code></td><td>保存・比較・重複排除の基準名。</td><td>必須。空白/underscore正規化ルールも固定する。</td></tr>
+        <tr><td><code>aliases</code></td><td>表記ゆれ、旧名、和製入力の吸収。</td><td>手動編集 + import時の重複検出から開始。</td></tr>
+        <tr><td><code>polarity</code></td><td>positive/negative/bothを分離。</td><td>既存negative欄移動と連動。</td></tr>
+        <tr><td><code>modelFamilies</code></td><td>Pony/Illustrious/SDXL/SD1.5などで使える語彙を分ける。</td><td>まず手動タグ付け。LoRA/Checkpoint profileとの連携は次段階。</td></tr>
+        <tr><td><code>source</code></td><td>Civitai、tagger、built-in、手動、importの由来を保持。</td><td>保存時に最低 <code>manual</code> / <code>built-in</code> を入れる。</td></tr>
+        <tr><td><code>usage</code></td><td>最近/頻度/おすすめ順位に使う。</td><td>既存recentTagsからv2へ吸収。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>UI強化案</h2>
+    <h3>タグ追加ボタン周り</h3>
+    <ol>
+      <li>グループ見出し右側に「+ タグ」を常時表示し、hoverしなくても押せるようにする。</li>
+      <li>タグ欄の末尾にある小さい <code>+</code> は補助導線に下げ、主導線は見出しへ移す。</li>
+      <li>クリック時はインライン1行入力ではなく、横幅のある追加パネルを開く。入力欄、翻訳、positive/negative、alias、モデル適性、出典メモをまとめる。</li>
+      <li>検索欄で該当タグがない場合、候補リストの最上部に <code>Add "入力文字"</code> を出す。</li>
+      <li>複数行貼り付けは残し、previewで「追加」「重複skip」「alias候補」を事前表示する。</li>
+    </ol>
+
+    <h3>タグ管理タブの情報設計</h3>
+    <table>
+      <thead>
+        <tr><th>エリア</th><th>役割</th><th>追加したい操作</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>左ペイン</td>
+          <td>カテゴリ、グループ、お気に入り、最近、未整理。</td>
+          <td>未分類、重複候補、alias未確認、tagger候補のフィルタを追加。</td>
+        </tr>
+        <tr>
+          <td>中央ペイン</td>
+          <td>タグ一覧と検索。</td>
+          <td>token input、bulk paste preview、候補score、モデル適性バッジ。</td>
+        </tr>
+        <tr>
+          <td>右ペイン</td>
+          <td>選択タグ詳細。</td>
+          <td>canonical/alias/translation/source/modelFamilies/negative移動/削除履歴。</td>
+        </tr>
+        <tr>
+          <td>下部</td>
+          <td>現在のprompt/negativeへの反映。</td>
+          <td>選択タグをpositive/negativeへ移動、implicationを含めて追加、モデル別整形。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>段階的ロードマップ</h2>
+    <table>
+      <thead>
+        <tr><th>Phase</th><th>実装内容</th><th>検証</th><th>リスク</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1. 安全な土台</td>
+          <td>保存前バックアップ、atomic write、export/import、dry-run preview、v1 fixtureを用意。</td>
+          <td>既存 <code>custom-prompt-library.json</code> を読み込み、保存後もタグ数・カテゴリ数が一致するテスト。</td>
+          <td>ここを飛ばすとTag-Managerと同じデータ消失リスクが残る。</td>
+        </tr>
+        <tr>
+          <td>2. UI改善</td>
+          <td>グループ見出しの常時追加ボタン、追加パネル、検索からAdd、bulk preview。</td>
+          <td>DOM QAで <code>data-testid</code> による追加導線、キーボード操作、重複skipを確認。</td>
+          <td>見た目変更だけで終わると、データ品質は改善しない。</td>
+        </tr>
+        <tr>
+          <td>3. スキーマv2</td>
+          <td>canonical/alias/source/modelFamilies/polarity/usageを導入し、既存UIには互換アダプタを通す。</td>
+          <td>migration unit test、typecheck、既存PromptLibrary表示のsnapshot相当確認。</td>
+          <td>一括変換で翻訳やお気に入りを落とさないようにする。</td>
+        </tr>
+        <tr>
+          <td>4. 推薦・連携</td>
+          <td>Civitai/LoRA profile/tagger/history reviewから候補を出し、ユーザー承認後にライブラリへ昇格。</td>
+          <td>tagger score付き候補を保存、採用/拒否の履歴が次回候補順位に反映されること。</td>
+          <td>自動追加しすぎるとライブラリが汚れる。必ずreviewを挟む。</td>
+        </tr>
+        <tr>
+          <td>5. モデル別プロンプト整形</td>
+          <td>Pony/Illustrious/NoobAI/Animagine/SD1.5などのprofileに基づき、quality tag、negative、tag順序を調整。</td>
+          <td>Checkpoint profileとLoRA補助入力の組み合わせで、重複や衝突が出ないこと。</td>
+          <td>モデル固有ルールは時間で変わるため、手動編集可能にして固定しすぎない。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>2026-05-22 実装結果</h2>
+    <div class="card decision">
+      <p>
+        Phase 1〜3 の中核を実装済み。タグ追加UI、schema v2、保存前バックアップ、atomic write、
+        JSON import dry-run preview、実ファイルを使ったDOM QAまで通過した。
+      </p>
+      <ul>
+        <li><code>src/components/PromptLibrary.tsx</code>: タグ追加パネル、alias/canonical対応、取込プレビュー、適用時マージを追加。</li>
+        <li><code>src/shared/types.ts</code>: <code>PromptLibraryDocumentV2</code> とタグメタデータ型を追加。</li>
+        <li><code>electron/storage.ts</code>: legacy配列とschema v2の両対応、保存前バックアップ、atomic writeを追加。</li>
+        <li><code>scripts/dom-qa.cjs</code>: <code>tag-library-import</code> QAを追加。schema v2とlegacy配列の一時JSONを選択し、新規/重複/無効件数、適用後保存、cleanupを確認。</li>
+      </ul>
+    </div>
+
+    <h3>通過した検証</h3>
+    <pre>npm.cmd run typecheck
+node --check scripts/dom-qa.cjs
+npm.cmd run build
+npm.cmd run qa:dom:tag-library-import -- --port=9338
+npm.cmd run qa:dom -- selectors --port=9338
+git diff --check</pre>
+
+    <p class="small">
+      残る拡張余地は、検索欄からのAdd候補、タグ詳細ペイン、Civitai/tagger/history由来候補のreview昇格、
+      モデル別プロンプト整形ルールとの深い連携。
+    </p>
+  </section>
+
+  <section>
+    <h2>実装時の受け入れ条件</h2>
+    <ul>
+      <li>既存のbuilt-in YAML、user custom、favorites、recentTagsを読み込める。</li>
+      <li>保存前に <code>userdata/backups/tag-library/</code> へ自動バックアップが残る。</li>
+      <li>importはdry-runで追加数、skip数、重複、alias候補、破損行を表示する。</li>
+      <li>タグ追加UIはクリック操作だけでなく、Enter/Escape/Arrow/Backspaceの最低限のキーボード操作を持つ。</li>
+      <li>候補は自動確定せず、Civitai/tagger/historyなど出典を表示して承認後に保存する。</li>
+      <li>検証は <code>npm.cmd run typecheck</code>、関連DOM QA、migration unit test、<code>git diff --check</code> を通す。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>採用しない方針</h2>
+    <div class="card bad">
+      <ul>
+        <li>Tag-ManagerのTkinter UIをそのまま移植しない。YoitomoshiのReact/Electron UIと操作体系が分断されるため。</li>
+        <li>SQLiteへ急に置き換えない。現状のYAML/JSON資産とElectron storageに合わせ、まずschema versioningで進める。</li>
+        <li>AI/tagger結果を自動で全追加しない。画像taggerは便利だが、誤検出やモデル由来の偏りがあるためreviewを挟む。</li>
+        <li>Civitaiタグをそのままpromptタグ扱いしない。Civitaiのタグはモデル分類用途が混ざるため、source/typeを分ける。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>参考ソース</h2>
+    <ul class="source-list">
+      <li><a href="https://github.com/imonoonoko/Tag-Manager">imonoonoko/Tag-Manager</a> - README、src構成、TagManager/AI predictor/export/importを確認。</li>
+      <li><a href="https://github.com/imonoonoko/Tag-Manager/pull/1">Tag-Manager PR #1: Fix data loss and ai download bug</a> - データ消失対策を優先する根拠。</li>
+      <li><a href="https://www.w3.org/WAI/ARIA/apg/patterns/combobox/">WAI-ARIA Authoring Practices: Combobox Pattern</a> - タグ候補入力のキーボード/アクセシビリティ基準。</li>
+      <li><a href="https://primer.github.io/design/components/text-input-with-tokens/">GitHub Primer: Text input with tokens</a> - 複数値入力、token削除、Autocomplete併用の設計参考。</li>
+      <li><a href="https://mui.com/material-ui/react-autocomplete/">MUI Autocomplete</a> - free solo、creatable、multiple values、virtualization、listbox roleの実装観点。</li>
+      <li><a href="https://github.com/civitai/civitai/wiki/REST-API-Reference">Civitai REST API Reference</a> - 2026年4月時点でdeveloper portal移行案内。ライブ確認では <code>/api/v1/tags?limit=3</code> がタグ一覧を返した。</li>
+      <li><a href="https://pybooru.readthedocs.io/en/stable/api_danbooru.html">Pybooru Danbooru API Reference</a> - tag_list、tag_aliases、tag_implications、tag_relatedのAPI観点。</li>
+      <li><a href="https://deepwiki.com/danbooru/danbooru/4.1-tag-relationships">Danbooru tag relationships</a> - alias、implication、bulk updateの概念整理。</li>
+      <li><a href="https://huggingface.co/deepghs/pixai-tagger-v0.9-onnx">PixAI Tagger v0.9 ONNX</a> - 13,461タグ、general/character threshold、ONNX tagger運用参考。</li>
+      <li><a href="https://huggingface.co/SmilingWolf/wd-eva02-large-tagger-v3">SmilingWolf WD EVA02-Large Tagger v3</a> - rating/character/generalタグ対応、Danbooru由来taggerの参考。</li>
+    </ul>
+    <p class="small">
+      補足: Civitaiのdeveloper portalは閲覧環境によって内容取得が不安定だったため、公開wikiの移行案内とライブAPI応答を併用した。
+    </p>
+  </section>
+</main>
+</body>
+</html>

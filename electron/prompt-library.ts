@@ -33,7 +33,8 @@ export interface PromptLibrary {
 export function loadPromptLibrary(resourcesDir: string): PromptLibrary {
   const paths = [
     join(resourcesDir, 'prompt-library.ja.yaml'),
-    join(resourcesDir, 'prompt-library.yoitomoshi.ja.yaml')
+    join(resourcesDir, 'prompt-library.yoitomoshi.ja.yaml'),
+    join(resourcesDir, 'prompt-dictionary.yoitomoshi.ja.yaml')
   ]
 
   let categories: PromptCategory[] = []

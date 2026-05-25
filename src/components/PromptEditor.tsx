@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { api } from '@/lib/ipc'
 import { useStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import { adjustTokenWeight } from '@/lib/prompt-utils'
+import { useT } from '@/lib/i18n'
+import type { PromptDictionaryEntry } from '@shared/types'
 
 interface Props {
   value: string
@@ -18,12 +21,17 @@ interface Props {
 interface Suggestion {
   en: string
   ja: string
+  meaning?: string
+  category?: string
+  group?: string
+  sourceLabel?: string
 }
 
 const MAX_SUGGESTIONS = 8
+const AUTOCOMPLETE_DELAY_MS = 140
 
 /**
- * Textarea with opt-in autocomplete fed from the prompt library tag dictionary.
+ * Textarea with autocomplete fed by the main-process Prompt Daijiten service.
  * Ctrl+Space opens suggestions for the current token; Tab or Enter accepts.
  */
 export function PromptEditor({
@@ -38,16 +46,24 @@ export function PromptEditor({
 }: Props): JSX.Element {
   const ref = useRef<HTMLTextAreaElement>(null)
   const autocomplete = useStore((s) => s.autocomplete)
+  const searchSeq = useRef(0)
+  const searchTimer = useRef<number | null>(null)
 
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [highlighted, setHighlighted] = useState(0)
   const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [activeQuery, setActiveQuery] = useState('')
+  const t = useT()
 
-  function findSuggestions(text: string, caret: number): Suggestion[] {
+  function currentToken(text: string, caret: number): string {
     const before = text.slice(0, caret)
     // Last token = portion after the most recent boundary char.
     const m = before.match(/([^\s,()\n]+)$/)
-    const token = m?.[1] ?? ''
+    return m?.[1] ?? ''
+  }
+
+  function findLocalSuggestions(token: string): Suggestion[] {
     if (token.length < 2 || autocomplete.size === 0) return []
 
     const lc = token.toLowerCase()
@@ -74,21 +90,83 @@ export function PromptEditor({
     return out
   }
 
+  function suggestionFromDictionary(entry: PromptDictionaryEntry): Suggestion {
+    return {
+      en: entry.en,
+      ja: entry.ja,
+      meaning: entry.meaning,
+      category: entry.category,
+      group: entry.group,
+      sourceLabel: entry.sourceLabel
+    }
+  }
+
+  function shouldSearchToken(token: string, forced: boolean): boolean {
+    if (forced) return token.trim().length > 0
+    const length = [...token.trim()].length
+    if (length === 0) return false
+    if (/[\u3040-\u30ff\u3400-\u9fff]/.test(token)) return length >= 1
+    return length >= 2
+  }
+
+  function clearSearchTimer(): void {
+    if (searchTimer.current !== null) {
+      window.clearTimeout(searchTimer.current)
+      searchTimer.current = null
+    }
+  }
+
+  function searchSuggestions(text: string, caret: number, forced = false): void {
+    const token = currentToken(text, caret).trim()
+    clearSearchTimer()
+    if (!shouldSearchToken(token, forced)) {
+      setSuggestions([])
+      setOpen(false)
+      setLoading(false)
+      setActiveQuery('')
+      return
+    }
+
+    const seq = searchSeq.current + 1
+    searchSeq.current = seq
+    setActiveQuery(token)
+    setLoading(true)
+    setOpen(true)
+
+    searchTimer.current = window.setTimeout(() => {
+      api.promptDictionary.search({ query: token, limit: MAX_SUGGESTIONS })
+        .then((result) => {
+          if (searchSeq.current !== seq) return
+          const dictionarySuggestions = result.entries.map(suggestionFromDictionary)
+          const seen = new Set(dictionarySuggestions.map((item) => item.en.toLowerCase()))
+          const localSuggestions = findLocalSuggestions(token).filter((item) => !seen.has(item.en.toLowerCase()))
+          const next = [...dictionarySuggestions, ...localSuggestions].slice(0, MAX_SUGGESTIONS)
+          setSuggestions(next)
+          setHighlighted(0)
+          setOpen(next.length > 0)
+        })
+        .catch(() => {
+          if (searchSeq.current !== seq) return
+          const fallback = findLocalSuggestions(token)
+          setSuggestions(fallback)
+          setHighlighted(0)
+          setOpen(fallback.length > 0)
+        })
+        .finally(() => {
+          if (searchSeq.current === seq) setLoading(false)
+        })
+    }, forced ? 0 : AUTOCOMPLETE_DELAY_MS)
+  }
+
   function showAutocomplete(): void {
     const ta = ref.current
     if (!ta) return
-    const out = findSuggestions(value, ta.selectionStart)
-    setSuggestions(out)
-    setHighlighted(0)
-    setOpen(out.length > 0)
+    searchSuggestions(value, ta.selectionStart, true)
   }
 
   function refreshAutocomplete(text = value, caret = ref.current?.selectionStart ?? 0): void {
     if (!open) return
-    const out = findSuggestions(text, caret)
-    setSuggestions(out)
-    setHighlighted(0)
-    setOpen(out.length > 0)
+    searchSuggestions(text, caret)
   }
 
   function accept(s: Suggestion | undefined): void {
@@ -113,7 +191,7 @@ export function PromptEditor({
 
   function onTextChange(e: React.ChangeEvent<HTMLTextAreaElement>): void {
     onChange(e.target.value)
-    if (open) refreshAutocomplete(e.target.value, e.target.selectionStart)
+    searchSuggestions(e.target.value, e.target.selectionStart)
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
@@ -169,8 +247,10 @@ export function PromptEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, autocomplete])
 
+  useEffect(() => () => clearSearchTimer(), [])
+
   return (
-    <div>
+    <div className="relative">
       <textarea
         ref={ref}
         rows={rows}
@@ -191,14 +271,21 @@ export function PromptEditor({
           tone === 'negative' && 'border-line/60'
         )}
       />
-      {open && suggestions.length > 0 && (
-        <div className="mt-1 max-h-[180px] overflow-auto card shadow-xl">
+      {open && (suggestions.length > 0 || loading) && (
+        <div
+          className="mt-1 max-h-[220px] overflow-auto rounded-md border border-line bg-bg-1 shadow-xl"
+          data-testid={`${testId ?? 'prompt-editor'}-dictionary-suggestions`}
+          data-query={activeQuery}
+        >
+          {loading && suggestions.length === 0 && (
+            <div className="px-2.5 py-2 text-[11px] text-ink-3">{t('promptDictionary.loading')}</div>
+          )}
           {suggestions.map((s, i) => (
             <button
               key={s.en}
               type="button"
               className={cn(
-                'w-full text-left flex items-baseline gap-2 px-2.5 py-1.5 text-sm transition-colors',
+                'w-full text-left flex items-start gap-2 px-2.5 py-1.5 text-sm transition-colors',
                 i === highlighted ? 'bg-bg-3 text-accent' : 'hover:bg-bg-3'
               )}
               onMouseDown={(e) => {
@@ -206,9 +293,19 @@ export function PromptEditor({
                 accept(s)
               }}
               onMouseEnter={() => setHighlighted(i)}
+              data-testid={`${testId ?? 'prompt-editor'}-dictionary-suggestion-${i}`}
             >
-              <span className="font-mono text-[13px]">{s.en}</span>
-              <span className="text-[11px] text-ink-3 truncate">{s.ja}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-mono text-[13px]">{s.en}</span>
+                {(s.ja || s.meaning) && (
+                  <span className="block truncate text-[11px] text-ink-3">{s.ja || s.meaning}</span>
+                )}
+              </span>
+              {(s.category || s.group) && (
+                <span className="max-w-[96px] shrink-0 truncate rounded border border-line px-1 py-0.5 text-[10px] text-ink-3">
+                  {s.group || s.category}
+                </span>
+              )}
             </button>
           ))}
         </div>

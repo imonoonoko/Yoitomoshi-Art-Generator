@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useStore, type AppState } from './lib/store'
 import { api } from './lib/ipc'
@@ -15,6 +15,8 @@ import {
 } from './lib/generation-utils'
 import {
   checkpointPromptContextFromModel,
+  checkpointPromptProfileParamsChanged,
+  checkpointPromptProfileParamsPatch,
   findCheckpointPromptProfile,
   formatPromptForCheckpoint
 } from './lib/checkpoint-prompt-profile'
@@ -27,6 +29,7 @@ import { SidePanel } from './components/SidePanel'
 import { StartupOverlay } from './components/StartupOverlay'
 import { SettingsModal } from './components/SettingsModal'
 import { ShortcutsModal } from './components/ShortcutsModal'
+import { PromptDictionaryAutocompleteLayer } from './components/PromptDictionaryAutocompleteLayer'
 import { t as tStatic } from './lib/i18n'
 import type { CivitaiAssetType, Txt2ImgResponse } from '@shared/types'
 
@@ -52,6 +55,7 @@ const CivitaiSearchModal = lazy(() =>
 export default function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const modelSyncRef = useRef<{ revision: number; promise: Promise<void> } | null>(null)
   const civitaiSearch = useStore((s) => s.civitaiSearch)
   const openCivitaiSearch = useStore((s) => s.openCivitaiSearch)
   const closeCivitaiSearch = useStore((s) => s.closeCivitaiSearch)
@@ -72,6 +76,7 @@ export default function App(): JSX.Element {
   const setProgress = useStore((s) => s.setProgress)
   const setLastImage = useStore((s) => s.setLastImage)
   const setGenerating = useStore((s) => s.setGenerating)
+  const setSidePanelTab = useStore((s) => s.setSidePanelTab)
 
   // Global `?` key toggles the shortcuts help. Skipped when typing into a
   // text field — `?` is a printable character there and shouldn't open a modal.
@@ -154,6 +159,7 @@ export default function App(): JSX.Element {
         presets,
         favorites,
         quickPresets,
+        promptComposerSlotTemplates,
         loraFavs,
         loraPromptOverrides,
         checkpointPromptProfiles,
@@ -166,6 +172,7 @@ export default function App(): JSX.Element {
         api.storage.listPresets(),
         api.storage.getFavorites(),
         api.storage.listQuickPresets(),
+        api.storage.listPromptComposerSlotTemplates(),
         api.storage.getLoraFavorites(),
         api.storage.listLoraPromptOverrides(),
         api.storage.listCheckpointPromptProfiles(),
@@ -181,6 +188,7 @@ export default function App(): JSX.Element {
       setPresets(presets)
       useStore.getState().setFavorites(new Set(favorites))
       useStore.getState().setQuickPresets(quickPresets)
+      useStore.getState().setPromptComposerSlotTemplates(promptComposerSlotTemplates)
       useStore.getState().setLoraFavorites(new Set(loraFavs))
       useStore.getState().setLoraPromptOverrides(loraPromptOverrides)
       useStore.getState().setCheckpointPromptProfiles(checkpointPromptProfiles)
@@ -263,6 +271,8 @@ export default function App(): JSX.Element {
   // checkpoint or active-LoRA set changes. Local-only computation, no IPC.
   const prompt = useStore((s) => s.prompt)
   const selectedModelTitle = useStore((s) => s.selectedModelTitle)
+  const selectedModelRevision = useStore((s) => s.selectedModelRevision)
+  const models = useStore((s) => s.models)
   const recommendation = useStore((s) => s.recommendation)
   const activeLoras = useStore((s) => s.activeLoras)
   const loras = useStore((s) => s.loras)
@@ -287,47 +297,80 @@ export default function App(): JSX.Element {
     return () => clearTimeout(handle)
   }, [prompt, selectedModelTitle, recommendation, activeLoras, loras, loraMeta, loraFavorites, loraUsage, uiLanguage])
 
-  async function handleModelChanged(title: string): Promise<void> {
-    setSelectedModel(title)
+  function syncSelectedModelContext(title: string, revision: number): Promise<void> {
+    const existing = modelSyncRef.current
+    if (existing?.revision === revision) return existing.promise
+    const model = useStore.getState().models.find((item) => item.title === title)
+    if (useStore.getState().forgeStatus.kind !== 'ready' || !model) return Promise.resolve()
+
     setRecommendation(null)
     useStore.getState().setCommunityStats(null)
+    useStore.getState().setCommunityStatsLoading(false)
     setRecLoading(true)
-    try {
-      const models = useStore.getState().models
-      const m = models.find((x) => x.title === title)
-      if (!m) return
-      // Switch Forge's live checkpoint and fetch Civitai metadata in parallel.
-      const [, rec] = await Promise.all([
-        api.forge.setCurrentModel(title),
-        api.civitai.lookup(m).catch(() => null)
-      ])
-      if (useStore.getState().selectedModelTitle !== title) return
-      setRecommendation(rec)
-      if (!rec) {
-        toast(tStatic('toast.civitaiNoMatch'), { icon: 'ℹ' })
-      } else {
-        // Kick off the slow community-mining in the background — RecommendationCard
-        // shows a loading badge and updates when results arrive. Cached responses
-        // come back almost instantly (14-day TTL); fresh mining takes 3-10s.
-        useStore.getState().setCommunityStatsLoading(true)
-        void api.civitai
-          .mineCommunity(rec.modelVersionId)
-          .then((stats) => {
-            // Only apply if user hasn't switched models since we started.
-            if (useStore.getState().recommendation?.modelVersionId === rec.modelVersionId) {
-              useStore.getState().setCommunityStats(stats)
-            }
-          })
-          .catch((e) => console.warn('[civitai] community mining failed:', e))
-          .finally(() => useStore.getState().setCommunityStatsLoading(false))
+
+    const promise = (async () => {
+      try {
+        // Keep Forge, the title bar, and the Civitai recommendation card in
+        // sync no matter whether the model changed from the title bar,
+        // history restore, workspace restore, or next-image actions.
+        const [, rec] = await Promise.all([
+          api.forge.setCurrentModel(title),
+          api.civitai.lookup(model).catch(() => null)
+        ])
+        const latest = useStore.getState()
+        if (latest.selectedModelRevision !== revision || latest.selectedModelTitle !== title) return
+        setRecommendation(rec)
+        if (!rec) {
+          toast(tStatic('toast.civitaiNoMatch'), { icon: 'ℹ' })
+        } else {
+          // Kick off the slow community-mining in the background —
+          // RecommendationCard shows a loading badge and updates when results
+          // arrive. Cached responses come back almost instantly (14-day TTL);
+          // fresh mining takes 3-10s.
+          useStore.getState().setCommunityStatsLoading(true)
+          void api.civitai
+            .mineCommunity(rec.modelVersionId)
+            .then((stats) => {
+              // Only apply if user hasn't switched models since we started.
+              if (useStore.getState().recommendation?.modelVersionId === rec.modelVersionId) {
+                useStore.getState().setCommunityStats(stats)
+              }
+            })
+            .catch((e) => console.warn('[civitai] community mining failed:', e))
+            .finally(() => {
+              if (useStore.getState().recommendation?.modelVersionId === rec.modelVersionId) {
+                useStore.getState().setCommunityStatsLoading(false)
+              }
+            })
+        }
+      } catch (e) {
+        if (useStore.getState().selectedModelRevision === revision) {
+          toast.error(tStatic('toast.modelInfoFailed', { message: (e as Error).message }))
+        }
+      } finally {
+        const latest = useStore.getState()
+        if (latest.selectedModelRevision === revision && latest.selectedModelTitle === title) {
+          setRecLoading(false)
+        }
+        if (modelSyncRef.current?.revision === revision) {
+          modelSyncRef.current = null
+        }
       }
-    } catch (e) {
-      toast.error(tStatic('toast.modelInfoFailed', { message: (e as Error).message }))
-    } finally {
-      if (useStore.getState().selectedModelTitle === title) {
-        setRecLoading(false)
-      }
-    }
+    })()
+
+    modelSyncRef.current = { revision, promise }
+    return promise
+  }
+
+  useEffect(() => {
+    if (status.kind !== 'ready' || !selectedModelTitle) return
+    void syncSelectedModelContext(selectedModelTitle, selectedModelRevision)
+  }, [status.kind, selectedModelTitle, selectedModelRevision, models, setRecommendation, setRecLoading])
+
+  async function handleModelChanged(title: string): Promise<void> {
+    setSelectedModel(title)
+    const revision = useStore.getState().selectedModelRevision
+    await syncSelectedModelContext(title, revision)
   }
 
   function applyAutoCheckpointPromptFormatting(state: AppState): AppState {
@@ -337,10 +380,12 @@ export default function App(): JSX.Element {
     if (profile?.mode !== 'auto') return state
     const promptResult = formatPromptForCheckpoint(state.prompt, 'positive', context, profile)
     const negativeResult = formatPromptForCheckpoint(state.negativePrompt, 'negative', context, profile)
-    if (!promptResult.changed && !negativeResult.changed) return state
+    const paramsChanged = checkpointPromptProfileParamsChanged(state.params, profile)
+    if (!promptResult.changed && !negativeResult.changed && !paramsChanged) return state
     if (promptResult.changed) state.setPrompt(promptResult.prompt)
     if (negativeResult.changed) state.setNegativePrompt(negativeResult.prompt)
-    toast.success(tStatic('prompt.modelFormatted'))
+    if (paramsChanged) state.patchParams(checkpointPromptProfileParamsPatch(profile))
+    toast.success(tStatic(paramsChanged ? 'prompt.modelProfileApplied' : 'prompt.modelFormatted'))
     return useStore.getState()
   }
 
@@ -456,6 +501,9 @@ export default function App(): JSX.Element {
         }
         setLastImage(preparedHistory[0].dataUrl, firstItemId ?? undefined)
         setHistory((await api.storage.listHistory()).slice(0, 500))
+        if (preparedHistory.length >= 2) {
+          setSidePanelTab('board')
+        }
 
         // Record LoRA usage for the suggestion engine. One row per active
         // LoRA, indexed by checkpoint + prompt digest so future scoring can
@@ -530,6 +578,7 @@ export default function App(): JSX.Element {
         )}
         <StartupOverlay />
       </div>
+      <PromptDictionaryAutocompleteLayer />
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       {civitaiSearch.open && (

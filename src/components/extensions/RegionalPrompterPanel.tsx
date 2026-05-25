@@ -110,6 +110,7 @@ export function RegionalPrompterPanel(): JSX.Element {
             label={t('regional.commonPrompt')}
             value={regional.commonPrompt}
             onChange={(commonPrompt) => patch({ commonPrompt })}
+            testId="regional-common-prompt"
           />
         )}
         {regional.useBase && (
@@ -117,6 +118,7 @@ export function RegionalPrompterPanel(): JSX.Element {
             label={t('regional.basePrompt')}
             value={regional.basePrompt}
             onChange={(basePrompt) => patch({ basePrompt })}
+            testId="regional-base-prompt"
           />
         )}
 
@@ -130,6 +132,8 @@ export function RegionalPrompterPanel(): JSX.Element {
                 className="input min-w-0 flex-1 py-1 text-[11px]"
                 value={prompt}
                 onChange={(e) => updateRegion(index, e.target.value)}
+                data-prompt-dictionary-autocomplete="regional"
+                data-testid={`regional-region-prompt-${index}`}
               />
               <button
                 type="button"
@@ -184,11 +188,27 @@ export function RegionalPrompterPanel(): JSX.Element {
   )
 }
 
-function PromptLine({ label, value, onChange }: { label: string; value: string; onChange(value: string): void }): JSX.Element {
+function PromptLine({
+  label,
+  value,
+  onChange,
+  testId
+}: {
+  label: string
+  value: string
+  onChange(value: string): void
+  testId: string
+}): JSX.Element {
   return (
     <label className="block">
       <span className="text-[10px] text-ink-3">{label}</span>
-      <input className="input w-full py-1 text-[11px]" value={value} onChange={(e) => onChange(e.target.value)} />
+      <input
+        className="input w-full py-1 text-[11px]"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        data-prompt-dictionary-autocomplete="regional"
+        data-testid={testId}
+      />
     </label>
   )
 }

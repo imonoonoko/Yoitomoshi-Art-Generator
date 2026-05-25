@@ -1,0 +1,1653 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codex Atelier - Lo-Fi Dev Companion Requirements Report</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111316;
+      --panel: #181c21;
+      --panel-2: #20252c;
+      --panel-3: #15191e;
+      --line: #33404c;
+      --ink: #f1f5f9;
+      --muted: #b6c0cd;
+      --dim: #8490a0;
+      --blue: #7db1ff;
+      --green: #6ed39a;
+      --gold: #f0c56a;
+      --rose: #ff8d9a;
+      --teal: #63d7d5;
+      --violet: #b29cff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(180deg, #15181d 0, #111316 360px),
+        var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+      line-height: 1.62;
+    }
+
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .wrap {
+      width: min(1180px, calc(100vw - 36px));
+      margin: 0 auto;
+    }
+
+    header {
+      border-bottom: 1px solid var(--line);
+      background: #15191e;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr);
+      gap: 26px;
+      padding: 38px 0 30px;
+      align-items: end;
+    }
+
+    h1, h2, h3, h4 { line-height: 1.25; margin: 0; }
+    h1 { font-size: clamp(31px, 4vw, 50px); letter-spacing: 0; }
+    h2 { font-size: 24px; margin-bottom: 14px; }
+    h3 { font-size: 17px; margin-bottom: 8px; }
+    h4 { font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+    p { margin: 0; }
+
+    .lead {
+      margin-top: 18px;
+      max-width: 790px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      display: inline-block;
+    }
+
+    .hero-panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .score {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--panel-3);
+      min-height: 92px;
+    }
+
+    .score b {
+      display: block;
+      color: var(--ink);
+      font-size: 26px;
+      line-height: 1.15;
+    }
+
+    .score span {
+      display: block;
+      margin-top: 5px;
+      color: var(--dim);
+      font-size: 12px;
+    }
+
+    main { padding: 30px 0 58px; }
+    section { margin-top: 34px; }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .section-note {
+      color: var(--dim);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 16px;
+    }
+
+    .card p, .card li, td, th {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    ul, ol { margin: 9px 0 0; padding-left: 1.25rem; }
+    li + li { margin-top: 5px; }
+
+    .callout {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--blue);
+      background: #151a20;
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .callout strong { color: var(--ink); }
+    .callout.warn { border-left-color: var(--gold); }
+    .callout.risk { border-left-color: var(--rose); }
+    .callout.ok { border-left-color: var(--green); }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .tag {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 8px;
+      color: var(--muted);
+      font-size: 11px;
+      background: #12161b;
+    }
+
+    .tag.green { color: var(--green); }
+    .tag.gold { color: var(--gold); }
+    .tag.rose { color: var(--rose); }
+    .tag.teal { color: var(--teal); }
+    .tag.violet { color: var(--violet); }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 780px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+    }
+
+    th {
+      color: var(--ink);
+      font-size: 12px;
+      background: #20262d;
+      white-space: nowrap;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    .status {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid var(--line);
+      background: #12161b;
+      white-space: nowrap;
+    }
+
+    .status.high { color: var(--green); }
+    .status.mid { color: var(--gold); }
+    .status.low { color: var(--dim); }
+    .status.risk { color: var(--rose); }
+
+    pre {
+      overflow-x: auto;
+      margin: 10px 0 0;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #0d1116;
+      color: #dce7f5;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    code {
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: .92em;
+      color: #d9e8ff;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .step {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 12px;
+      min-height: 116px;
+    }
+
+    .step .num {
+      width: 24px;
+      height: 24px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 999px;
+      background: #253244;
+      color: var(--blue);
+      font-weight: 700;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .step p {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .source-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .source-list a, .source-list span {
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .source-list a strong, .source-list span strong {
+      color: var(--ink);
+      display: block;
+      margin-bottom: 3px;
+      font-size: 13px;
+    }
+
+    footer {
+      color: var(--dim);
+      font-size: 12px;
+      border-top: 1px solid var(--line);
+      padding: 20px 0 34px;
+    }
+
+    @media (max-width: 920px) {
+      .hero, .grid, .grid.two, .source-list { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr 1fr; }
+      .section-head { align-items: flex-start; flex-direction: column; }
+      .section-note { white-space: normal; }
+    }
+
+    @media (max-width: 560px) {
+      .wrap { width: min(100vw - 24px, 1180px); }
+      .score-grid, .flow { grid-template-columns: 1fr; }
+      h1 { font-size: 30px; }
+    }
+
+    @media print {
+      :root { color-scheme: light; }
+      body { background: #fff; color: #12161b; }
+      header, .card, .hero-panel, .callout, .table-wrap, .step, .source-list a, .source-list span {
+        background: #fff;
+        color: #12161b;
+      }
+      a { color: #0645ad; }
+      .wrap { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap hero">
+      <div>
+        <h1>Codex Atelier: Lo-Fi Dev Companion</h1>
+        <p class="lead">
+          このセッションで出た「Codexの働きを、ポモドーロ付きデスクトップ放置ゲームとして育てる」案を、
+          実装前に必要な情報、MVP要件、アーキテクチャ、リスク、検証観点まで落としたHTMLレポート。
+          結論は、Codex本体のペット機能に閉じず、Obsidian/Codex Brain、repo docs、Web調査、セッションログを束ねる
+          ローカル常駐の情報工房として作るのが現実的。
+        </p>
+        <div class="meta">
+          <span class="pill"><span class="dot"></span>作成日: 2026-05-25 JST</span>
+          <span class="pill">対象: Windows / Codex Desktop / local repos</span>
+          <span class="pill">出力: 要件収集 + MVP設計</span>
+          <span class="pill">推奨: Electron + React + TypeScript</span>
+        </div>
+      </div>
+      <aside class="hero-panel">
+        <div class="score-grid">
+          <div class="score">
+            <b>Separate App</b>
+            <span>Codex本体改造ではなく、ログとGitを読む外部アプリから始める。</span>
+          </div>
+          <div class="score">
+            <b>Quality XP</b>
+            <span>行数ではなく、テスト成功・失敗修正・docs更新・承認を報酬化。</span>
+          </div>
+          <div class="score">
+            <b>Refined Codex</b>
+            <span>工房整理が進むほど、次回Codexの動きと判断が洗練される。</span>
+          </div>
+          <div class="score">
+            <b>Knowledge Hub</b>
+            <span>Brain、docs、Webソース、作業ログを工房の棚として集約する。</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <div class="section-head">
+        <h2>1. 結論</h2>
+        <span class="section-note">実装判断を先に固定</span>
+      </div>
+      <div class="callout ok">
+        <strong>作るべき最初の形:</strong>
+        「Lo-Fi作業部屋 + 相棒キャラ + ポモドーロ + Codex/Git/テストイベントで育つ工房」のローカル常駐アプリ。
+        `hatch-pet` はCodex内ペット差し替えの中心ではなく、工房内に置くマスコットや進化素材の生成パイプラインとして使う。
+      </div>
+      <div class="callout" style="margin-top:14px">
+        <strong>企画の核心:</strong>
+        このゲームの最大の価値は、見た目の育成や放置報酬ではなく、
+        工房を整理するほどCodex自体の次回行動が洗練される自己改善ループにある。
+        書斎に信頼できる調査サイトが溜まり、作業机に定番手順が残り、検証ラボに失敗パターンが蓄積し、
+        それらが次のCodex実行時の初手、確認順、報告品質を良くしていく。
+        既存のObsidian/Codex Brainはこのループの外部ツールではなく、工房の書斎・資料庫・長期記憶棚として統合する。
+      </div>
+      <div class="grid two" style="margin-top:14px">
+        <div class="card">
+          <h3>なぜこの方向か</h3>
+          <ul>
+            <li>Codex Desktop内のペット表示を外部からリアルタイム制御できる保証がまだない。</li>
+            <li>このセッションでは、ユーザーの関心が「既存ペット枠」から「Codexの働き全体のゲーム化」へ移った。</li>
+            <li>Steam系の参照作は、常駐・集中支援・関係性・収集・自動化を組み合わせている。</li>
+            <li>Codex固有の強みは、整理された情報・手順・検証記録がそのまま次回の作業品質を上げられる点にある。</li>
+            <li>既にObsidian/Codex Brainがあるため、工房は新しい記憶を乱立させるのではなく、Brainやrepo docsを束ねる操作面にできる。</li>
+            <li>Yoitomoshi周辺はElectron/React/TypeScriptの実績があり、Windows常駐UIを作りやすい。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>最初に捨てるもの</h3>
+          <ul>
+            <li>Codex Desktop本体UIの改造。</li>
+            <li>セッションログ形式への強い依存。必ずアダプタ層で吸収する。</li>
+            <li>変更行数・ファイル数・作業時間だけを直接報酬にする設計。</li>
+            <li>Steam参照作のUI、キャラクター、音源、固有表現のコピー。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>2. 収集した情報</h2>
+        <span class="section-note">ローカル実測 + 公式ページ</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>分類</th>
+              <th>確認したこと</th>
+              <th>この企画への意味</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>このセッション</td>
+              <td><code>019e5bae-887c-7050-af03-bf33a874f103</code> のJSONLログを確認。Codex Desktop由来、作業テーマは `hatch-pet` からCodex作業ゲーム化へ展開。</td>
+              <td>最初の仕様材料として、会話の方向転換とMVP案を抽出できる。</td>
+            </tr>
+            <tr>
+              <td>Codex環境</td>
+              <td>セッションメタでは <code>cli_version=0.133.0-alpha.1</code>、ローカル <code>codex --version</code> は <code>0.130.0</code>。</td>
+              <td>Desktop内蔵CodexとPATH上のCodex CLIはズレる可能性がある。実装時は利用する実行ファイルを明示する。</td>
+            </tr>
+            <tr>
+              <td>Codex設定</td>
+              <td><code>C:\Users\Humin\.codex\config.toml</code> で <code>model=gpt-5.5</code>、<code>model_reasoning_effort=xhigh</code>、<code>selected-avatar-id=custom:onoko</code> を確認。</td>
+              <td>ゲーム側は設定を読むだけにし、勝手に書き換えない。アバター/ペット連携はオプション扱い。</td>
+            </tr>
+            <tr>
+              <td>Codex Brain</td>
+              <td><code>C:\Users\Humin\Obsidian\Codex Cortex\Codex Brain</code> が存在し、<code>wiki\hot.md</code> と <code>wiki\INDEX.md</code> に運用モデル、project memory、Skill索引、Notion/Obsidian adapterがある。</td>
+              <td>工房はBrainを置き換えず、Brain・repo docs・Web調査・セッションログを横断する情報集約スペースとして設計する。</td>
+            </tr>
+            <tr>
+              <td>ペット素材</td>
+              <td><code>C:\Users\Humin\.codex\pets\onoko\pet.json</code> は <code>id / displayName / description / spritesheetPath</code> の小さな構造。</td>
+              <td>Codex互換ペットはゲーム本体の状態管理には不足。別の <code>state</code> と <code>asset registry</code> が必要。</td>
+            </tr>
+            <tr>
+              <td>自動化</td>
+              <td><code>C:\Users\Humin\.codex\automations\automation\automation.toml</code> に、1時間ごとの技術リサーチcronが存在。</td>
+              <td>ゲームイベント源として、Codex作業ログだけでなくAutomation完了レポートも扱える。</td>
+            </tr>
+            <tr>
+              <td>対象repo</td>
+              <td><code>Yoitomoshi-Art-Generator</code> は Electron / React / TypeScript / Zustand / lucide-react / electron-vite。</td>
+              <td>新規常駐アプリも同系統で作ると、既存知見と検証手順を流用しやすい。</td>
+            </tr>
+            <tr>
+              <td>OpenAI公式</td>
+              <td>Codex公式docsに、非対話実行、Codex SDK、Automations、Hooks、AGENTS、Skills、Windows、安全設定が掲載されている。</td>
+              <td>ログ読取MVPの後、SDKや <code>codex exec resume</code> に拡張する道がある。</td>
+            </tr>
+            <tr>
+              <td>参考ゲーム</td>
+              <td>Steam公式ページから、作業同席、ポモドーロ、ToDo/習慣/日記、XP、常駐農場、自動化、Focus Modeを確認。</td>
+              <td>Codex版は「集中支援ツール」と「実作業で育つゲーム」を接続するのが強い。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>3. セッションから抽出した要求</h2>
+        <span class="section-note">ユーザー意図の整理</span>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>最初の発想</h3>
+          <p>
+            <code>hatch-pet</code> を使い、Codexがコードを書いたり開発を進めるたびに発展する
+            デスクトップ放置経営ゲームの可能性を確認したい。
+          </p>
+          <div class="tag-row">
+            <span class="tag">hatch-pet</span>
+            <span class="tag">pet evolution</span>
+            <span class="tag">development progress</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>方向転換</h3>
+          <p>
+            Codex既存機能に縛られず、Codexの働き自体をゲーム化する方向を検討したい。
+            この時点で、外部アプリとしてのゲーム状態管理が本命になる。
+          </p>
+          <div class="tag-row">
+            <span class="tag green">external app</span>
+            <span class="tag green">event engine</span>
+            <span class="tag green">project districts</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>体験の拡張</h3>
+          <p>
+            Steamのデスクトップ放置ゲームを参考にし、ポモドーロタイマー付きで相棒キャラと過ごす
+            作業同席体験を組み込みたい。
+          </p>
+          <div class="tag-row">
+            <span class="tag gold">Pomodoro</span>
+            <span class="tag gold">lo-fi room</span>
+            <span class="tag gold">relationship story</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>4. 参考ゲームから採用する要素</h2>
+        <span class="section-note">コピーではなく機能文法として分解</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>参照軸</th>
+              <th>公式ページで確認した特徴</th>
+              <th>Codex版への変換</th>
+              <th>優先度</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Chill with You : Lo-Fi Story</td>
+              <td>作業机でSatoneと過ごす、Lo-Fi/環境音/風景カスタム、ポモドーロ、作業時間で関係が深まる。</td>
+              <td>相棒キャラがCodex作業を見守り、休憩中に短い会話や日記イベントを解放する。</td>
+              <td><span class="status high">MVP</span></td>
+            </tr>
+            <tr>
+              <td>Spirit City: Lofi Sessions</td>
+              <td>ToDo、セッションタイマー、習慣トラッカー、日記、XP、部屋/アバター/収集要素。</td>
+              <td>ユーザーの集中タスクとCodexの作業イベントを同じセッション履歴にまとめ、XPと部屋カスタムへ反映する。</td>
+              <td><span class="status high">MVP+</span></td>
+            </tr>
+            <tr>
+              <td>Rusty's Retirement</td>
+              <td>画面下/横に置ける常駐型、農場、資源生産、自動化、Focus Mode。</td>
+              <td>Bottom Bar、Side Dock、Compact Companionの3表示を用意し、集中時は低干渉にする。</td>
+              <td><span class="status mid">Phase 2</span></td>
+            </tr>
+            <tr>
+              <td>Codex固有性</td>
+              <td>Codexは非対話実行、SDK、Goals/Automations、Skills、AGENTS、Hooksなどの自動化面を持つ。</td>
+              <td>実際の調査、実装、テスト、docs更新、Automation完了をゲーム内イベントにする。</td>
+              <td><span class="status high">Core</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>5. プロダクト要件</h2>
+        <span class="section-note">define-requirements形式</span>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3>Goal</h3>
+          <p>
+            ユーザーとCodexの開発作業を、集中支援・作業記録・育成/経営ゲームに変換し、
+            放置していても「進んだこと」が見えるだけでなく、整理された工房が次回Codexの調査・実装・検証の質を上げる
+            デスクトップ常駐ソフトを作る。Obsidian/Codex Brain、repo内docs、調査サイト、作業ログ、検証結果を工房に集約し、
+            Codexが次に読むべき情報へ迷わず辿れる状態を育てる。
+          </p>
+        </div>
+        <div class="card">
+          <h3>Target Users</h3>
+          <ul>
+            <li>Codexを長時間のローカル開発や調査に使う個人制作者。</li>
+            <li>作業記録を楽しく残したいが、手動の日報やタスク管理は続きにくいユーザー。</li>
+            <li>ポモドーロ、Lo-Fi、作業同席、デスクトップ常駐ゲームが好きなユーザー。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Success Criteria</h3>
+          <ul>
+            <li>CodexセッションとGit/テスト結果から、意味のある作業イベントを自動抽出できる。</li>
+            <li>25分作業後、部屋/工房/相棒キャラの状態が自然に進む。</li>
+            <li>書斎・作業机・検証ラボの整理状態が、次回Codexの推奨ソース、実行手順、確認観点として再利用される。</li>
+            <li>Obsidian/Codex Brainやrepo docsを「どこに何があるか分かる棚」として見せ、必要な時に正しい一次情報へ誘導できる。</li>
+            <li>無駄な変更や行数稼ぎを促さず、品質イベントを報酬化する。</li>
+            <li>設定やリポジトリを壊さず、最初は読取中心で動く。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Non-Goals</h3>
+          <ul>
+            <li>Codex Desktop本体の未公開内部UIを直接改造する。</li>
+            <li>Steam参照作のキャラクター、UI、音源、固有表現をコピーする。</li>
+            <li>ユーザー承認なしにCodex設定、AGENTS、repoファイルを書き換える。</li>
+            <li>コード量やコマンド数を主報酬にして、作業品質を悪化させる。</li>
+            <li>整理された工房を、現在性確認なしの固定ルールとしてCodexに押し付ける。</li>
+            <li>Obsidian/Codex Brain、repo docs、Webソースのsource of truth境界を曖昧にする。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>6. Core Loop</h2>
+        <span class="section-note">作業からゲーム進行まで</span>
+      </div>
+      <div class="flow">
+        <div class="step">
+          <div class="num">1</div>
+          <h3>Atelier Prepares</h3>
+          <p>書斎、作業机、検証ラボから今回のrepoに合うソース、手順、注意点を提示する。</p>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <h3>Focus Starts</h3>
+          <p>ユーザーがポモドーロを開始。相棒キャラとCodexが、整理済みの初手に沿って作業モードへ入る。</p>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <h3>Codex Works</h3>
+          <p>調査、実装、検証、docs更新、Automationを進め、結果を共通イベントへ変換する。</p>
+        </div>
+        <div class="step">
+          <div class="num">4</div>
+          <h3>Atelier Organizes</h3>
+          <p>使えたソース、失敗パターン、検証コマンド、成果物を棚と施設に整理する。</p>
+        </div>
+        <div class="step">
+          <div class="num">5</div>
+          <h3>Codex Refines</h3>
+          <p>休憩中に成果を振り返り、次回Codexの探索順・判断基準・報告テンプレートを少し良くする。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>7. イベント設計</h2>
+        <span class="section-note">報酬設計は品質優先</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Normalized Event</th>
+              <th>入力源</th>
+              <th>ゲーム内表現</th>
+              <th>報酬</th>
+              <th>ガードレール</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>repo_inspected</code></td>
+              <td>Codex message / shell reads / docs reads</td>
+              <td>偵察、地図解放、資料棚更新</td>
+              <td>Research +1</td>
+              <td>同一repoで短時間に連続加算しない。</td>
+            </tr>
+            <tr>
+              <td><code>requirements_defined</code></td>
+              <td><code>define-requirements</code> skill / PRD / report</td>
+              <td>企画机、設計図、会議メモ</td>
+              <td>Planning +2、信頼度 +1</td>
+              <td>要求が成果物に残った時だけ加算。</td>
+            </tr>
+            <tr>
+              <td><code>implementation_done</code></td>
+              <td>git diff / response summary</td>
+              <td>建設、設備更新、工房稼働</td>
+              <td>Code +2</td>
+              <td>行数ではなく、関連ファイル群と検証の有無を見る。</td>
+            </tr>
+            <tr>
+              <td><code>tests_passed</code></td>
+              <td>npm / pytest / build / DOM QA outputs</td>
+              <td>納品成功、検証ラボ点灯</td>
+              <td>Quality +3、coins +少量</td>
+              <td>失敗直後の修正成功を高めに評価。</td>
+            </tr>
+            <tr>
+              <td><code>tests_failed</code></td>
+              <td>command exit code / error summary</td>
+              <td>小トラブル、修理タスク</td>
+              <td>incident生成</td>
+              <td>失敗自体を罰しすぎない。復旧までセットで扱う。</td>
+            </tr>
+            <tr>
+              <td><code>bug_fixed</code></td>
+              <td>final summary / diff / test retry</td>
+              <td>修理完了、耐久度上昇</td>
+              <td>Quality +4、reputation +1</td>
+              <td>同じエラーを雑に再試行しただけでは加算しない。</td>
+            </tr>
+            <tr>
+              <td><code>docs_updated</code></td>
+              <td>docs diff / HTML report / README</td>
+              <td>図書室、知識庫、掲示板</td>
+              <td>Knowledge +2</td>
+              <td>生成物だけでなく内容の種類を分類する。</td>
+            </tr>
+            <tr>
+              <td><code>user_approved</code></td>
+              <td>user message / merged PR / explicit closeout</td>
+              <td>納品印、関係イベント</td>
+              <td>trust +2、story flag</td>
+              <td>曖昧な沈黙を承認扱いしない。</td>
+            </tr>
+            <tr>
+              <td><code>automation_completed</code></td>
+              <td><code>.codex/automations</code> job / output report</td>
+              <td>夜間調査、工房の留守番成果</td>
+              <td>Research +2、new lead</td>
+              <td>重複リサーチは低報酬にする。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn" style="margin-top:14px">
+        <strong>重要:</strong>
+        報酬は「手数」ではなく「検証された進捗」に寄せる。変更行数、ファイル数、実行コマンド数、長時間実行だけを報酬にすると、
+        ゲームのために開発品質が落ちる。
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>8. 機能一覧</h2>
+        <span class="section-note">MVPから拡張まで</span>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>Pomodoro / Focus</h3>
+          <ul>
+            <li>25/5、50/10、自由設定。</li>
+            <li>集中中は低干渉表示。</li>
+            <li>休憩時だけ会話、日記、作業サマリ。</li>
+            <li>Codex稼働状態に合わせた小さな演出。</li>
+          </ul>
+          <div class="tag-row"><span class="tag green">MVP</span></div>
+        </div>
+        <div class="card">
+          <h3>Companion Character</h3>
+          <ul>
+            <li>作業同席する相棒キャラ。</li>
+            <li>関係値、信頼度、ストーリー解放。</li>
+            <li>恋愛寄り/同僚寄り/管理人寄りを切替可能にする。</li>
+            <li>作業内容に応じた短い反応。</li>
+          </ul>
+          <div class="tag-row"><span class="tag green">MVP</span><span class="tag gold">tone decision needed</span></div>
+        </div>
+        <div class="card">
+          <h3>Atelier Management</h3>
+          <ul>
+            <li>Research / Code / Test / Docs / Release資源。</li>
+            <li>作業机、検証ラボ、資料室、ビルド炉、レビュー机。</li>
+            <li>施設成長は倍率より可視化と演出を優先。</li>
+            <li>repo別の地区や部屋。</li>
+          </ul>
+          <div class="tag-row"><span class="tag green">MVP</span><span class="tag teal">unique value</span></div>
+        </div>
+        <div class="card">
+          <h3>Codex Event Ingestion</h3>
+          <ul>
+            <li><code>.codex/sessions/**/*.jsonl</code> を読取。</li>
+            <li>Git差分、テスト結果、docs成果物を補助入力にする。</li>
+            <li>将来はCodex SDK、<code>codex exec</code>、Hooksへ拡張。</li>
+            <li>秘密情報を保存しない正規化イベントへ変換。</li>
+          </ul>
+          <div class="tag-row"><span class="tag green">MVP</span><span class="tag rose">privacy sensitive</span></div>
+        </div>
+        <div class="card">
+          <h3>Research Library / 書斎</h3>
+          <ul>
+            <li>調査で使った公式docs、Steam、GitHub、Reddit、API docsを棚として保存。</li>
+            <li>「この系統の調査では次回ここから見る」をtopic別に記録。</li>
+            <li>信頼度、更新日、使いどころ、注意点、採用/不採用理由を残す。</li>
+            <li>書斎が整理されるほど、次回Codexの探索順と判断基準が洗練される。</li>
+          </ul>
+          <div class="tag-row"><span class="tag green">MVP</span><span class="tag violet">Codex refinement</span></div>
+        </div>
+        <div class="card">
+          <h3>Knowledge Hub / 情報集約工房</h3>
+          <ul>
+            <li>Obsidian/Codex Brain、repo docs、AGENTS、Skills、調査サイト、成果HTMLを横断表示。</li>
+            <li>Brainは長期記憶、repo docsは現在の設計、Webは現在性確認、セッションログは直近作業として棚分け。</li>
+            <li>情報を「次回Codexが最初に読むもの」「必要時に検索するもの」「古いので再確認するもの」に分類。</li>
+            <li>工房が整理されるほど、Codexの初手、質問、検証、報告が洗練される状態を作る。</li>
+          </ul>
+          <div class="tag-row"><span class="tag green">Core</span><span class="tag violet">Brain integration</span></div>
+        </div>
+        <div class="card">
+          <h3>Desktop Modes</h3>
+          <ul>
+            <li>Bottom Bar: 画面下の横長工房。</li>
+            <li>Side Dock: 画面端の縦型部屋。</li>
+            <li>Compact Companion: 相棒だけの小表示。</li>
+            <li>Focus Mode: 演出と生産速度を控えめに。</li>
+          </ul>
+          <div class="tag-row"><span class="tag gold">Phase 2</span></div>
+        </div>
+        <div class="card">
+          <h3>Sound / Ambience</h3>
+          <ul>
+            <li>Lo-Fi、雨、夜、カフェ、図書館、海辺。</li>
+            <li>テスト中、調査中、納品時の控えめな音。</li>
+            <li>配信/録画に使うなら音源ライセンスを明確化。</li>
+            <li>最初は無音でも成立するUIを作る。</li>
+          </ul>
+          <div class="tag-row"><span class="tag gold">Phase 2</span><span class="tag rose">license check</span></div>
+        </div>
+        <div class="card">
+          <h3>Collection / Customization</h3>
+          <ul>
+            <li>docs更新で本棚アイテム。</li>
+            <li>テスト成功で検証バッジ。</li>
+            <li>リリースで納品スタンプ。</li>
+            <li><code>hatch-pet</code> のマスコットを工房に配置。</li>
+          </ul>
+          <div class="tag-row"><span class="tag gold">Phase 2</span></div>
+        </div>
+        <div class="card">
+          <h3>Skill Staff View</h3>
+          <ul>
+            <li><code>define-requirements</code>: 企画係。</li>
+            <li><code>github</code>: 配達係。</li>
+            <li><code>playwright</code>: 画面確認係。</li>
+            <li><code>hatch-pet</code>: 画材係。</li>
+          </ul>
+          <div class="tag-row"><span class="tag teal">Phase 3</span></div>
+        </div>
+        <div class="card">
+          <h3>Reports / Daily Log</h3>
+          <ul>
+            <li>今日のCodex成果を1画面で要約。</li>
+            <li>ポモドーロ回数、復旧した失敗、生成した成果物。</li>
+            <li>Obsidian/Codex Brainは書斎の主要棚として扱い、必要なら後段でcapture/wiki更新へつなげる。</li>
+            <li>HTML exportは最初から有用。</li>
+          </ul>
+          <div class="tag-row"><span class="tag green">MVP</span><span class="tag violet">report-friendly</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>9. 推奨アーキテクチャ</h2>
+        <span class="section-note">読取中心から始める</span>
+      </div>
+      <div class="callout">
+        <strong>推奨:</strong>
+        Windowsローカル常駐を前提に、Electron + React + TypeScript + SQLiteから開始する。
+        Yoitomoshi-Art-Generatorと同系統なので、PowerShell、electron-vite、DOM QA、IPC入力検証の知見を流用できる。
+      </div>
+      <div class="grid two" style="margin-top:14px">
+        <div class="card">
+          <h3>Process Layout</h3>
+          <pre><code>Codex Desktop / CLI / Automations
+        |
+        | append-only logs / job files / optional SDK
+        v
+Event Collector (Node main process)
+        |
+        | redaction + normalization
+        v
+Research Library (source registry + topic shelves)
+        |
+        | trusted source hints
+        v
+Knowledge Hub (Brain + repo docs + source-of-truth routing)
+        |
+        | current context and reusable memory
+        v
+Game Engine (rules, scoring, story flags)
+        |
+        | SQLite + summary JSON
+        v
+Renderer (React desktop UI)
+        |
+        | tray / dock / bottom bar / report export
+        v
+User focus loop</code></pre>
+        </div>
+        <div class="card">
+          <h3>Storage Layout</h3>
+          <pre><code>%APPDATA%\Yoitomoshi\CodexAtelier\
+  state.sqlite
+  settings.json
+  event-cache\
+  research-library\
+    sources.json
+    topics.json
+    source-notes\
+  knowledge-hub\
+    brain-index-cache.json
+    repo-doc-index.json
+    source-of-truth-map.json
+  reports\
+  assets\
+    companions\
+    rooms\
+    hatch-pets\
+
+C:\Users\Humin\.codex\
+  sessions\**\rollout-*.jsonl   # read-only
+  automations\**\automation.toml # read-only
+  pets\onoko\pet.json            # read-only
+
+C:\Users\Humin\Obsidian\Codex Cortex\Codex Brain\
+  wiki\hot.md                    # read-only in MVP
+  wiki\INDEX.md                  # read-only in MVP
+  wiki\project-memory-index.md   # read-only in MVP</code></pre>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:14px">
+        <table>
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>責務</th>
+              <th>実装候補</th>
+              <th>注意点</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Session Adapter</td>
+              <td>Codex JSONLからturn、message、tool call、command resultを抽出。</td>
+              <td>Node stream parser、file watcher + polling fallback。</td>
+              <td>JSONL形式は公開安定契約とは限らない。バージョン別adapterにする。</td>
+            </tr>
+            <tr>
+              <td>Git Adapter</td>
+              <td>repo状態、diff分類、docs/実装/テスト領域の変化を読む。</td>
+              <td><code>git status --porcelain</code>、<code>git diff --name-status</code>。</td>
+              <td>未コミット変更はユーザー作業。ゲーム側が勝手に戻さない。</td>
+            </tr>
+            <tr>
+              <td>Test Adapter</td>
+              <td>npm scriptsやビルド結果をイベント化。</td>
+              <td>Codex tool output parse、明示された検証ログのみ。</td>
+              <td>テストを勝手に走らせるのは後段。MVPは既存結果を読む。</td>
+            </tr>
+            <tr>
+              <td>Scoring Engine</td>
+              <td>Normalized eventを資源、XP、信頼度、施設進行へ変換。</td>
+              <td>pure TypeScript rules、設定可能なweights。</td>
+              <td>行数稼ぎ対策、連続加算抑制、品質イベント優先。</td>
+            </tr>
+            <tr>
+              <td>Research Library</td>
+              <td>調査で使ったサイト、一次情報、再利用価値、注意点をtopic別に保存。</td>
+              <td>SQLite tablesまたはJSON registry、source freshness checker、tagged shelves。</td>
+              <td>古い情報を自動で「確認済み」と扱わない。再調査時は更新日と一次情報を見直す。</td>
+            </tr>
+            <tr>
+              <td>Knowledge Hub</td>
+              <td>Obsidian/Codex Brain、repo docs、AGENTS、Skills、Webソース、HTMLレポートの位置づけを束ねる。</td>
+              <td>source-of-truth map、Brain index cache、repo doc index、open-in-Obsidian link。</td>
+              <td>MVPでは読取専用。Brain更新は明示操作またはCodex Brain skillのcapture/wiki手順に委ねる。</td>
+            </tr>
+            <tr>
+              <td>Story Engine</td>
+              <td>相棒セリフ、休憩イベント、関係進行。</td>
+              <td>YAML/JSON script、条件式、ローカルテンプレート。</td>
+              <td>最初は固定文で十分。LLM生成は後段で安全確認。</td>
+            </tr>
+            <tr>
+              <td>Renderer</td>
+              <td>作業部屋、工房、タイマー、履歴、設定。</td>
+              <td>React、Zustand、lucide-react、CSS modulesまたはTailwind。</td>
+              <td>集中ツールなので視覚情報は密すぎない。</td>
+            </tr>
+            <tr>
+              <td>Codex Control</td>
+              <td>将来的にCodex SDKや非対話実行を呼び出す。</td>
+              <td><code>@openai/codex-sdk</code>、<code>codex exec resume</code>。</td>
+              <td>初期版では読取のみ。実行は必ずユーザー承認とsandbox設定を尊重。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>10. MVP Scope</h2>
+        <span class="section-note">最初の完成形</span>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3>MVPに入れる</h3>
+          <ol>
+            <li>ポモドーロタイマー、作業/休憩状態、セッション履歴。</li>
+            <li>相棒キャラ1人、部屋1つ、工房レベル、信頼度。</li>
+            <li>CodexセッションJSONLを読んで、調査/実装/検証/docs/レポートをイベント化。</li>
+            <li>Git diffのファイル種別分類。</li>
+            <li>今日の成果とゲーム進行を表示するダッシュボード。</li>
+            <li>調査で使ったサイトをtopic別の書斎棚に保存し、次回の探索候補として出せる。</li>
+            <li>Obsidian/Codex Brainとrepo docsの索引を読取専用で表示し、情報の集約スペースとして使える。</li>
+            <li><code>hatch-pet</code> 既存ONOKO素材を読み込める任意スロット。</li>
+            <li>HTML daily report export。</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>MVPから外す</h3>
+          <ol>
+            <li>音声付きフルサウンドノベル。</li>
+            <li>Codex Desktopの内部ペット表示の動的差し替え。</li>
+            <li>Codex SDKによる自動実行制御。</li>
+            <li>多数キャラ、Live2D、複雑な部屋編集。</li>
+            <li>配信向け音源管理。</li>
+            <li>Brain wikiへの自動書き込み。MVPでは集約・表示・導線までに留める。</li>
+            <li>クラウド同期、ランキング、公開販売。</li>
+          </ol>
+        </div>
+      </div>
+      <div class="callout ok" style="margin-top:14px">
+        <strong>MVPの評価基準:</strong>
+        1日のCodex作業後にアプリを開くと、「何を調べ、何を作り、何を検証し、どこで詰まり、何が育ったか」が
+        3分で分かること。ゲームとしては、次のポモドーロを始めたくなる程度の反応があれば十分。
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>11. データモデル案</h2>
+        <span class="section-note">最小で始める</span>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3>Normalized Event</h3>
+          <pre><code>{
+  "id": "evt_20260525_001",
+  "source": "codex-session",
+  "sourceId": "019e5bae-887c-7050-af03-bf33a874f103",
+  "workspace": "C:\\宵灯工房アート\\Yoitomoshi-Art-Generator",
+  "type": "docs_updated",
+  "confidence": 0.86,
+  "occurredAt": "2026-05-25T05:42:00+09:00",
+  "summary": "Codex作業ゲーム化のHTMLレポートを作成",
+  "evidence": {
+    "files": ["docs/CODEX_ATELIER_DEV_COMPANION_REQUIREMENTS_REPORT_2026-05-25.html"],
+    "commands": ["git status --short", "git diff --check"]
+  },
+  "privacy": {
+    "rawPromptStored": false,
+    "redacted": true
+  }
+}</code></pre>
+        </div>
+        <div class="card">
+          <h3>Game State</h3>
+          <pre><code>{
+  "profile": {
+    "displayName": "Codex Atelier",
+    "companionId": "partner_01",
+    "theme": "lofi-dev-room"
+  },
+  "focus": {
+    "mode": "pomodoro",
+    "workMinutes": 25,
+    "breakMinutes": 5,
+    "sessionsToday": 3
+  },
+  "resources": {
+    "research": 18,
+    "code": 12,
+    "quality": 9,
+    "knowledge": 21,
+    "reputation": 4
+  },
+  "relationship": {
+    "trust": 17,
+    "storyChapter": 2,
+    "lastReaction": "docs_updated"
+  },
+  "facilities": {
+    "desk": 2,
+    "testLab": 1,
+    "library": 3,
+    "researchShelf": 2,
+    "brainArchive": 1,
+    "deliveryBoard": 1
+  }
+}</code></pre>
+        </div>
+        <div class="card">
+          <h3>Research Source</h3>
+          <pre><code>{
+  "id": "src_openai_codex_sdk",
+  "title": "OpenAI Codex SDK",
+  "url": "https://developers.openai.com/codex/sdk",
+  "topicTags": ["codex", "sdk", "automation"],
+  "sourceType": "official-doc",
+  "trustLevel": "primary",
+  "lastCheckedAt": "2026-05-25T05:45:00+09:00",
+  "useWhen": "Codexを外部アプリから制御する実装を検討する時",
+  "notes": [
+    "MVPは読取中心。SDK連携はPhase 5以降。",
+    "現在のCLI/Desktopバージョン差分を再確認する。"
+  ],
+  "gameEffect": {
+    "facility": "researchShelf",
+    "unlocks": ["trusted-source-hint", "codex-control-brief"]
+  }
+}</code></pre>
+        </div>
+        <div class="card">
+          <h3>Knowledge Shelf</h3>
+          <pre><code>{
+  "id": "shelf_codex_brain",
+  "label": "Codex Brain",
+  "sourceType": "obsidian-vault",
+  "root": "C:\\Users\\Humin\\Obsidian\\Codex Cortex\\Codex Brain",
+  "sourceOfTruth": "durable-memory-index",
+  "readMode": "index-first",
+  "entrypoints": [
+    "wiki\\hot.md",
+    "wiki\\INDEX.md",
+    "wiki\\project-memory-index.md"
+  ],
+  "useWhen": [
+    "過去文脈が必要",
+    "横断判断が必要",
+    "再利用する運用ルールを探す"
+  ],
+  "writePolicy": "explicit-capture-or-wiki-workflow-only",
+  "freshnessRule": "Brainは索引。現在のrepoと公式情報で再確認する。"
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>12. 実装ロードマップ</h2>
+        <span class="section-note">小さく検証できる順</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Phase</th>
+              <th>目的</th>
+              <th>成果物</th>
+              <th>検証</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="status high">0</span> Discovery CLI</td>
+              <td>CodexログとGit状態からイベント抽出できるか確認。</td>
+              <td><code>codex-atelier-scan</code>、JSON event output、サンプルHTML。</td>
+              <td>指定セッション <code>019e5bae...</code> から会話3件と提案を分類できる。</td>
+            </tr>
+            <tr>
+              <td><span class="status high">1</span> MVP Dashboard</td>
+              <td>Pomodoro + 相棒 + 工房レベル + 今日の成果を表示。</td>
+              <td>Electron app、SQLite state、1画面ダッシュボード。</td>
+              <td>25/5タイマー、手動イベント投入、Codexログ読取が動く。</td>
+            </tr>
+            <tr>
+              <td><span class="status high">1.5</span> Research Library</td>
+              <td>調査に使ったサイトをtopic別の書斎棚として保存し、次回調査の初手に使う。</td>
+              <td>source registry、topic shelves、last checked、trust level、use-when notes。</td>
+              <td>このレポートのOpenAI/Steam公式ソースを登録し、次回の候補として表示できる。</td>
+            </tr>
+            <tr>
+              <td><span class="status high">1.6</span> Knowledge Hub</td>
+              <td>Obsidian/Codex Brain、repo docs、AGENTS、Skills、調査ソースを工房の棚として集約。</td>
+              <td>Brain index viewer、repo docs index、source-of-truth map、open-in-Obsidian links。</td>
+              <td><code>wiki\hot.md</code> と <code>wiki\INDEX.md</code> を読取専用で表示し、次回Codexの初手候補へ変換できる。</td>
+            </tr>
+            <tr>
+              <td><span class="status mid">2</span> Desktop Modes</td>
+              <td>常駐ゲームらしく画面端で邪魔しない表示。</td>
+              <td>Tray、Bottom Bar、Side Dock、Compact Companion。</td>
+              <td>マルチモニタ、最前面、DPI、終了復帰を確認。</td>
+            </tr>
+            <tr>
+              <td><span class="status mid">3</span> Relationship / Story</td>
+              <td>作業内容に反応する相棒体験を強化。</td>
+              <td>セリフscript、休憩イベント、日記、信頼度解放。</td>
+              <td>同じ作業に同じ反応が出続けない。集中を邪魔しない。</td>
+            </tr>
+            <tr>
+              <td><span class="status mid">4</span> Asset Pipeline</td>
+              <td><code>hatch-pet</code> と独自キャラ/部屋素材を管理。</td>
+              <td>asset registry、ペット配置、部屋アイテム解放。</td>
+              <td>既存 <code>onoko</code> petを読み、表示と非表示を切替できる。</td>
+            </tr>
+            <tr>
+              <td><span class="status low">5</span> Codex Control</td>
+              <td>必要時にSDK/非対話実行/Automation結果と深く接続。</td>
+              <td>Codex SDK adapter、実行承認UI、Automation viewer。</td>
+              <td>承認なしにコマンド実行しない。sandbox設定を画面に表示する。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>13. 受け入れ条件</h2>
+        <span class="section-note">MVPの合格ライン</span>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>Functional</h3>
+          <ul>
+            <li>ユーザーが作業時間/休憩時間を設定し、Pomodoroを開始/停止/スキップできる。</li>
+            <li>CodexセッションJSONLからユーザー依頼、assistant要約、tool call、command outputを抽出できる。</li>
+            <li>抽出イベントがResearch/Code/Test/Docs/Releaseに分類される。</li>
+            <li>分類結果が工房レベル、資源、信頼度、今日の履歴に反映される。</li>
+            <li>今日の成果をHTMLでexportできる。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Safety / Privacy</h3>
+          <ul>
+            <li>初期状態では <code>.codex</code> とrepoへの書込をしない。</li>
+            <li>raw promptやtool output全文をゲームDBに保存しない設定を持つ。</li>
+            <li>API key、token、secret、passwordらしき値はredactionする。</li>
+            <li>監視対象フォルダはユーザーが明示的に選ぶ。</li>
+            <li>Codex SDK/exec連携はMVPでは無効。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>UX</h3>
+          <ul>
+            <li>集中中はアニメーション、通知、会話が控えめになる。</li>
+            <li>休憩時にだけ会話と成果サマリが前に出る。</li>
+            <li>デスクトップ端に置いても主要作業を隠さない。</li>
+            <li>相棒キャラのトーンは設定で調整できる。</li>
+            <li>毎日見ても同じ文面だけにならない。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>14. リスクと未確定事項</h2>
+        <span class="section-note">先に潰すべき順</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>リスク</th>
+              <th>影響</th>
+              <th>対策</th>
+              <th>優先</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Codex JSONL形式が変わる</td>
+              <td>イベント抽出が壊れる。</td>
+              <td>versioned adapter、schema snapshot、未知typeを無視してログに残す。</td>
+              <td><span class="status high">High</span></td>
+            </tr>
+            <tr>
+              <td>ログに機密情報が混ざる</td>
+              <td>ゲームDBやレポートに秘密が残る。</td>
+              <td>raw保存を避け、redaction済み要約だけ保存。export前にsecret scan。</td>
+              <td><span class="status high">High</span></td>
+            </tr>
+            <tr>
+              <td>報酬が悪い行動を促す</td>
+              <td>無駄な変更やテスト乱発を誘発。</td>
+              <td>品質イベント中心、同一イベント連続抑制、ユーザー承認や検証を重視。</td>
+              <td><span class="status high">High</span></td>
+            </tr>
+            <tr>
+              <td>Desktop常駐UIが邪魔</td>
+              <td>集中支援ツールとして本末転倒。</td>
+              <td>Compact/Focus Mode、低頻度通知、休憩時だけ前面。</td>
+              <td><span class="status mid">Medium</span></td>
+            </tr>
+            <tr>
+              <td>音源/キャラ素材ライセンス</td>
+              <td>配布や公開時に使えない。</td>
+              <td>最初は自前/無音/ライセンス確認済み素材だけ。Steam参照作は機能文法のみ採用。</td>
+              <td><span class="status mid">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Codex CLIの複数バージョン</td>
+              <td>SDK/execの挙動が想定と違う。</td>
+              <td>Desktop内蔵path、PATH上CLI、configの <code>CODEX_CLI_PATH</code> を区別して表示。</td>
+              <td><span class="status mid">Medium</span></td>
+            </tr>
+            <tr>
+              <td>相棒キャラの方向性が曖昧</td>
+              <td>UI/ストーリー/素材制作がぶれる。</td>
+              <td>恋愛寄り、同僚寄り、管理人寄りの3トーンを最初に選べるようにする。</td>
+              <td><span class="status mid">Medium</span></td>
+            </tr>
+            <tr>
+              <td>書斎の情報が古くなる</td>
+              <td>Codexが古いdocsや過去判断に引っ張られる。</td>
+              <td>sourceごとに <code>lastCheckedAt</code>、鮮度、一次/二次情報、再確認ルールを持たせる。</td>
+              <td><span class="status mid">Medium</span></td>
+            </tr>
+            <tr>
+              <td>情報集約がsource of truthを曖昧にする</td>
+              <td>Brain、repo docs、Web、セッションログのどれを信じるべきか分からなくなる。</td>
+              <td>棚ごとに役割を固定する。Brainは長期記憶、repo docsは現在設計、Webは現在性、セッションログは直近証跡。</td>
+              <td><span class="status high">High</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>15. 次に必要な追加調査</h2>
+        <span class="section-note">実装前チェックリスト</span>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3>ローカル技術調査</h3>
+          <ul>
+            <li>Codex DesktopのセッションJSONLが実行中にどの粒度で追記されるか。</li>
+            <li><code>codex exec resume &lt;SESSION_ID&gt;</code> がこのWindows環境でどのCodexバイナリを使うか。</li>
+            <li>Codex SDKが現在のDesktopログ/認証とどう共存するか。</li>
+            <li>Electronの透明ウィンドウ、最前面、クリック透過、マルチモニタ挙動。</li>
+            <li>SQLiteかJSON stateか。イベント数が増えるならSQLiteが堅い。</li>
+            <li>調査サイトをsource registryへ入れる時のsecret redaction、更新日確認、リンク切れ検出。</li>
+            <li>Obsidian/Codex Brainを読取専用で索引化し、クリックでObsidianまたはファイルを開く導線。</li>
+            <li>Brain、repo docs、AGENTS、Skills、HTML reportsのsource-of-truth mapをどうUI化するか。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>体験設計調査</h3>
+          <ul>
+            <li>相棒キャラの年齢感、関係性、セリフトーン、名前。</li>
+            <li>作業同席と恋愛/同僚/管理人のどれを初期トーンにするか。</li>
+            <li>Lo-Fiや環境音を初期版に入れるか、無音UIから始めるか。</li>
+            <li>報酬資源の名前を開発工房らしくするか、もっと日常寄りにするか。</li>
+            <li>Yoitomoshi Art Generatorに同梱するか、別repo/別アプリにするか。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>16. AI Coding連携ソフトの近接例リサーチ</h2>
+        <span class="section-note">2026-05-25時点の公式情報中心</span>
+      </div>
+      <div class="callout">
+        <strong>調査結論:</strong>
+        「AI coding agentと連携し、ポモドーロ、常駐ゲーム、作業記憶、情報整理、Codexの次回行動改善まで一体化した例」はまだ少ない。
+        ただし部品ごとの先行例はかなり揃っている。最も近いのは、MCP対応のゲーミファイド集中/タスク/街づくりアプリ
+        <a href="https://dovilo.app/">Dovilo</a>。AI agent作業管制はBand/Superset、開発活動可視化はWakaTime/Gource/GitCity、
+        agent memory/skill管理はvexp/Engram/Agentverが近い。
+      </div>
+      <div class="table-wrap" style="margin-top:14px">
+        <table>
+          <thead>
+            <tr>
+              <th>系統</th>
+              <th>近接例</th>
+              <th>確認できた特徴</th>
+              <th>Codex Atelierへの示唆</th>
+              <th>近さ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>AI agent対応のゲーミファイド集中/タスク</td>
+              <td><a href="https://dovilo.app/">Dovilo</a></td>
+              <td>ToDo、Pomodoro風focus timer、isometric city builder、MCP tools、signed webhooksを組み合わせ、Claude Code/Cursor/Windsurf/Codex CLI等からタスク読取・状態更新・notes/telemetry追記ができる。</td>
+              <td>今回の企画に最も近い。ただしDoviloは「タスク完了で街が育つ」が中心で、「工房整理がCodexの次回行動を洗練する」までは踏み込んでいない。ここが差別化点。</td>
+              <td><span class="status high">Closest</span></td>
+            </tr>
+            <tr>
+              <td>Agent-first IDE / 作業管制</td>
+              <td><a href="https://getband.app/">Band</a></td>
+              <td>Claude Code/Codex/OpenCodeをchat paneごとに切替、git worktreeで分離、並列task dispatch、リアルタイムstatus、scheduled tasksをdesktop IDEとして提供。</td>
+              <td>工房の「作業机」「進行中タスク」「agent状態表示」の参考になる。ゲーム要素は薄いが、worktree分離とtask historyは必須級。</td>
+              <td><span class="status mid">High partial</span></td>
+            </tr>
+            <tr>
+              <td>複数CLI agentのダッシュボード</td>
+              <td><a href="https://superset.sh/">Superset</a></td>
+              <td>Claude Code/OpenCode/Cursor/Codex/Gemini等のCLI agentを複数taskで並列起動し、各agentをisolated git worktreeで動かし、差分やstatusをレビューできる。</td>
+              <td>工房の「複数プロジェクト/複数Codex作業の掲示板」に近い。放置中に進むagentの見守りUIとして参考になる。</td>
+              <td><span class="status mid">High partial</span></td>
+            </tr>
+            <tr>
+              <td>既存IDE内AI coding agent</td>
+              <td><a href="https://cursor.com/product/">Cursor</a>, <a href="https://windsurf.com/">Windsurf</a>, <a href="https://github.blog/news-insights/product-news/github-copilot-meet-the-new-coding-agent/">GitHub Copilot coding agent</a></td>
+              <td>Cursorはcodebase indexing、long-running autonomous coding、dynamic context discoveryを打ち出す。Windsurfはflow state、preview、Problems、Agent Command Center/Devin連携を強調。GitHub Copilot coding agentはGitHub issue/Actions/PR workflowに統合される。</td>
+              <td>AI coding本体としては強いが、作業同席・工房・自己改善のUIではない。Codex Atelierはこれらを置き換えず、状態・記憶・判断導線を横断する上位レイヤーにする。</td>
+              <td><span class="status mid">Infrastructure</span></td>
+            </tr>
+            <tr>
+              <td>自律ソフトウェアエンジニア</td>
+              <td><a href="https://docs.devin.ai/">Devin</a>, <a href="https://docs.replit.com/core-concepts/agent/">Replit Agent</a>, <a href="https://www.openhands.dev/">OpenHands</a>, <a href="https://opencode.ai/">OpenCode</a></td>
+              <td>自然言語のtaskからplan/code/test/PRやapp buildへ進むagent群。OpenHands/OpenCodeはopen sourceやlocal/privacyを強調し、Replitはbrowser内で自然言語からapp生成する。</td>
+              <td>「Codexが何をしたか」をイベント化する入力源として近い。ゲーム側はagent本体ではなく、成果・失敗・検証・記憶を整理する層にすると競合しにくい。</td>
+              <td><span class="status low">Input source</span></td>
+            </tr>
+            <tr>
+              <td>開発活動の計測/可視化/ゲーミフィケーション</td>
+              <td><a href="https://wakatime.com/metrics-for-developers">WakaTime</a>, <a href="https://gource.io/">Gource</a>, <a href="https://gitcity.natrajx.in/">GitCity</a></td>
+              <td>WakaTimeはIDE pluginからcoding metrics、goals、leaderboards、AI-generated code visibilityを提供。GourceはGit等の履歴を3D treeとして可視化。GitCityはGitHub contributionsを3D/isometric cityに変換する。</td>
+              <td>「活動を街/工房に変換する」表現の先行例。ただし行数/commit量に寄りやすいので、Codex Atelierでは品質イベントとsource整理を報酬の中心にする。</td>
+              <td><span class="status mid">Visual precedent</span></td>
+            </tr>
+            <tr>
+              <td>Agent memory / context / skill管理</td>
+              <td><a href="https://vexp.dev/">vexp</a>, <a href="https://openengram.ai/">Engram</a>, <a href="https://agentver.com/">Agentver</a></td>
+              <td>vexpはlocal-first context engineとしてcross-repo graphとMCP agent連携を提供。EngramはMCP/SDKでagent memory、semantic code search、knowledge graphを提供。AgentverはSkills/Configs/Plugins/Scripts/Promptsをversion管理し複数agentへ配布する。</td>
+              <td>今回の核心「工房整理がCodexの次回行動を洗練する」に最も近い技術領域。工房はこれらの概念を、視覚的な棚・source-of-truth map・作業同席体験へ翻訳する。</td>
+              <td><span class="status high">Core adjacent</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid two" style="margin-top:14px">
+        <div class="card">
+          <h3>この企画が既存例と違う点</h3>
+          <ul>
+            <li>Doviloに近いが、単なるタスク/集中報酬ではなく、Codexの次回行動を良くする情報整理をゲームの主目的にする。</li>
+            <li>Band/Supersetに近いが、agentを大量に回す管制塔ではなく、作業後の知識・失敗・検証・sourceを整理する工房にする。</li>
+            <li>WakaTime/Gource/GitCityに近いが、commit量や時間ではなく、検証済み進捗・再利用可能な知識・信頼ソースを育成資源にする。</li>
+            <li>vexp/Engram/Agentverに近いが、裏側のmemory/context管理をユーザーが見て整理できる「書斎/資料庫」として見せる。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>採用したいパターン</h3>
+          <ul>
+            <li>Dovilo: MCPでagentがtask/context/status/notes/telemetryへ触れる。ただし作成や破壊操作は制限する。</li>
+            <li>Band/Superset: taskごとのworktree分離、進行中/レビュー待ち/失敗の視覚化。</li>
+            <li>WakaTime: coding activityの自動計測。ただし報酬は品質イベント中心。</li>
+            <li>Gource/GitCity: Git履歴を工房/街/棚として見せる表現。</li>
+            <li>vexp/Engram/Agentver: local-first、source attribution、versioned skills、memoryの信頼度管理。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>17. 推奨する最初の実装タスク</h2>
+        <span class="section-note">次のCodex依頼にそのまま使える粒度</span>
+      </div>
+      <div class="callout">
+        <strong>最初の依頼文案:</strong>
+        <br />
+        <code>Codex Atelier Dev CompanionのPhase 0として、指定したCodex session JSONLとGit repoからNormalized Event JSONを生成するNode/TypeScript CLIを作って。まずは読取専用で、secret redaction、schema test、指定セッション019e5bae...のサンプル出力まで検証して。</code>
+      </div>
+      <div class="table-wrap" style="margin-top:14px">
+        <table>
+          <thead>
+            <tr>
+              <th>タスク</th>
+              <th>内容</th>
+              <th>完了条件</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1. Event Extractor</td>
+              <td>Codex JSONLからturn/message/tool/commandを安全に読む。</td>
+              <td>指定セッションから、3つのユーザー要求と提案内容を分類できる。</td>
+            </tr>
+            <tr>
+              <td>2. Scoring Prototype</td>
+              <td>Normalized EventをResearch/Code/Test/Docs/Releaseに変換。</td>
+              <td>行数ではなくイベント品質ベースのscoreが出る。</td>
+            </tr>
+            <tr>
+              <td>3. Static Dashboard</td>
+              <td>HTMLで今日の工房状態、相棒コメント、Pomodoro枠を表示。</td>
+              <td>ブラウザで開ける1ファイルHTMLが生成される。</td>
+            </tr>
+            <tr>
+              <td>4. Electron Shell</td>
+              <td>Static Dashboardを常駐アプリへ移す。</td>
+              <td>Tray、終了、設定保存、透明/端寄せ表示が動く。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>18. Sources</h2>
+        <span class="section-note">確認した一次/ローカル情報</span>
+      </div>
+      <div class="source-list">
+        <span>
+          <strong>Local session log</strong>
+          C:\Users\Humin\.codex\sessions\2026\05\25\rollout-2026-05-25T05-30-25-019e5bae-887c-7050-af03-bf33a874f103.jsonl
+        </span>
+        <span>
+          <strong>Local Codex config</strong>
+          C:\Users\Humin\.codex\config.toml（secret系行は除外して確認）
+        </span>
+        <span>
+          <strong>Local pet asset</strong>
+          C:\Users\Humin\.codex\pets\onoko\pet.json
+        </span>
+        <span>
+          <strong>Target repo docs</strong>
+          docs\AI_PROJECT_MAP.md, docs\DOCS_INDEX.md, docs\ROADMAP.md
+        </span>
+        <a href="https://developers.openai.com/codex/noninteractive">
+          <strong>OpenAI Codex Non-interactive mode</strong>
+          codex exec / resume / non-interactive workflow
+        </a>
+        <a href="https://developers.openai.com/codex/sdk">
+          <strong>OpenAI Codex SDK</strong>
+          Programmatically control local Codex agents
+        </a>
+        <a href="https://developers.openai.com/codex/agent-approvals-security">
+          <strong>OpenAI Agent approvals & security</strong>
+          sandbox, approvals, Windows notes
+        </a>
+        <a href="https://developers.openai.com/codex/use-cases">
+          <strong>OpenAI Codex use cases</strong>
+          Goals, automations, integrations, workflow use cases
+        </a>
+        <a href="https://dovilo.app/">
+          <strong>Dovilo</strong>
+          agent-ready gamified task manager, focus timer, city builder, MCP/webhooks
+        </a>
+        <a href="https://getband.app/">
+          <strong>Band</strong>
+          agent-first desktop IDE, parallel agents, isolated git worktrees
+        </a>
+        <a href="https://superset.sh/">
+          <strong>Superset</strong>
+          parallel CLI coding agents, isolated worktrees, review dashboard
+        </a>
+        <a href="https://cursor.com/product/">
+          <strong>Cursor</strong>
+          AI coding agents, codebase indexing, autonomous coding research
+        </a>
+        <a href="https://windsurf.com/">
+          <strong>Windsurf</strong>
+          agentic coding IDE, preview/problems flow, Agent Command Center direction
+        </a>
+        <a href="https://github.blog/news-insights/product-news/github-copilot-meet-the-new-coding-agent/">
+          <strong>GitHub Copilot coding agent</strong>
+          GitHub-integrated coding agent using issues, Actions, and PR workflows
+        </a>
+        <a href="https://wakatime.com/metrics-for-developers">
+          <strong>WakaTime</strong>
+          coding metrics, goals, leaderboards, AI-generated code visibility
+        </a>
+        <a href="https://gource.io/">
+          <strong>Gource</strong>
+          software version-control visualization
+        </a>
+        <a href="https://gitcity.natrajx.in/">
+          <strong>GitCity</strong>
+          GitHub contributions visualized as an isometric 3D city
+        </a>
+        <a href="https://vexp.dev/">
+          <strong>vexp</strong>
+          local-first context engine for AI coding agents
+        </a>
+        <a href="https://openengram.ai/">
+          <strong>Engram</strong>
+          self-hosted memory infrastructure and MCP memory for AI agents
+        </a>
+        <a href="https://agentver.com/">
+          <strong>Agentver</strong>
+          version control and distribution for AI agent skills/configs/plugins
+        </a>
+        <a href="https://store.steampowered.com/app/3548580/Chill_with_You_Lo-Fi_Story/">
+          <strong>Steam: Chill with You : Lo-Fi Story</strong>
+          work-focused sound novel, Pomodoro, lo-fi, relationship progression
+        </a>
+        <a href="https://store.steampowered.com/app/2113850/Spirit_City_Lofi_Sessions/">
+          <strong>Steam: Spirit City: Lofi Sessions</strong>
+          gamified focus tool, to-do, timer, habit tracker, journal, XP
+        </a>
+        <a href="https://store.steampowered.com/app/2666510/Rustys_Retirement/">
+          <strong>Steam: Rusty's Retirement</strong>
+          desktop idle farming, screen-edge placement, automation, Focus Mode
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <p>
+        Report generated for local planning. Official product pages and Codex docs may change; re-check before implementation that depends on current SDK, CLI, pricing, or platform behavior.
+      </p>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yoitomoshi Forge Studio Current State Report - 2026-05-25</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1115;
+      --bg-soft: #141821;
+      --panel: #181d26;
+      --panel-2: #202633;
+      --line: #343c4a;
+      --ink: #edf2f8;
+      --muted: #adb7c7;
+      --dim: #7e899c;
+      --accent: #87b4ff;
+      --accent-2: #82d7c9;
+      --ok: #77d991;
+      --warn: #f1c766;
+      --risk: #ff8a93;
+      --purple: #b89cff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+      line-height: 1.65;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header {
+      background: linear-gradient(180deg, #161b24 0%, #101319 100%);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .wrap {
+      width: min(1220px, calc(100vw - 36px));
+      margin: 0 auto;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
+      gap: 28px;
+      padding: 42px 0 30px;
+      align-items: end;
+    }
+
+    h1, h2, h3 { line-height: 1.25; margin: 0; }
+    h1 { font-size: clamp(30px, 4vw, 52px); letter-spacing: 0; }
+    h2 { font-size: 23px; margin-bottom: 14px; }
+    h3 { font-size: 16px; margin-bottom: 8px; }
+    p { margin: 0; }
+
+    .lead {
+      margin-top: 18px;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--ok);
+      display: inline-block;
+    }
+
+    .hero-panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .score {
+      border: 1px solid var(--line);
+      background: #11151c;
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 86px;
+    }
+
+    .score b {
+      display: block;
+      color: var(--ink);
+      font-size: 24px;
+      line-height: 1.15;
+    }
+
+    .score span {
+      display: block;
+      margin-top: 5px;
+      color: var(--dim);
+      font-size: 12px;
+    }
+
+    main { padding: 30px 0 56px; }
+    section { margin-top: 34px; }
+
+    .section-head {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 10px;
+      margin-bottom: 18px;
+    }
+
+    .section-head p {
+      color: var(--dim);
+      font-size: 13px;
+      max-width: 620px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .card {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 15px;
+      min-width: 0;
+    }
+
+    .card h3 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .card p, .card li {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .card ul {
+      margin: 10px 0 0 18px;
+      padding: 0;
+    }
+
+    .tag {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: var(--muted);
+      background: #12161d;
+      white-space: nowrap;
+    }
+
+    .tag.ok { color: var(--ok); border-color: rgba(119, 217, 145, .42); }
+    .tag.warn { color: var(--warn); border-color: rgba(241, 199, 102, .45); }
+    .tag.risk { color: var(--risk); border-color: rgba(255, 138, 147, .45); }
+    .tag.info { color: var(--accent); border-color: rgba(135, 180, 255, .45); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #222938;
+      color: var(--ink);
+      font-weight: 650;
+    }
+
+    td { color: var(--muted); background: #151a23; }
+    td strong { color: var(--ink); }
+
+    code {
+      background: #0c1016;
+      border: 1px solid #2b3340;
+      border-radius: 5px;
+      padding: 1px 5px;
+      color: #e8edf5;
+      font-family: Consolas, "SFMono-Regular", ui-monospace, monospace;
+      font-size: .94em;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .flow .step {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 13px;
+      min-height: 116px;
+      position: relative;
+    }
+
+    .flow .step:not(:last-child)::after {
+      content: ">";
+      position: absolute;
+      right: -9px;
+      top: 46px;
+      color: var(--dim);
+      font-size: 14px;
+    }
+
+    .step b { display: block; color: var(--ink); margin-bottom: 5px; }
+    .step span { color: var(--muted); font-size: 12px; }
+
+    .callout {
+      border: 1px solid rgba(135, 180, 255, .35);
+      background: rgba(135, 180, 255, .08);
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .callout strong { color: var(--ink); }
+    .callout.warn {
+      border-color: rgba(241, 199, 102, .4);
+      background: rgba(241, 199, 102, .08);
+    }
+
+    .small { color: var(--dim); font-size: 12px; }
+    .list-plain { list-style: none; margin: 0; padding: 0; }
+    .list-plain li { margin: 8px 0; }
+
+    footer {
+      margin-top: 42px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: var(--dim);
+      font-size: 12px;
+    }
+
+    @media (max-width: 960px) {
+      .hero, .grid, .grid.two, .grid.four, .flow {
+        grid-template-columns: 1fr;
+      }
+      .flow .step:not(:last-child)::after { display: none; }
+      .section-head { display: block; }
+      .section-head p { margin-top: 6px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap hero">
+      <div>
+        <h1>Yoitomoshi Forge Studio<br />Current State Report</h1>
+        <p class="lead">
+          2026-05-25 時点のローカル実装、ドキュメント、保存データ、モデル在庫、検証結果を読み合わせた現況レポート。
+          結論として、現在のYoitomoshi Forge Studioは「Forgeを裏で動かす画像生成UI」から、
+          Prompt設計、候補選別、モデル管理、履歴再利用、Upscale、Video、保守ツールまで持つ個人制作向けローカル制作環境へ進んでいる。
+        </p>
+        <div class="meta">
+          <span class="pill"><span class="dot"></span>TypeScript typecheck PASS</span>
+          <span class="pill">対象: <code>C:\宵灯工房アート\Yoitomoshi-Art-Generator</code></span>
+          <span class="pill">報告日: 2026-05-25 JST</span>
+          <span class="pill">主目的: 完全個人利用</span>
+          <span class="pill">GitHub: 再利用・復元用</span>
+        </div>
+      </div>
+      <aside class="hero-panel">
+        <div class="score-grid">
+          <div class="score"><b>7</b><span>トップレベル作業面: txt2img / img2img / Tags / Video / Upscale / Models / Tools</span></div>
+          <div class="score"><b>100</b><span>確認した source / electron / scripts / resources ファイル</span></div>
+          <div class="score"><b>497</b><span>現在の生成履歴アイテム数</span></div>
+          <div class="score"><b>72.6GB</b><span>主要モデルカテゴリ合計: checkpoint / LoRA / VAE / ControlNet</span></div>
+        </div>
+      </aside>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <div class="section-head">
+        <h2>現在の結論</h2>
+        <p>コード、README、ROADMAP、AI_PROJECT_MAP、docs/maps、保存領域を実確認した要約。</p>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3>到達点 <span class="tag ok">実用段階</span></h3>
+          <p>
+            内部利用の制作ツールとしてはかなり揃っている。生成、img2img、Inpaint、ControlNet、ADetailer、LoRA、Civitai/Hugging Face検索、
+            モデルプロファイル、履歴、Candidate Board、Pro Recipe、Workspace保存、Upscale比較、Video、Tools保守まで一つのElectron UIに集約されている。
+          </p>
+        </div>
+        <div class="card">
+          <h3>運用前提 <span class="tag ok">個人利用</span></h3>
+          <p>
+            このリポジトリの目的は完全個人利用。GitHubへ上げる理由は、別PCや将来の自分が再利用・復元しやすくするため。
+            コード署名、更新配布、一般ユーザー向けインストーラ品質、Mac/Linux検証は、現在のゴールではない。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>制作ループ</h2>
+        <p>Yoitomoshi Forge Studioが今つないでいる、日常制作の流れ。</p>
+      </div>
+      <div class="flow">
+        <div class="step">
+          <b>1. 設計する</b>
+          <span>Prompt Composer Slots、タグライブラリ、Research Workflow、モデル別Prompt Profileで作りたい絵の条件を組む。</span>
+        </div>
+        <div class="step">
+          <b>2. 生成する</b>
+          <span>txt2img / img2img / Inpaint / ControlNet / ADetailer / LoRA / Dynamic PromptをForge APIへ送る。</span>
+        </div>
+        <div class="step">
+          <b>3. 選別する</b>
+          <span>履歴、Candidate Board、favorite / candidate / rejected / asset、Pro Recipe Reviewで候補を残す。</span>
+        </div>
+        <div class="step">
+          <b>4. 仕上げる</b>
+          <span>Upscale Simple / Diffusion / Ultimate、Tile ControlNet、denoise比較、Videoへの派生を使う。</span>
+        </div>
+        <div class="step">
+          <b>5. 再利用する</b>
+          <span>.yoitoart Workspace、PNG metadata、Model Library、Civitai Recipeヒント、Promptタグ辞書へ制作条件を戻す。</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>トップレベル作業面</h2>
+        <p><code>src/components/MainTabs.tsx</code> と README / AI_PROJECT_MAP で確認した現在のUI構成。</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>txt2img <span class="tag ok">中心</span></h3>
+          <p>テキストから画像生成。Prompt、Negative、基本パラメータ、LoRA、拡張設定、生成前チェックを同じ画面で扱う。</p>
+        </div>
+        <div class="card">
+          <h3>img2img <span class="tag ok">中心</span></h3>
+          <p>入力画像から再生成、Inpaint、AIキャラ追加、D&D / クリップボード画像取り込み、ControlNet準備を受け持つ。</p>
+        </div>
+        <div class="card">
+          <h3>Tags <span class="tag info">整理面</span></h3>
+          <p>Promptタグの追加、編集、翻訳、プリセット化、Positive / Negativeへの反映を行う独立ワークスペース。</p>
+        </div>
+        <div class="card">
+          <h3>Video <span class="tag info">派生</span></h3>
+          <p>Forge AnimateDiffとFramePack外部連携の短尺動画導線。8GB VRAM寄りの短尺・軽量設定を前提にしている。</p>
+        </div>
+        <div class="card">
+          <h3>Upscale <span class="tag ok">仕上げ</span></h3>
+          <p>Simple、Diffusion、Ultimateの3経路。Tile ControlNet、denoise比較、履歴やPreviewからの直送がある。</p>
+        </div>
+        <div class="card">
+          <h3>Models <span class="tag ok">資産管理</span></h3>
+          <p>モデル / LoRAのサムネ、Civitai情報、お気に入り、メモ、モデル別Prompt Profile、Recipeヒントを管理する。</p>
+        </div>
+        <div class="card">
+          <h3>Tools <span class="tag ok">保守</span></h3>
+          <p>個人環境ヘルスチェックと安全復旧、Workspace保存、起動診断、Model Library整合性、Tagger、Model Merger、Format Converter、partial整理を扱う。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>実装レイヤ</h2>
+        <p>renderer、preload、main、runtime、userdataの責務分離。</p>
+      </div>
+      <table>
+        <thead>
+          <tr><th>レイヤ</th><th>主なファイル</th><th>現在の責務</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Renderer shell</strong></td>
+            <td><code>src/App.tsx</code>, <code>src/main.tsx</code>, <code>MainTabs.tsx</code></td>
+            <td>起動時ロード、Forge ready後のcatalog取得、Generate実行、3カラム/単独ワークスペースの切替。</td>
+          </tr>
+          <tr>
+            <td><strong>State</strong></td>
+            <td><code>src/lib/store.ts</code></td>
+            <td>Zustand単一store。生成状態、Prompt、拡張、Video、Upscale、履歴、LoRA、Civitai、モデルプロファイルを保持。</td>
+          </tr>
+          <tr>
+            <td><strong>Generation payload</strong></td>
+            <td><code>generation-utils.ts</code>, <code>extension-payload.ts</code></td>
+            <td>Prompt / LoRA / Dynamic Prompt / alwayson_scriptsをForge API payloadへ変換。Upscale用分岐もここで守る。</td>
+          </tr>
+          <tr>
+            <td><strong>IPC boundary</strong></td>
+            <td><code>src/shared/types.ts</code>, <code>ipc-channels.ts</code>, <code>preload.ts</code>, <code>ipc-handlers.ts</code></td>
+            <td>rendererからmainへの型付き境界。URL、path、base64、script args、外部操作はmain側で検証する。</td>
+          </tr>
+          <tr>
+            <td><strong>Electron services</strong></td>
+            <td><code>forge-manager.ts</code>, <code>forge-api.ts</code>, <code>storage.ts</code>, <code>civitai-api.ts</code>, <code>huggingface-api.ts</code></td>
+            <td>Forge API専用起動、REST通信、JSON保存、モデル検索、download、Tagger / safetensors / prompt翻訳runtime。</td>
+          </tr>
+          <tr>
+            <td><strong>Local data</strong></td>
+            <td><code>runtime/</code>, <code>userdata/</code>, <code>output/</code></td>
+            <td>Forge本体、モデル、設定、履歴、Workspace、生成物。原則Git管理外で、通常作業では編集対象にしない。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>生成コア</h2>
+        <p>txt2img / img2imgの現在の契約。</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>Generate実行 <span class="tag ok">active tabで決定</span></h3>
+          <p>endpointは入力画像の有無ではなく、現在のワークスペースタブで決まる。txt2img上では古いinputImageがstoreに残っていてもtxt2imgを実行する。</p>
+        </div>
+        <div class="card">
+          <h3>img2img / Inpaint <span class="tag ok">入力必須</span></h3>
+          <p>img2imgはinputImage必須。maskがある場合はinpaint requestとしてForgeへ送る。画像貼り付け時は必要に応じてimg2imgへ自動切替する。</p>
+        </div>
+        <div class="card">
+          <h3>生成前チェック <span class="tag ok">モデル文脈</span></h3>
+          <p>Checkpoint Prompt ProfileがPrompt形式、Negative方針、推奨比率、LoRA数、Sampler/Steps/CFG/Clip Skipの差分を表示する。</p>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>拡張 / 制御</th><th>現在の扱い</th><th>注意点</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>ControlNet</td><td>Forge built-in <code>sd_forge_controlnet</code>をAPI経由で操作。Builderがpose / depth / lineart / tileなどの役割を案内。</td><td>起動時登録に依存するため、現時点では常時ロード維持。</td></tr>
+          <tr><td>ADetailer</td><td>顔、手、人物の補修用。dicts-only形式を維持。</td><td>引数レイアウトが壊れやすく、<code>extension-payload.ts</code>の契約変更は実機smoke優先。</td></tr>
+          <tr><td>Regional Prompter</td><td>領域別Prompt制御をReact UIからpayload化。</td><td>Prompt分割と比率の整合性を崩さない。</td></tr>
+          <tr><td>FABRIC</td><td>feedback画像ベースの誘導を持つ。</td><td>ControlNet referenceとの衝突をguardする。</td></tr>
+          <tr><td>Dynamic Thresholding / FreeU</td><td>Forge拡張のalwayson_scriptsとして統合済み。</td><td>UI無効時にpayloadへ残さない。</td></tr>
+          <tr><td>Dynamic Prompt</td><td>seed依存で展開し、履歴にmetaを保存。</td><td>履歴復元と再現性のため、解決結果を記録する。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>Prompt / Tags / Composer</h2>
+        <p>現在もっとも制作支援が厚い領域。</p>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3>Prompt Composer Slots <span class="tag ok">Phase 3完了</span></h3>
+          <p>
+            品質、主題、構図、表情/ポーズ、服/小物、背景、光、色、質感/画風、仕上げ、避けたい破綻をスロット化。
+            Pony / Animagine / Illustrious / Fluxなどモデル系統ごとにPositive Prompt順を変える。
+          </p>
+        </div>
+        <div class="card">
+          <h3>タグライブラリ <span class="tag ok">組込 + custom</span></h3>
+          <p>
+            <code>resources/prompt-library.yoitomoshi.ja.yaml</code> を組込辞書として読み、ユーザー追加タグは <code>userdata/</code> へ保存。
+            Tagsタブ、PromptLibrary、PromptTagChipsから編集・挿入する。
+          </p>
+        </div>
+        <div class="card">
+          <h3>翻訳runtime <span class="tag info">補助</span></h3>
+          <p>
+            <code>electron/prompt-translation-runtime.ts</code> と <code>resources/python/deep_translate_prompt.py</code> で日本語の自然文やタグを英語Promptへ寄せる。
+            runtime不調でもcleanup-only導線は残る。
+          </p>
+        </div>
+        <div class="card">
+          <h3>Research Workflow <span class="tag ok">実用UI</span></h3>
+          <p>
+            現在のPrompt構造、Negative不足、seed固定、ADetailer候補、ControlNet候補、SDXL解像度を診断し、
+            構図探索、顔補修、Prompt構造、ポーズ固定、仕上げUpscaleのレシピを適用できる。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>Models / LoRA / 外部連携</h2>
+        <p>Forgeのモデルフォルダ、Model Library、Civitai、Hugging Faceを結ぶ領域。</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>Model Library <span class="tag ok">索引化</span></h3>
+          <p>ローカルモデル、metadata、preview、お気に入り、メモ、Prompt Profileを管理する。欠損metadataやpreviewは起動を止めない。</p>
+        </div>
+        <div class="card">
+          <h3>LoRA提案 <span class="tag ok">文脈加点</span></h3>
+          <p>Prompt digest、checkpoint、使用履歴、trigger word、Civitai由来情報から提案する。LoRAごとのPrompt overrideも持てる。</p>
+        </div>
+        <div class="card">
+          <h3>Civitai / HF <span class="tag ok">検索 + download</span></h3>
+          <p>Civitai検索、hash照合、metadata/preview保存、community stats、Hugging Face検索とdownload導線がある。</p>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>モデルカテゴリ</th><th>ファイル数</th><th>概算サイズ</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Stable-diffusion</strong></td><td>6</td><td>38.77 GB</td><td>checkpoint本体。</td></tr>
+          <tr><td><strong>LoRA</strong></td><td>15</td><td>2.80 GB</td><td>絵柄、キャラ、服装、補助表現。</td></tr>
+          <tr><td><strong>VAE</strong></td><td>5</td><td>1.33 GB</td><td>色味・復元補助。</td></tr>
+          <tr><td><strong>ControlNet</strong></td><td>7</td><td>13.76 GB</td><td>pose / depth / lineart / tileなどの生成制御。</td></tr>
+          <tr><td><strong>ESRGAN / hypernetworks</strong></td><td>0</td><td>0 GB</td><td>現時点の棚卸しでは主要ファイルなし。</td></tr>
+        </tbody>
+      </table>
+      <p class="small">注: 棚卸しはファイル名・サイズ・カテゴリのみ。モデルファイル内容や秘密情報は読んでいない。</p>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>History / Candidate Board / Pro Recipe</h2>
+        <p>生成結果を次の制作判断へ戻すための領域。</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>History <span class="tag ok">497件</span></h3>
+          <p>full image、thumbnail、prompt、params、activeLoras、dynamicPrompt、label、tagReview、proRecipeReviewを <code>userdata/history/</code> に保存する。</p>
+        </div>
+        <div class="card">
+          <h3>Candidate Board <span class="tag ok">Phase 4完了</span></h3>
+          <p>batch生成の候補を右カラムに並べ、favorite / candidate / rejected / assetを付け、選択候補をimg2img、Upscale、Pro Recipeへ送れる。</p>
+        </div>
+        <div class="card">
+          <h3>Pro Recipe Review <span class="tag ok">Phase 1完了</span></h3>
+          <p>良かった点、弱かった点、次に試すこと、rating、用途ラベルを履歴へ保存し、偶然の良画像を再利用できる制作知へ変える。</p>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>重要:</strong> <code>tagReview</code> はTagger比較とPrompt Helperの連携元、<code>proRecipeReview</code> は制作判断用。
+        同じ履歴indexに保存されるが、用途は分けられている。
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>Upscale / Video / Tools</h2>
+        <p>生成後の仕上げ、派生、保守作業。</p>
+      </div>
+      <table>
+        <thead>
+          <tr><th>領域</th><th>現在の機能</th><th>保存 / 注意</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Upscale</strong></td>
+            <td>SimpleはForge <code>/extra-single-image</code>、Diffusion / Ultimateはimg2img系。Tile ControlNet専用分岐とdenoise比較を持つ。</td>
+            <td><code>userdata/upscale-comparisons/</code> に比較保存。現在8ファイル。</td>
+          </tr>
+          <tr>
+            <td><strong>Video</strong></td>
+            <td>Forge AnimateDiffとFramePack外部連携。Prompt、Negative、motion module、出力形式、closed loop、VRAM診断を扱う。</td>
+            <td><code>userdata/videos/</code> に保存。現在8ファイル。</td>
+          </tr>
+          <tr>
+            <td><strong>Tools</strong></td>
+            <td>個人環境ヘルスチェック、安全復旧、Workspace保存、Model Library整合性、Download job整理、Tagger、Model Merger、Format Converter、起動診断。</td>
+            <td>モデル実ファイル操作はmain側検証つき。通常名partial削除は避け、fixtureか明示範囲で扱う。</td>
+          </tr>
+          <tr>
+            <td><strong>Character composite</strong></td>
+            <td>AIキャラ追加の配置、mask、before/after、report保存。</td>
+            <td><code>userdata/character-composites/</code> に現在7ファイル。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>保存データ / 実行設定</h2>
+        <p>2026-05-25時点の安全なメタ情報だけを確認。</p>
+      </div>
+      <div class="grid four">
+        <div class="card">
+          <h3>Workspaces <span class="tag info">4</span></h3>
+          <p><code>.yoitoart</code> でprompt、model、LoRA、拡張、画像参照を保存。embed / references / settings-onlyの3モード。</p>
+        </div>
+        <div class="card">
+          <h3>Download jobs <span class="tag warn">2 / running 1</span></h3>
+          <p>再開可能download manifestが存在。running扱いが1件あるため、Toolsの個人環境ヘルスチェックから安全復旧または手動整理する。</p>
+        </div>
+        <div class="card">
+          <h3>Startup metrics <span class="tag info">198 lines</span></h3>
+          <p>直近20サンプル平均: renderer loaded 約228ms、Forge ready 約29.1秒。最小約17.0秒、最大約51.1秒。</p>
+        </div>
+        <div class="card">
+          <h3>Forge設定 <span class="tag ok">API専用</span></h3>
+          <p>既定pathは <code>runtime\forge</code>、<code>autoStartForge=true</code>、追加引数は <code>--cuda-malloc</code>。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>検証状態</h2>
+        <p>このレポート作成時に確認したこと。</p>
+      </div>
+      <table>
+        <thead>
+          <tr><th>確認</th><th>結果</th><th>メモ</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>git status --short --branch</code></td>
+            <td><span class="tag warn">既存変更多数</span></td>
+            <td>README、docs、electron、srcなどに既存の未コミット変更と新規docs/mapsがある。今回の作業では戻していない。</td>
+          </tr>
+          <tr>
+            <td><code>npm.cmd run typecheck</code></td>
+            <td><span class="tag ok">PASS</span></td>
+            <td><code>typecheck:node</code> と <code>typecheck:web</code> がどちらも成功。</td>
+          </tr>
+          <tr>
+            <td>DOM QA</td>
+            <td><span class="tag info">今回は未実行</span></td>
+            <td>UIコードは変更していないため、Electron起動を伴うDOM QAは省略。既存scriptにはprompt-composer、candidate-board、history、model-profileなどのsmokeがある。</td>
+          </tr>
+          <tr>
+            <td>Build / package</td>
+            <td><span class="tag info">今回は未実行</span></td>
+            <td>HTMLレポート追加のみなのでbuildは不要。配布確認が必要な変更ではない。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>残るリスクと次の焦点</h2>
+        <p>今すぐ壊れているというより、次の判断で見落としやすいところ。</p>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3>GitHub運用 <span class="tag ok">再利用用</span></h3>
+          <ul>
+            <li>GitHubは公開プロダクト配布ではなく、ソース保管、再セットアップ、別環境への再利用を目的にする。</li>
+            <li><code>runtime/</code>、<code>userdata/</code>、モデル、生成物、秘密情報はGitHubに含めない。</li>
+            <li>コード署名、更新メタデータ、正式アイコン、Mac/Linux対応は、将来必要になった時だけ検討する。</li>
+            <li>NSFW生成モデレーションはアプリ本体にはない。Civitai検索フィルタとは別問題。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>制作機能 <span class="tag info">伸びしろ</span></h3>
+          <ul>
+            <li>Phase 6のReference Board / Optional Backendsは設計確認のみで任意フェーズ。</li>
+            <li>Workspace参照保存はできるが、欠落参照の差し替えUIと相対パス化は検討候補。</li>
+            <li>Format ConverterのLoRA抽出系、Inpaint maskの編集履歴/反転/ぼかしは後続候補。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>起動性能 <span class="tag warn">Forge側が主コスト</span></h3>
+          <ul>
+            <li>rendererは軽い。直近平均でも約228ms。</li>
+            <li>Forge readyはサンプルにより約17.0秒から51.1秒まで幅がある。</li>
+            <li>Toolsの個人環境ヘルスチェックから、Python/Torch、拡張、ControlNet、checkpoint/VAE、API readiness polling の遅延シグナルを分けて確認できる。</li>
+            <li>安全復旧はsettings正規化、stale download整理、Model Library復旧に限定し、残プロセス停止や孤立partial削除は手動確認に残す。</li>
+            <li>ControlNetの遅延有効化は再起動影響が大きく、現状は常時ロード維持が妥当。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>作業ツリー <span class="tag warn">大きい差分</span></h3>
+          <ul>
+            <li>現在のリポジトリは多数の未コミット変更を含む。</li>
+            <li>次の実装前には、今回のHTMLレポート以外の既存差分がどの作業に属するか確認した方がよい。</li>
+            <li>生成物やruntime/userdataを不用意に整形・削除しない。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>読む順番</h2>
+        <p>このレポートから深掘りする時の入口。</p>
+      </div>
+      <table>
+        <thead>
+          <tr><th>目的</th><th>読むもの</th><th>理由</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>AI/Codexに最初に渡す</td><td><a href="AI_PROJECT_MAP.md">AI_PROJECT_MAP.md</a></td><td>触る領域、地図、検証の入口。</td></tr>
+          <tr><td>全体構造を一枚で見る</td><td><a href="PROJECT_MAP.md">PROJECT_MAP.md</a></td><td>ユーザー操作からForge API / storageまでの流れ。</td></tr>
+          <tr><td>現在の優先順位</td><td><a href="ROADMAP.md">ROADMAP.md</a></td><td>完了済みPhase、残タスク、判断基準。</td></tr>
+          <tr><td>実装レイヤ別に読む</td><td><a href="maps/00-overview.md">docs/maps/00-overview.md</a> から <code>07</code> まで</td><td>生成、Prompt、Model、History、IPC、Storage、Video/Upscale/Toolsに分かれている。</td></tr>
+          <tr><td>Pro制作ワークフロー</td><td><a href="PRO_AI_ILLUSTRATION_IMPLEMENTATION_PROGRESS_REPORT_2026-05-25.html">PRO_AI_ILLUSTRATION_IMPLEMENTATION_PROGRESS_REPORT_2026-05-25.html</a></td><td>Phase 1-5のGUI実装進捗と検証結果。</td></tr>
+          <tr><td>DOM QA手順</td><td><a href="QA_DOM_GUIDE_2026-05-14.md">QA_DOM_GUIDE_2026-05-14.md</a></td><td>Electron remote debuggingと安定セレクタ運用。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer>
+      Sources checked: <code>git status</code>, <code>README.md</code>, <code>docs/AI_PROJECT_MAP.md</code>, <code>docs/DOCS_INDEX.md</code>,
+      <code>docs/ROADMAP.md</code>, <code>docs/PROJECT_MAP.md</code>, <code>docs/maps/*.md</code>, <code>package.json</code>,
+      <code>src/</code>, <code>electron/</code>, <code>scripts/dom-qa.cjs</code>, safe metadata under <code>userdata/</code> and <code>runtime/forge/webui/models</code>.
+      No secret values or model file contents were read.
+    </footer>
+  </main>
+</body>
+</html>

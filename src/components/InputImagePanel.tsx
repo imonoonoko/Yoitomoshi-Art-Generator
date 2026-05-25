@@ -212,6 +212,8 @@ export function InputImagePanel(): JSX.Element {
               value={taggerBlacklistText}
               onChange={(e) => setTaggerBlacklistText(e.target.value)}
               placeholder="blurry, watermark, text"
+              data-prompt-dictionary-autocomplete="tag-blacklist"
+              data-testid="input-image-tagger-blacklist"
             />
           </label>
         </div>

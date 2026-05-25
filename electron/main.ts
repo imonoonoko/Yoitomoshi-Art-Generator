@@ -190,13 +190,19 @@ async function createWindow(beforeLoad?: (win: BrowserWindow) => void): Promise<
   return win
 }
 
+function focusMainWindow(): void {
+  if (!mainWindow) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  if (!mainWindow.isVisible()) mainWindow.show()
+  mainWindow.moveTop()
+  mainWindow.focus()
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    if (!mainWindow) return
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.focus()
+    focusMainWindow()
   })
 
   app.whenReady().then(async () => {
@@ -204,7 +210,8 @@ if (!app.requestSingleInstanceLock()) {
     const storage = new Storage({ dataRoot: portableDataRoot, projectRoot })
     const settings = storage.getSettings()
 
-    const library = loadPromptLibrary(resourcesDir())
+    const resourceRoot = resourcesDir()
+    const library = loadPromptLibrary(resourceRoot)
     const manager = new ForgeManager({
       forgePath: settings.forgePath,
       port: settings.forgePort,
@@ -213,7 +220,16 @@ if (!app.requestSingleInstanceLock()) {
     const api = new ForgeApi(`http://127.0.0.1:${settings.forgePort}`)
 
     await createWindow((win) => {
-      registerIpcHandlers({ win, manager, api, storage, library, startupMetrics })
+      registerIpcHandlers({
+        win,
+        manager,
+        api,
+        storage,
+        library,
+        resourcesDir: resourceRoot,
+        dataRoot: portableDataRoot,
+        startupMetrics
+      })
       startupMetrics.ipcRegisteredAt = Date.now()
     })
 
@@ -236,6 +252,7 @@ if (!app.requestSingleInstanceLock()) {
 
     app.on('activate', async () => {
       if (BrowserWindow.getAllWindows().length === 0) await createWindow()
+      else focusMainWindow()
     })
 
     app.on('window-all-closed', () => {

@@ -1,6 +1,6 @@
 # Yoitomoshi Art Generator — ロードマップ
 
-最終更新: 2026-05-19
+最終更新: 2026-05-25
 
 現在の作業フォルダ: `C:\宵灯工房アート\Yoitomoshi-Art-Generator`
 
@@ -27,7 +27,8 @@
 
 ## 現在の判断基準
 
-- 2026-05-21時点では、このリポジトリをForge版として整理する。Forge代表経路、package / dist、実インストール/アンインストール、active interruptは確認済み。コード署名、公開先に合わせた更新メタデータ、正式アイコン承認は外部配布フェーズへ送る。
+- 2026-05-21時点では、このリポジトリをForge版として整理する。Forge代表経路、package / dist、実インストール/アンインストール、active interruptは確認済み。一般配布は目的外で、GitHubは将来の自分が再利用・復元するためのソース保管先として扱う。コード署名、更新メタデータ、正式アイコン承認は、将来本当に配布が必要になった時だけ検討する。
+- 2026-05-25時点では、用途をゲーム制作に限定せず、「自分が使いやすい Stable Diffusion 利用ツール」を主目的にする。判断軸は生成しやすさ、再利用しやすさ、モデル管理、プロンプト整理、起動/操作の軽さ。
 - トップレベルタブは `txt2img / img2img / Video / Upscale / Models / Tools` を維持する。小さい補助機能は既存タブ内の折りたたみパネルやモーダルで増やし、動画・モデル管理のように作業面が独立する機能だけトップレベルタブに置く。
 - Forge 拡張は Gradio UI を埋め込まず、Forge 側に拡張を入れて `alwayson_scripts` または `script_name/script_args` を React UI から操作する。
 - `C:\宵灯工房アート` 直下の sibling 構成は解消し、Forge は `Yoitomoshi-Art-Generator\runtime\forge` に統合する。Electron 利用では Gradio UI を開かず、Forge は `--nowebui` API 専用起動を既定にする。ただし Forge/ControlNet 内部が `gradio` Python パッケージを import するため、依存ファイルの物理削除は検証済みの不要物だけに限定する。
@@ -72,7 +73,44 @@
 
 ## 次に進める順序
 
-### 現在の優先度(2026-05-12 実装後)
+### 現在の優先度(2026-05-25 個人利用優先)
+
+1. **起動と復旧の安定化**
+   - 2026-05-25 初期対応として、Tools に「個人環境ヘルスチェック」を追加。壊れた `settings.json`、残った Forge/Electron 関連プロセス、stale running DownloadJob、孤立 `.partial`、Model Library 整合性、Forge ready 遅延シグナルを1画面で確認できるようにした。
+   - Forge ready が遅い時は、現在の Forge log tail と起動メトリクスから Python/Torch 初期化、拡張読み込み、ControlNet、checkpoint/VAE、API readiness polling に分けて表示する。
+   - 2026-05-25 追補として、「復旧を実行」から個人環境の安全復旧IPCを呼ぶ導線を追加。自動対象は `settings.json` の再作成/正規化/秘密情報移行、stale running DownloadJob の整理、Model Library metadata/preview/SHA queue 復旧に限定する。残プロセス停止や孤立 `.partial` 削除は手動確認対象として残す。
+   - 2026-05-26 追補として、`qa:dom:personal-health` を追加。Toolsの個人環境ヘルスチェック、復旧API surface、Forge readyの5分類シグナルを実機DOMで確認できるようにした。
+
+2. **制作履歴の検索性**
+   - 既存の model / sampler / LoRA / label / prompt diff に加えて、LoRA名、Prompt tag、rating、Pro Recipe、favorite、用途ラベルを横断検索できるようにする。
+   - 「成功レシピだけ」「没だけ」「素材用だけ」をワンクリックで出し、サムネ一覧に良かった点/失敗理由メモを表示する。
+   - 2026-05-25 初期対応として、History検索を prompt / negative / model / sampler / LoRA名・trigger / tagReview / Pro Recipe rating・notes / label synonym まで拡張。成功レシピ・お気に入り・没・素材用・Pro Recipeありのquick filterと、一覧カード上のPro Recipe要点表示を追加した。
+   - 2026-05-25 追補として、rating範囲フィルタを追加し、Candidate Boardの選択候補から採用理由、失敗理由、次に試すことを直接 `proRecipeReview` に保存できるようにした。
+   - 次は用途ラベル拡張と、検索結果から派生生成・Reference Boardへ送る導線を整理する。
+
+3. **Download / Model Libraryの後始末**
+   - running扱いで残ったDownloadJob、孤立 `.partial`、provider SHA未照合、missing file を Model Library 側の回復導線と統合する。
+   - 2026-05-25 初期対応として、Model Libraryに Download / partial整理パネルを追加。running / stale / failed / orphan partialを分けて表示し、stale running jobは復旧導線、orphan `.partial` は整合性チェック後の専用リストから削除できるようにした。main側では実行中downloadの破棄/再開を拒否し、stale化したものだけ安全に扱う。
+   - 2026-05-25 追補として、checkpoint Prompt Profileに `relatedModels` を追加。関連LoRA / VAE / ControlNetを role、weight、notes 付きで保存でき、対応関係をcheckpoint単位で集約できるようにした。
+   - 2026-05-25 追補として、保存した `relatedModels` を生成前チェックとPrompt Composerのモデル関連メモに表示。関連情報は生成ブロック/警告ではなく、制作前に確認する非破壊の参照情報として扱う。
+   - 次は関連モデル情報からLoRA適用候補、VAE選択候補、ControlNet構成候補を安全に作る導線を検討する。
+
+4. **Prompt資産と候補管理**
+   - よく使う Prompt Composer Slot をテンプレート化し、モデル別に効く構成、避けるNegative、推奨LoRA数を育てる。
+   - 2026-05-26 初期対応として、Prompt Composer Slotテンプレートを `userdata/prompt-composer-slot-templates.json` に永続保存し、Prompt Composerから保存/読込/削除できるようにした。
+   - 2026-05-26 追補として、Prompt Libraryに用途別レシピを追加。立ち絵ベース / SNS向け / 素材用 / ポーズ確認 / 仕上げ検査を、Slot挿入ONなら各Prompt Composer Slotへ、OFFならPrompt/Negativeへ追記できるようにした。
+   - モデル別の効く構成、避けるNegative、推奨LoRA数はcheckpoint Prompt ProfileとPrompt Composerのモデル順序へ接続済み。次は関連モデル情報から安全な適用候補を作る導線を検討する。
+   - 2026-05-26 追補として、Candidate BoardにSNS向け / 参考用ラベルを追加し、素材用ラベルも用途ラベルとして扱うようにした。選択候補から seed+1、CFG±0.5、LoRA weight±0.05 の派生を `txt2img` 生成設定へ直接送れる。
+   - Candidate Board では採用理由/失敗理由の保存、用途ラベル、seed / CFG / LoRA weight 派生まで接続済み。次は用途ラベルをReference BoardやUpscale採用判断へ渡す。
+
+5. **Reference Board / Upscale仕上げ**
+   - 参照画像、ポーズ、色味、キャラ資料を Workspace にまとめ、ControlNet / img2img / Inpaint へ送る導線を統一する。
+   - 2026-05-26 初期対応として、ToolsにReference Boardを追加。直近結果、img2img入力、参考用/素材用/候補/お気に入り/SNSラベル付き履歴を取り込み、用途メモ付きでWorkspace snapshotへ保存・復元できる。各参照は img2img / Inpaint準備 / ControlNet Unit 1 へ送れる。
+   - 2026-05-26 追補として、Upscale比較カードに採用設定メタデータを表示し、顔崩れ / 衣装drift / 線の破綻などの仕上げチェックと、採用Upscale設定のPro Recipe自動保存を追加した。
+   - Tile ON/OFF、denoise、Ultimate設定、顔崩れ/衣装drift/線の破綻チェックを比較し、採用設定を Pro Recipe へ保存する。
+   - 2026-05-26 追補として、Upscale比較カードに method / scale / upscaler / tile / Ultimate padding・seam等の採用判断情報を表示。仕上げチェックで顔崩れ、衣装drift、線の破綻、タイル境界、質感過剰を記録し、History保存時に採用Upscale設定とチェック結果をPro Recipeへ自動保存する。
+
+### 参考: 2026-05-12 実装後の優先度
 
 1. **実素材QA — ControlNet入力生成**
    - 画像ドロップ、preprocessor実行、結果プレビュー、ControlNet Unit 1反映は実装済み。
@@ -97,10 +135,10 @@
    - 2026-05-12 QAで同一素材の6候補比較を保存済み。証跡: [`QA_UPSCALE_COMPARISON_2026-05-12.md`](QA_UPSCALE_COMPARISON_2026-05-12.md)。
    - 標準候補は `Tile ON / denoise 0.25`。顔やポーズ保持を最優先する素材では `Tile OFF / denoise 0.25` も確認する。`denoise 0.45` はdetail確認用で、人物素材の既定値にはしない。
 
-5. **公開準備**
+5. **GitHub再利用準備**
    - `runtime/`、`userdata/`、`output/`、`node_modules/`、ビルド成果物はGit除外を維持する。
    - README / HTMLレポート / 構造ドキュメントのリンクを揃えたうえで、最小コミットを作る。
-   - GitHubへpushする段階では、リポジトリ名と公開範囲(public/private)を確定してから `gh repo create` または既存remoteを設定する。
+   - GitHubへpushする段階では、リポジトリ名と公開範囲(public/private)を確定してから `gh repo create` または既存remoteを設定する。目的は一般配布ではなく、再セットアップと再利用のための保管。
 
 2026-05-11 追加実装:
 
@@ -400,7 +438,7 @@ rg -n "[ぁ-んァ-ン一-龯]" src\components src\App.tsx src\lib -g '!i18n.ts'
 
 ### 完了 — Phase 9B: 履歴からの再利用導線(主要部)
 
-目的: ゲーム素材制作で「良かった生成」を再利用しやすくする。
+目的: 自分の Stable Diffusion 利用で「良かった生成」を再利用しやすくする。
 
 2026-05-11 実装済み:
 
@@ -553,7 +591,7 @@ rg -n "[ぁ-んァ-ン一-龯]" src\components src\App.tsx src\lib -g '!i18n.ts'
 
 - electron-builder のインストーラ生成とコード署名。
 - GitHub Releases ベースの更新配布。
-- ただし現時点の主目的は個人ゲーム開発用環境なので、配布作業は需要が明確になってから。
+- ただし現時点の主目的は自分が使いやすい Stable Diffusion 利用環境なので、配布作業は需要が明確になってから。
 
 ---
 

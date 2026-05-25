@@ -22,6 +22,7 @@ import type {
   GeneratedVideoSaveRequest,
   GeneratedVideoSaveResult,
   HistoryItem,
+  HistoryProRecipeReview,
   HistoryTagReview,
   HuggingFaceSearchOptions,
   HuggingFaceSearchResult,
@@ -50,7 +51,18 @@ import type {
   ModelMergerRequest,
   ModelMergerResult,
   ModelMergerSupportReport,
+  PersonalEnvironmentHealthReport,
+  PersonalEnvironmentRecoveryResult,
   PromptCategory,
+  PromptDictionarySearchRequest,
+  PromptDictionarySearchResult,
+  PromptTextTranslationRequest,
+  PromptTextTranslationResult,
+  PromptTextTranslationRuntimeStatus,
+  PromptTagTranslationRequest,
+  PromptTagTranslationResult,
+  PromptComposerSlotTemplate,
+  PromptComposerSlotTemplateSaveInput,
   PromptPreset,
   QuickPreset,
   SdLora,
@@ -226,6 +238,10 @@ const api = {
       ipcRenderer.invoke(IPC.toolsCancelModelMerger),
     inspectCharacterCompositeIntegrations: (): Promise<CharacterCompositeIntegrationStatus> =>
       ipcRenderer.invoke(IPC.toolsInspectCharacterCompositeIntegrations),
+    inspectPersonalHealth: (): Promise<PersonalEnvironmentHealthReport> =>
+      ipcRenderer.invoke(IPC.toolsInspectPersonalHealth),
+    runPersonalHealthRecovery: (): Promise<PersonalEnvironmentRecoveryResult> =>
+      ipcRenderer.invoke(IPC.toolsRunPersonalHealthRecovery),
     onModelMergerProgress: (cb: (p: ModelMergerProgress) => void): (() => void) => {
       const handler = (_e: Electron.IpcRendererEvent, p: ModelMergerProgress): void => cb(p)
       ipcRenderer.on(IPC.toolsModelMergerProgress, handler)
@@ -296,6 +312,8 @@ const api = {
       ipcRenderer.invoke(IPC.storageSetHistoryLabel, id, label ?? null),
     setHistoryTagReview: (id: string, review: HistoryTagReview | null): Promise<HistoryItem | null> =>
       ipcRenderer.invoke(IPC.storageSetHistoryTagReview, id, review),
+    setHistoryProRecipeReview: (id: string, review: HistoryProRecipeReview | null): Promise<HistoryItem | null> =>
+      ipcRenderer.invoke(IPC.storageSetHistoryProRecipeReview, id, review),
     listPresets: (): Promise<PromptPreset[]> => ipcRenderer.invoke(IPC.storageListPresets),
     savePreset: (input: {
       id?: string
@@ -319,6 +337,12 @@ const api = {
     }): Promise<QuickPreset> => ipcRenderer.invoke(IPC.storageSaveQuickPreset, input),
     deleteQuickPreset: (id: string): Promise<void> =>
       ipcRenderer.invoke(IPC.storageDeleteQuickPreset, id),
+    listPromptComposerSlotTemplates: (): Promise<PromptComposerSlotTemplate[]> =>
+      ipcRenderer.invoke(IPC.storageListPromptComposerSlotTemplates),
+    savePromptComposerSlotTemplate: (input: PromptComposerSlotTemplateSaveInput): Promise<PromptComposerSlotTemplate> =>
+      ipcRenderer.invoke(IPC.storageSavePromptComposerSlotTemplate, input),
+    deletePromptComposerSlotTemplate: (id: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.storageDeletePromptComposerSlotTemplate, id),
     getLoraFavorites: (): Promise<string[]> =>
       ipcRenderer.invoke(IPC.storageGetLoraFavorites),
     setLoraFavorites: (names: string[]): Promise<void> =>
@@ -370,6 +394,24 @@ const api = {
     getCustom: (): Promise<PromptCategory[]> => ipcRenderer.invoke(IPC.libraryGetCustom),
     saveCustom: (cats: PromptCategory[]): Promise<void> =>
       ipcRenderer.invoke(IPC.librarySaveCustom, cats)
+  },
+
+  // Prompt dictionary
+  promptDictionary: {
+    search: (input: PromptDictionarySearchRequest): Promise<PromptDictionarySearchResult> =>
+      ipcRenderer.invoke(IPC.promptDictionarySearch, input)
+  },
+
+  // Translation
+  translation: {
+    promptTag: (input: PromptTagTranslationRequest): Promise<PromptTagTranslationResult> =>
+      ipcRenderer.invoke(IPC.translationPromptTag, input),
+    promptText: (input: PromptTextTranslationRequest): Promise<PromptTextTranslationResult> =>
+      ipcRenderer.invoke(IPC.translationPromptText, input),
+    promptRuntimeStatus: (): Promise<PromptTextTranslationRuntimeStatus> =>
+      ipcRenderer.invoke(IPC.translationPromptRuntimeStatus),
+    preparePromptRuntime: (): Promise<PromptTextTranslationRuntimeStatus> =>
+      ipcRenderer.invoke(IPC.translationPreparePromptRuntime)
   },
 
   // Misc

@@ -16,8 +16,10 @@ import type {
   LoraPromptOverride,
   LoraUsageRecord,
   PromptCategory,
+  PromptComposerSlotTemplate,
   PromptPreset,
   QuickPreset,
+  ReferenceBoardItem,
   ScoredLora,
   SdLora,
   SdModel,
@@ -25,6 +27,7 @@ import type {
   SdVae,
   VideoOutputFormat
 } from '@shared/types'
+import type { PromptComposerSlotKey, PromptComposerSlots } from './prompt-composer'
 
 /**
  * Top-level workspace tabs. Kept intentionally small — each tab hosts
@@ -32,6 +35,7 @@ import type {
  * than splitting into many tabs.
  */
 export type WorkspaceTab = 'txt2img' | 'img2img' | 'tags' | 'video' | 'upscale' | 'models' | 'tools'
+export type SidePanelTab = 'library' | 'lora' | 'board' | 'history' | 'presets'
 export type GenerationWorkspaceMode = 'create' | 'refine' | 'advanced'
 
 /**
@@ -449,8 +453,12 @@ export interface AppState {
   // flows; smaller helpers belong inside existing panels.
   currentTab: WorkspaceTab
   setCurrentTab(t: WorkspaceTab): void
+  sidePanelTab: SidePanelTab
+  setSidePanelTab(t: SidePanelTab): void
   generationMode: GenerationWorkspaceMode
   setGenerationMode(mode: GenerationWorkspaceMode): void
+  previewInspectorOpen: boolean
+  setPreviewInspectorOpen(open: boolean): void
 
   // Extension-feature settings. Each lives as a flat slice with a `patch*`
   // setter so panels can update individual fields without spreading the
@@ -503,6 +511,7 @@ export interface AppState {
   /** Selected VAE name. "Automatic" = use checkpoint built-in. */
   selectedVae: string
   selectedModelTitle: string | null
+  selectedModelRevision: number
   setModels(m: SdModel[]): void
   setSamplers(s: SdSampler[]): void
   setSchedulers(s: string[]): void
@@ -547,6 +556,14 @@ export interface AppState {
   inpaintMaskImage: string | null
   setInpaintMaskImage(image: string | null): void
 
+  // Reference Board: reusable source images and notes kept with Workspace snapshots.
+  referenceBoardItems: ReferenceBoardItem[]
+  setReferenceBoardItems(items: ReferenceBoardItem[]): void
+  upsertReferenceBoardItem(item: ReferenceBoardItem): void
+  updateReferenceBoardItem(id: string, patch: Partial<ReferenceBoardItem>): void
+  deleteReferenceBoardItem(id: string): void
+  clearReferenceBoardItems(): void
+
   // Tags extracted via interrogator from the input image (or any uploaded image)
   extractedTags: string[]
   setExtractedTags(tags: string[]): void
@@ -579,6 +596,21 @@ export interface AppState {
   // Recently-used tags (in-memory, MRU max 60)
   recentTags: string[]
   pushRecentTag(en: string): void
+
+  // Pro Prompt Composer Slots
+  promptComposerSlotDraft: PromptComposerSlots
+  promptComposerSlotInsertEnabled: boolean
+  promptComposerSlotInsertTarget: PromptComposerSlotKey
+  promptComposerSlotTemplates: PromptComposerSlotTemplate[]
+  setPromptComposerSlotDraft(slots: PromptComposerSlots): void
+  updatePromptComposerSlot(key: PromptComposerSlotKey, value: string): void
+  appendPromptComposerSlotTag(key: PromptComposerSlotKey, tag: string): void
+  clearPromptComposerSlots(): void
+  setPromptComposerSlotInsertEnabled(value: boolean): void
+  setPromptComposerSlotInsertTarget(key: PromptComposerSlotKey): void
+  setPromptComposerSlotTemplates(items: PromptComposerSlotTemplate[]): void
+  upsertPromptComposerSlotTemplate(item: PromptComposerSlotTemplate): void
+  deletePromptComposerSlotTemplate(id: string): void
 
   // Quick presets (positive + negative bundled snippets)
   quickPresets: QuickPreset[]
@@ -714,11 +746,40 @@ function nonEmptyString(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.trim() ? value : fallback
 }
 
+function buildPromptAutocompleteIndex(
+  builtin: PromptCategory[],
+  custom: PromptCategory[]
+): Map<string, string> {
+  const next = new Map<string, string>()
+  for (const category of builtin) {
+    for (const group of category.groups) {
+      for (const tag of group.tags) {
+        if (!next.has(tag.en)) next.set(tag.en, tag.ja ?? '')
+      }
+    }
+  }
+  for (const category of custom) {
+    for (const group of category.groups) {
+      for (const tag of group.tags) {
+        // User-added custom entries are allowed to refine or override
+        // translations surfaced in chip/autocomplete UI.
+        if ((tag.ja ?? '').trim()) next.set(tag.en, tag.ja ?? '')
+        else if (!next.has(tag.en)) next.set(tag.en, '')
+      }
+    }
+  }
+  return next
+}
+
 export const useStore = create<AppState>((set) => ({
   currentTab: 'txt2img',
   setCurrentTab: (t) => set({ currentTab: t }),
+  sidePanelTab: 'library',
+  setSidePanelTab: (t) => set({ sidePanelTab: t }),
   generationMode: 'create',
   setGenerationMode: (mode) => set({ generationMode: mode }),
+  previewInspectorOpen: false,
+  setPreviewInspectorOpen: (open) => set({ previewInspectorOpen: open }),
 
   dynThres: DEFAULT_DYN_THRES,
   patchDynThres: (patch) => set((s) => ({ dynThres: { ...s.dynThres, ...patch } })),
@@ -811,15 +872,22 @@ export const useStore = create<AppState>((set) => ({
   vaes: [],
   selectedVae: 'Automatic',
   selectedModelTitle: null,
+  selectedModelRevision: 0,
   setModels: (m) => set({ models: m }),
   setSamplers: (s) => set({ samplers: s }),
   setSchedulers: (s) => set({ schedulers: s }),
   setVaes: (v) => set({ vaes: v }),
   setSelectedVae: (name) => set({ selectedVae: name }),
   setSelectedModel: (title) => set((state) => {
-    if (state.selectedModelTitle === title) return { selectedModelTitle: title }
+    if (state.selectedModelTitle === title) {
+      return {
+        selectedModelTitle: title,
+        selectedModelRevision: state.selectedModelRevision + 1
+      }
+    }
     return {
       selectedModelTitle: title,
+      selectedModelRevision: state.selectedModelRevision + 1,
       recommendation: null,
       recommendationLoading: false,
       communityStats: null,
@@ -871,6 +939,27 @@ export const useStore = create<AppState>((set) => ({
   inpaintMaskImage: null,
   setInpaintMaskImage: (image) => set({ inpaintMaskImage: image }),
 
+  referenceBoardItems: [],
+  setReferenceBoardItems: (items) => set({ referenceBoardItems: items }),
+  upsertReferenceBoardItem: (item) => set((s) => {
+    const index = s.referenceBoardItems.findIndex((current) => current.id === item.id)
+    if (index < 0) return { referenceBoardItems: [item, ...s.referenceBoardItems] }
+    return {
+      referenceBoardItems: s.referenceBoardItems.map((current, currentIndex) =>
+        currentIndex === index ? { ...current, ...item } : current
+      )
+    }
+  }),
+  updateReferenceBoardItem: (id, patch) => set((s) => ({
+    referenceBoardItems: s.referenceBoardItems.map((item) =>
+      item.id === id ? { ...item, ...patch } : item
+    )
+  })),
+  deleteReferenceBoardItem: (id) => set((s) => ({
+    referenceBoardItems: s.referenceBoardItems.filter((item) => item.id !== id)
+  })),
+  clearReferenceBoardItems: () => set({ referenceBoardItems: [] }),
+
   extractedTags: [],
   setExtractedTags: (tags) => set({ extractedTags: tags }),
 
@@ -887,21 +976,15 @@ export const useStore = create<AppState>((set) => ({
   library: [],
   customLibrary: [],
   autocomplete: new Map(),
-  setLibrary: (c, ac) => set({ library: c, autocomplete: ac }),
+  setLibrary: (c) => set((s) => ({
+    library: c,
+    autocomplete: buildPromptAutocompleteIndex(c, s.customLibrary)
+  })),
   setCustomLibrary: (c) =>
     set((s) => {
-      // Rebuild autocomplete to include user-added tags. Built-in tags take
-      // precedence (the YAML translations are curated); user duplicates only
-      // add when they introduce a new key.
-      const next = new Map(s.autocomplete)
-      for (const cat of c) {
-        for (const g of cat.groups) {
-          for (const t of g.tags) {
-            if (!next.has(t.en)) next.set(t.en, t.ja ?? '')
-          }
-        }
-      }
-      return { customLibrary: c, autocomplete: next }
+      // Rebuild from source categories every time so editing a user-added
+      // translation updates visible chips immediately.
+      return { customLibrary: c, autocomplete: buildPromptAutocompleteIndex(s.library, c) }
     }),
 
   favorites: new Set(),
@@ -920,6 +1003,35 @@ export const useStore = create<AppState>((set) => ({
       const filtered = s.recentTags.filter((t) => t !== en)
       return { recentTags: [en, ...filtered].slice(0, 60) }
     }),
+
+  promptComposerSlotDraft: {},
+  promptComposerSlotInsertEnabled: false,
+  promptComposerSlotInsertTarget: 'subject',
+  promptComposerSlotTemplates: [],
+  setPromptComposerSlotDraft: (slots) => set({ promptComposerSlotDraft: slots }),
+  updatePromptComposerSlot: (key, value) =>
+    set((s) => ({ promptComposerSlotDraft: { ...s.promptComposerSlotDraft, [key]: value } })),
+  appendPromptComposerSlotTag: (key, tag) =>
+    set((s) => {
+      const current = s.promptComposerSlotDraft[key]?.trim() ?? ''
+      const next = current ? `${current}, ${tag}` : tag
+      return { promptComposerSlotDraft: { ...s.promptComposerSlotDraft, [key]: next } }
+    }),
+  clearPromptComposerSlots: () => set({ promptComposerSlotDraft: {} }),
+  setPromptComposerSlotInsertEnabled: (value) => set({ promptComposerSlotInsertEnabled: value }),
+  setPromptComposerSlotInsertTarget: (key) => set({ promptComposerSlotInsertTarget: key }),
+  setPromptComposerSlotTemplates: (items) => set({ promptComposerSlotTemplates: items }),
+  upsertPromptComposerSlotTemplate: (item) =>
+    set((s) => ({
+      promptComposerSlotTemplates: [
+        item,
+        ...s.promptComposerSlotTemplates.filter((current) => current.id !== item.id)
+      ]
+    })),
+  deletePromptComposerSlotTemplate: (id) =>
+    set((s) => ({
+      promptComposerSlotTemplates: s.promptComposerSlotTemplates.filter((item) => item.id !== id)
+    })),
 
   quickPresets: [],
   setQuickPresets: (p) => set({ quickPresets: p }),

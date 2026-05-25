@@ -132,6 +132,7 @@ export function ParametersPanel(): JSX.Element {
         max={30}
         step={0.5}
         onChange={(v) => patch({ cfgScale: v })}
+        testId="params-cfg-scale"
       />
 
       <NumberField
@@ -176,6 +177,7 @@ export function ParametersPanel(): JSX.Element {
         type="button"
         className="btn btn-ghost col-span-2 justify-center text-xs"
         onClick={() => setAdvancedOpen((open) => !open)}
+        data-testid="params-advanced-toggle"
       >
         <SlidersHorizontal className="h-3.5 w-3.5" />
         {advancedOpen ? t('params.hideAdvanced') : t('params.showAdvanced')}
@@ -246,6 +248,7 @@ export function ParametersPanel(): JSX.Element {
               step={1}
               onChange={(v) => patch({ seed: Math.round(v) })}
               className="flex-1"
+              testId="params-seed"
             />
             <div className="flex flex-col justify-end gap-1">
               <button

@@ -10,7 +10,7 @@ import { suggestUpscaleSettings, applyUpscaleSuggestion, type UpscaleSuggestion,
 import { Slider, SelectField } from './extensions/controls'
 import { PromptEditor } from './PromptEditor'
 import { cn } from '@/lib/utils'
-import type { UpscaleComparisonCandidate } from '@shared/types'
+import type { HistoryProRecipeReview, UpscaleComparisonCandidate } from '@shared/types'
 
 const DEFAULT_COMPARE_CRITERIA = [
   'drift: 顔、髪型、服の形、手足、背景の主要配置が入力から別解釈になっていないか。',
@@ -18,6 +18,25 @@ const DEFAULT_COMPARE_CRITERIA = [
   'detail: 低denoiseで眠い質感にならず、高denoiseで描き換わりすぎていないか。',
   '採用目安: drift/seamが最小で、元絵のシルエットを保つ候補を優先する。'
 ].join('\n')
+
+const FINISH_ISSUE_ITEMS = [
+  { id: 'face', labelKey: 'upscale.finish.face', issueKey: 'upscale.finish.issue.face' },
+  { id: 'clothing', labelKey: 'upscale.finish.clothing', issueKey: 'upscale.finish.issue.clothing' },
+  { id: 'line', labelKey: 'upscale.finish.line', issueKey: 'upscale.finish.issue.line' },
+  { id: 'seam', labelKey: 'upscale.finish.seam', issueKey: 'upscale.finish.issue.seam' },
+  { id: 'detail', labelKey: 'upscale.finish.detail', issueKey: 'upscale.finish.issue.detail' }
+] as const
+
+type FinishIssueId = typeof FINISH_ISSUE_ITEMS[number]['id']
+type FinishIssueFlags = Record<FinishIssueId, boolean>
+
+const DEFAULT_FINISH_ISSUES: FinishIssueFlags = {
+  face: false,
+  clothing: false,
+  line: false,
+  seam: false,
+  detail: false
+}
 
 /**
  * Upscale tab — a one-screen workflow for enlarging an image. Two paths:
@@ -77,6 +96,9 @@ export function UpscaleWorkspace(): JSX.Element {
   const [compareCriteria, setCompareCriteria] = useState(DEFAULT_COMPARE_CRITERIA)
   const [compareCandidates, setCompareCandidates] = useState<UpscaleComparisonCandidate[]>([])
   const [historySaving, setHistorySaving] = useState(false)
+  const [finishIssues, setFinishIssues] = useState<FinishIssueFlags>(DEFAULT_FINISH_ISSUES)
+  const [finishMemo, setFinishMemo] = useState('')
+  const [adoptedCandidateKey, setAdoptedCandidateKey] = useState<string | null>(null)
 
   useEffect(() => {
     if (status.kind !== 'ready') return
@@ -197,6 +219,19 @@ export function UpscaleWorkspace(): JSX.Element {
     setSuggestion(null)
   }
 
+  function setFinishIssue(id: FinishIssueId, checked: boolean): void {
+    setFinishIssues((current) => ({ ...current, [id]: checked }))
+  }
+
+  function adoptCandidate(candidate: UpscaleComparisonCandidate): void {
+    patch({
+      outputImage: candidate.imageDataUrl,
+      denoise: candidate.denoise,
+      tileControlNetEnabled: candidate.tileControlNetEnabled
+    })
+    setAdoptedCandidateKey(upscaleCandidateKey(candidate))
+  }
+
   async function runUpscale(): Promise<void> {
     if (!u.inputImage) {
       toast.error(t('upscale.needInput'))
@@ -207,7 +242,15 @@ export function UpscaleWorkspace(): JSX.Element {
       return
     }
     patch({ isRunning: true, outputImage: null })
+    setAdoptedCandidateKey(null)
     try {
+      const qaMockOutput = readUpscaleQaMockOutput()
+      if (qaMockOutput) {
+        patch({ outputImage: qaMockOutput })
+        setAdoptedCandidateKey(null)
+        toast.success(t('upscale.done'))
+        return
+      }
       if (u.method === 'simple') {
         const raw = u.inputImage.replace(/^data:image\/[a-z]+;base64,/, '')
         const r = await api.forge.extraSingleImage({
@@ -226,6 +269,7 @@ export function UpscaleWorkspace(): JSX.Element {
           return
         }
         patch({ outputImage: `data:image/png;base64,${r.image}` })
+        setAdoptedCandidateKey(null)
         toast.success(t('upscale.done'))
       } else if (u.method === 'diffusion') {
         // Diffusion path: img2img with MultiDiffusion alwayson. We size the
@@ -264,6 +308,7 @@ export function UpscaleWorkspace(): JSX.Element {
         const first = res.images[0]
         if (first) {
           patch({ outputImage: `data:image/png;base64,${first}` })
+          setAdoptedCandidateKey(null)
           toast.success(t('upscale.done'))
         } else {
           toast.error(t('upscale.noOutput'))
@@ -348,6 +393,7 @@ export function UpscaleWorkspace(): JSX.Element {
         const first = res.images[0]
         if (first) {
           patch({ outputImage: `data:image/png;base64,${first}` })
+          setAdoptedCandidateKey(null)
           toast.success(t('upscale.done'))
         } else {
           toast.error(t('upscale.noOutput'))
@@ -371,6 +417,7 @@ export function UpscaleWorkspace(): JSX.Element {
     }
     setCompareBusy(true)
     setCompareCandidates([])
+    setAdoptedCandidateKey(null)
     try {
       const denoises = [0.25, 0.35, 0.45]
       const tileStates = u.tileControlNetModel === 'None' ? [false] : [false, true]
@@ -379,7 +426,7 @@ export function UpscaleWorkspace(): JSX.Element {
       for (const tileControlNetEnabled of tileStates) {
         for (const denoise of denoises) {
           const imageDataUrl = await runUpscaleCandidate(denoise, tileControlNetEnabled)
-          out.push({ denoise, tileControlNetEnabled, imageDataUrl })
+          out.push(buildUpscaleComparisonCandidate(useStore.getState().upscale, denoise, tileControlNetEnabled, imageDataUrl))
           setCompareCandidates([...out])
         }
       }
@@ -510,6 +557,7 @@ export function UpscaleWorkspace(): JSX.Element {
     try {
       const state = useStore.getState()
       const dims = await imageDimensions(u.outputImage)
+      const adoptedCandidate = compareCandidates.find((candidate) => upscaleCandidateKey(candidate) === adoptedCandidateKey) ?? null
       const item = await api.storage.addHistory({
         pngBase64: dataUrlToBase64(u.outputImage),
         thumbDataUrl: await makeThumbnail(u.outputImage, 320),
@@ -545,8 +593,13 @@ export function UpscaleWorkspace(): JSX.Element {
           }
         }
       })
+      const updated = await api.storage.setHistoryProRecipeReview(
+        item.id,
+        buildUpscaleProRecipeReview(u, dims, finishIssues, finishMemo, adoptedCandidate)
+      )
+      if (!updated) throw new Error('Could not attach Pro Recipe review')
       useStore.getState().setHistory((await api.storage.listHistory()).slice(0, 500))
-      toast.success(tStatic('upscale.savedToHistory', { id: item.id.slice(0, 8) }))
+      toast.success(tStatic('upscale.savedToHistoryWithRecipe', { id: item.id.slice(0, 8) }))
     } catch (e) {
       toast.error(tStatic('upscale.historySaveFailed', { message: (e as Error).message }))
     } finally {
@@ -597,6 +650,7 @@ export function UpscaleWorkspace(): JSX.Element {
                 className="absolute top-1 right-1 btn btn-icon btn-ghost bg-bg-1/80"
                 onClick={() => patch({ inputImage: null, inputFilename: null, inputImagePath: null, inputHistoryId: null })}
                 title={t('upscale.clearInput')}
+                data-testid="upscale-clear-input"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -718,18 +772,21 @@ export function UpscaleWorkspace(): JSX.Element {
               onClick={() => patch({ method: 'simple' })}
               label={t('upscale.simple')}
               hint={t('upscale.simpleHint')}
+              testId="upscale-method-simple"
             />
             <MethodButton
               active={u.method === 'diffusion'}
               onClick={() => patch({ method: 'diffusion' })}
               label={t('upscale.diffusion')}
               hint={t('upscale.diffusionHint')}
+              testId="upscale-method-diffusion"
             />
             <MethodButton
               active={u.method === 'ultimate'}
               onClick={() => patch({ method: 'ultimate' })}
               label={t('upscale.ultimate')}
               hint={t('upscale.ultimateHint')}
+              testId="upscale-method-ultimate"
             />
           </div>
         </div>
@@ -933,6 +990,7 @@ export function UpscaleWorkspace(): JSX.Element {
             className="btn w-full justify-center text-xs gap-1.5"
             onClick={() => { void runDenoiseComparison() }}
             disabled={!u.inputImage || compareBusy || u.isRunning}
+            data-testid="upscale-compare-run"
           >
             <GitCompare className={cn('h-3.5 w-3.5', compareBusy && 'animate-pulse')} />
             {compareBusy ? t('upscale.compareRunning') : t('upscale.compareRun')}
@@ -950,9 +1008,17 @@ export function UpscaleWorkspace(): JSX.Element {
                 criteria={compareCriteria}
                 onCriteriaChange={setCompareCriteria}
                 onSave={() => { void saveComparison() }}
+                onUseCandidate={adoptCandidate}
                 saving={compareSaving}
+                selectedKey={adoptedCandidateKey}
               />
             )}
+            <FinishChecklistPanel
+              issues={finishIssues}
+              memo={finishMemo}
+              onIssueChange={setFinishIssue}
+              onMemoChange={setFinishMemo}
+            />
             <DimensionsCompare inputUrl={u.inputImage} outputUrl={u.outputImage} />
             <img
               src={u.outputImage}
@@ -991,7 +1057,15 @@ export function UpscaleWorkspace(): JSX.Element {
               criteria={compareCriteria}
               onCriteriaChange={setCompareCriteria}
               onSave={() => { void saveComparison() }}
+              onUseCandidate={adoptCandidate}
               saving={compareSaving}
+              selectedKey={adoptedCandidateKey}
+            />
+            <FinishChecklistPanel
+              issues={finishIssues}
+              memo={finishMemo}
+              onIssueChange={setFinishIssue}
+              onMemoChange={setFinishMemo}
             />
           </div>
         ) : u.inputImage ? (
@@ -1009,53 +1083,129 @@ function DenoiseCompareGrid({
   criteria,
   onCriteriaChange,
   onSave,
-  saving
+  onUseCandidate,
+  saving,
+  selectedKey
 }: {
   candidates: UpscaleComparisonCandidate[]
   criteria: string
   onCriteriaChange: (value: string) => void
   onSave: () => void
+  onUseCandidate: (candidate: UpscaleComparisonCandidate) => void
   saving: boolean
+  selectedKey: string | null
 }): JSX.Element {
   const t = useT()
-  const patch = useStore((s) => s.patchUpscale)
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid="upscale-compare-grid" data-candidate-count={candidates.length}>
       <div className="flex items-center gap-2 text-xs text-ink-2">
         <GitCompare className="h-3.5 w-3.5 text-accent" />
         <span>{t('upscale.compareTitle')}</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {candidates.map((candidate) => (
-          <button
-            key={`${candidate.tileControlNetEnabled}-${candidate.denoise}`}
-            className="rounded border border-line bg-bg-2/50 p-2 text-left hover:border-accent transition-colors"
-            onClick={() => patch({
-              outputImage: candidate.imageDataUrl,
-              denoise: candidate.denoise,
-              tileControlNetEnabled: candidate.tileControlNetEnabled
-            })}
-            title={t('upscale.compareUse')}
-          >
-            <img src={candidate.imageDataUrl} alt={`denoise ${candidate.denoise}`} className="w-full aspect-square object-contain bg-bg-3 rounded" />
-            <div className="mt-1 flex items-center gap-1 font-mono text-xs text-ink-1">
-              <span>{candidate.tileControlNetEnabled ? 'Tile ON' : 'Tile OFF'}</span>
-              <span className="ml-auto">d {candidate.denoise.toFixed(2)}</span>
-            </div>
-          </button>
-        ))}
+        {candidates.map((candidate, index) => {
+          const key = upscaleCandidateKey(candidate)
+          const selected = key === selectedKey
+          return (
+            <button
+              key={key}
+              className={cn(
+                'rounded border bg-bg-2/50 p-2 text-left transition-colors hover:border-accent',
+                selected ? 'border-accent ring-1 ring-accent/40' : 'border-line'
+              )}
+              onClick={() => onUseCandidate(candidate)}
+              title={t('upscale.compareUse')}
+              data-testid={`upscale-compare-candidate-${index}`}
+              data-denoise={candidate.denoise}
+              data-tile={candidate.tileControlNetEnabled ? 'on' : 'off'}
+              data-selected={selected ? 'true' : 'false'}
+            >
+              <img src={candidate.imageDataUrl} alt={`denoise ${candidate.denoise}`} className="w-full aspect-square object-contain bg-bg-3 rounded" />
+              <div className="mt-1 flex items-center gap-1 font-mono text-xs text-ink-1">
+                <span>{candidate.tileControlNetEnabled ? 'Tile ON' : 'Tile OFF'}</span>
+                <span className="ml-auto">d {candidate.denoise.toFixed(2)}</span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-ink-3">
+                {upscaleCandidateFacts(candidate).map((fact) => (
+                  <span key={fact} className="rounded border border-line bg-bg-1 px-1 py-0.5">{fact}</span>
+                ))}
+              </div>
+              <div className="mt-1 text-[10px] text-accent">
+                {selected ? t('upscale.compareSelected') : t('upscale.compareUse')}
+              </div>
+            </button>
+          )
+        })}
       </div>
       <textarea
         className="input min-h-24 w-full resize-y text-xs leading-relaxed"
         value={criteria}
         onChange={(e) => onCriteriaChange(e.target.value)}
         aria-label={t('upscale.compareCriteria')}
+        data-testid="upscale-compare-criteria"
       />
       <button className="btn justify-center text-xs gap-1.5" onClick={onSave} disabled={saving}>
         <Download className={cn('h-3.5 w-3.5', saving && 'animate-pulse')} />
         {saving ? t('upscale.compareSaving') : t('upscale.compareSave')}
       </button>
     </div>
+  )
+}
+
+function FinishChecklistPanel({
+  issues,
+  memo,
+  onIssueChange,
+  onMemoChange
+}: {
+  issues: FinishIssueFlags
+  memo: string
+  onIssueChange: (id: FinishIssueId, checked: boolean) => void
+  onMemoChange: (value: string) => void
+}): JSX.Element {
+  const t = useT()
+  const issueCount = FINISH_ISSUE_ITEMS.filter((item) => issues[item.id]).length
+  return (
+    <section
+      className="rounded border border-line bg-bg-2/50 p-3 space-y-2"
+      data-testid="upscale-finish-checklist"
+      data-issue-count={issueCount}
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold text-ink-1">{t('upscale.finish.title')}</span>
+        <span className={cn(
+          'ml-auto rounded px-1.5 py-0.5 text-[10px]',
+          issueCount > 0 ? 'bg-warn/15 text-warn' : 'bg-accent/10 text-accent'
+        )}>
+          {issueCount > 0
+            ? t('upscale.finish.issueCount', { count: issueCount })
+            : t('upscale.finish.clean')}
+        </span>
+      </div>
+      <p className="text-[10px] text-ink-3 leading-relaxed">{t('upscale.finish.body')}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+        {FINISH_ISSUE_ITEMS.map((item) => (
+          <label key={item.id} className="flex items-center gap-2 rounded border border-line bg-bg-1 px-2 py-1.5 text-[11px] text-ink-2">
+            <input
+              type="checkbox"
+              className="accent-accent"
+              checked={issues[item.id]}
+              onChange={(event) => onIssueChange(item.id, event.target.checked)}
+              data-testid={`upscale-finish-check-${item.id}`}
+            />
+            <span>{t(item.labelKey)}</span>
+          </label>
+        ))}
+      </div>
+      <textarea
+        className="input min-h-16 w-full resize-y text-xs leading-relaxed"
+        value={memo}
+        onChange={(event) => onMemoChange(event.target.value)}
+        placeholder={t('upscale.finish.memoPlaceholder')}
+        data-testid="upscale-finish-memo"
+      />
+      <p className="text-[10px] text-ink-3 leading-relaxed">{t('upscale.finish.recipeHint')}</p>
+    </section>
   )
 }
 
@@ -1089,6 +1239,7 @@ function DropZone({ fileInputRef, onFile }: DropZoneProps): JSX.Element {
         type="file"
         accept="image/*"
         className="hidden"
+        data-testid="upscale-input-file"
         onChange={(e) => {
           const f = e.target.files?.[0]
           if (f) onFile(f)
@@ -1099,13 +1250,110 @@ function DropZone({ fileInputRef, onFile }: DropZoneProps): JSX.Element {
   )
 }
 
+function buildUpscaleComparisonCandidate(
+  u: UpscaleState,
+  denoise: number,
+  tileControlNetEnabled: boolean,
+  imageDataUrl: string
+): UpscaleComparisonCandidate {
+  return {
+    imageDataUrl,
+    denoise,
+    tileControlNetEnabled,
+    method: u.method,
+    scale: u.scale,
+    upscaler: u.upscaler,
+    tileWidth: u.method === 'ultimate' ? normalizeTileSize(u.ultimateTileWidth, 512) : normalizeTileSize(u.tileWidth, 768),
+    tileHeight: u.method === 'ultimate'
+      ? normalizeTileSize(u.ultimateTileHeight || u.ultimateTileWidth, 512)
+      : normalizeTileSize(u.tileHeight, 768),
+    tileOverlap: u.method === 'ultimate' ? null : normalizeTileOverlap(u.tileOverlap, u.tileWidth, u.tileHeight),
+    ultimateMaskBlur: u.method === 'ultimate' ? u.ultimateMaskBlur : null,
+    ultimatePadding: u.method === 'ultimate' ? u.ultimatePadding : null,
+    ultimateRedrawMode: u.method === 'ultimate' ? u.ultimateRedrawMode : null,
+    ultimateSeamsFixType: u.method === 'ultimate' ? u.ultimateSeamsFixType : null,
+    tileControlNetModule: tileControlNetEnabled ? u.tileControlNetModule : null,
+    tileControlNetModel: tileControlNetEnabled ? u.tileControlNetModel : null,
+    tileControlNetWeight: tileControlNetEnabled ? u.tileControlNetWeight : null
+  }
+}
+
+function upscaleCandidateKey(candidate: UpscaleComparisonCandidate): string {
+  return [
+    candidate.method ?? 'unknown',
+    candidate.tileControlNetEnabled ? 'tile-on' : 'tile-off',
+    candidate.denoise.toFixed(2),
+    candidate.tileWidth ?? 'na',
+    candidate.tileHeight ?? 'na',
+    candidate.ultimatePadding ?? 'na',
+    candidate.ultimateSeamsFixType ?? 'na'
+  ].join(':')
+}
+
+function upscaleCandidateFacts(candidate: UpscaleComparisonCandidate): string[] {
+  const facts = [
+    candidate.method ?? 'upscale',
+    `x${formatMaybeNumber(candidate.scale)}`,
+    candidate.upscaler ?? 'upscaler'
+  ]
+  if (candidate.tileWidth && candidate.tileHeight) facts.push(`${candidate.tileWidth}x${candidate.tileHeight}`)
+  if (candidate.tileOverlap != null) facts.push(`overlap ${candidate.tileOverlap}`)
+  if (candidate.ultimatePadding != null) facts.push(`padding ${candidate.ultimatePadding}`)
+  if (candidate.ultimateMaskBlur != null) facts.push(`blur ${candidate.ultimateMaskBlur}`)
+  if (candidate.ultimateSeamsFixType != null) facts.push(`seam ${candidate.ultimateSeamsFixType}`)
+  if (candidate.tileControlNetEnabled && candidate.tileControlNetWeight != null) facts.push(`CN ${candidate.tileControlNetWeight.toFixed(2)}`)
+  return facts.filter((fact) => fact && fact !== 'x-').slice(0, 8)
+}
+
+function buildUpscaleProRecipeReview(
+  u: UpscaleState,
+  dims: { width: number; height: number },
+  issues: FinishIssueFlags,
+  memo: string,
+  adoptedCandidate: UpscaleComparisonCandidate | null
+): HistoryProRecipeReview {
+  const issueLines = FINISH_ISSUE_ITEMS
+    .filter((item) => issues[item.id])
+    .map((item) => tStatic(item.issueKey))
+  const settings = [
+    `upscale:${u.method}`,
+    `x${u.scale}`,
+    `upscaler:${u.upscaler}`,
+    u.method === 'simple' ? null : `denoise:${u.denoise.toFixed(2)}`,
+    u.method === 'simple' ? null : `tile:${u.tileControlNetEnabled ? 'ON' : 'OFF'}`,
+    u.method === 'ultimate' ? `ultimate:${u.ultimateTileWidth}x${u.ultimateTileHeight || u.ultimateTileWidth}/padding${u.ultimatePadding}/seam${u.ultimateSeamsFixType}` : null,
+    adoptedCandidate ? `adopted:${adoptedCandidate.tileControlNetEnabled ? 'Tile ON' : 'Tile OFF'} d${adoptedCandidate.denoise.toFixed(2)}` : null,
+    `${dims.width}x${dims.height}`
+  ].filter((line): line is string => Boolean(line))
+  const memoLine = memo.trim()
+  return {
+    rating: issueLines.length === 0 ? 4 : 3,
+    strengths: [
+      tStatic('upscale.finish.recipeStrength'),
+      settings.join(' / ')
+    ],
+    issues: issueLines,
+    nextActions: memoLine ? [memoLine] : [tStatic('upscale.finish.recipeNext')],
+    scores: {
+      reusePotential: issueLines.length === 0 ? 4 : 3
+    },
+    ...(u.inputHistoryId ? { parentHistoryId: u.inputHistoryId } : {}),
+    updatedAt: Date.now()
+  }
+}
+
+function formatMaybeNumber(value: number | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : '-'
+}
+
 interface MethodButtonProps {
   active: boolean
   onClick: () => void
   label: string
   hint: string
+  testId: string
 }
-function MethodButton({ active, onClick, label, hint }: MethodButtonProps): JSX.Element {
+function MethodButton({ active, onClick, label, hint, testId }: MethodButtonProps): JSX.Element {
   return (
     <button
       type="button"
@@ -1116,6 +1364,7 @@ function MethodButton({ active, onClick, label, hint }: MethodButtonProps): JSX.
           : 'border-line text-ink-2 hover:border-ink-2'
       )}
       onClick={onClick}
+      data-testid={testId}
     >
       <div className="text-xs font-medium">{label}</div>
       <div className="text-[10px] text-ink-3 leading-tight mt-0.5">{hint}</div>
@@ -1333,6 +1582,18 @@ function dataUrlToBase64(dataUrl: string): string {
   const commaIdx = dataUrl.indexOf(',')
   if (commaIdx < 0) throw new Error('No base64 separator in data URL')
   return dataUrl.slice(commaIdx + 1)
+}
+
+function readUpscaleQaMockOutput(): string | null {
+  try {
+    const raw = window.localStorage.getItem('yoitomoshi:qa:upscale-output')
+    if (!raw) return null
+    if (raw.startsWith('data:image/')) return raw
+    if (/^[A-Za-z0-9+/=]+$/.test(raw)) return `data:image/png;base64,${raw}`
+  } catch {
+    return null
+  }
+  return null
 }
 
 async function imageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {

@@ -26,6 +26,12 @@ import {
 import { scanLoras } from './lora-scanner.js'
 import { searchHuggingFaceModels } from './huggingface-api.js'
 import { describeKind, inspectSafetensors, type ModelKind } from './safetensors-inspect.js'
+import {
+  inspectPromptTranslationRuntimeStatus,
+  preparePromptTranslationRuntime,
+  translatePromptText
+} from './prompt-translation-runtime.js'
+import { searchPromptDictionary } from './prompt-dictionary.js'
 import type { PromptLibrary } from './prompt-library.js'
 import type {
   AppSettings,
@@ -42,6 +48,7 @@ import type {
   ImportedExternalVideoResult,
   HuggingFaceSearchOptions,
   HistoryItem,
+  HistoryProRecipeReview,
   HistoryTagReview,
   Img2ImgRequest,
   Img2ImgResponse,
@@ -65,9 +72,20 @@ import type {
   ModelLibrarySummary,
   ModelImportResult,
   PartialFileDeleteResult,
+  PersonalEnvironmentHealthReport,
+  PersonalEnvironmentRecoveryResult,
+  PersonalHealthIssue,
+  PersonalHealthProcess,
+  PersonalHealthRecoveryAction,
+  PersonalHealthStartupSignal,
+  PromptDictionarySearchRequest,
+  PromptTagTranslationProvider,
+  PromptTagTranslationRequest,
+  PromptTagTranslationResult,
   SdLora,
   SdModel,
   StartupMetrics,
+  StartupMetricsSample,
   TaggerRunRequest,
   TaggerRunResult,
   TaggerRunSuppressedTag,
@@ -140,6 +158,9 @@ const VIDEO_MODEL_EXTS = new Set(['.ckpt', '.safetensors', '.pt', '.pth'])
 const VIDEO_OUTPUT_FILE_EXTS = new Set(['.gif', '.mp4', '.webp', '.webm'])
 const MODEL_MERGER_LOG_TAIL_LIMIT = 120
 const MODEL_MERGER_DISK_MARGIN_BYTES = 512 * 1024 * 1024
+const PROMPT_TAG_TRANSLATION_PROVIDERS = new Set<PromptTagTranslationProvider>(['google', 'mymemory'])
+const MAX_PROMPT_TAG_TRANSLATION_CHARS = 160
+const PROMPT_TAG_TRANSLATION_TIMEOUT_MS = 8000
 
 interface ActiveModelMerger {
   child: ChildProcessWithoutNullStreams
@@ -972,6 +993,72 @@ async function fetchJson<T>(url: string, timeoutMs: number): Promise<T> {
   }
 }
 
+function validatePromptTagTranslationRequest(input: unknown): PromptTagTranslationRequest {
+  assertPlainObject(input, 'prompt tag translation request')
+  const text = optionalString(input.text, 'translation text', MAX_PROMPT_TAG_TRANSLATION_CHARS) ?? ''
+  if (!text) throw new Error('Translation text is required')
+  const provider = optionalString(input.provider, 'translation provider', 40) ?? 'google'
+  if (!PROMPT_TAG_TRANSLATION_PROVIDERS.has(provider as PromptTagTranslationProvider)) {
+    throw new Error('Unsupported translation provider')
+  }
+  return {
+    text: text.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim(),
+    provider: provider as PromptTagTranslationProvider,
+    from: 'en',
+    to: 'ja'
+  }
+}
+
+async function translatePromptTag(input: unknown): Promise<PromptTagTranslationResult> {
+  const req = validatePromptTagTranslationRequest(input)
+  const translated = req.provider === 'mymemory'
+    ? await translatePromptTagWithMyMemory(req.text)
+    : await translatePromptTagWithGoogle(req.text)
+  return {
+    text: normalizePromptTagTranslation(translated),
+    provider: req.provider,
+    sourceText: req.text
+  }
+}
+
+async function translatePromptTagWithGoogle(text: string): Promise<string> {
+  const url = new URL('https://translate.googleapis.com/translate_a/single')
+  url.searchParams.set('client', 'gtx')
+  url.searchParams.set('sl', 'en')
+  url.searchParams.set('tl', 'ja')
+  url.searchParams.set('dt', 't')
+  url.searchParams.set('q', text)
+  const data = await fetchJson<unknown>(url.toString(), PROMPT_TAG_TRANSLATION_TIMEOUT_MS)
+  if (!Array.isArray(data) || !Array.isArray(data[0])) throw new Error('Unexpected Google translation response')
+  const textParts = data[0]
+    .filter((item): item is unknown[] => Array.isArray(item))
+    .map((item) => typeof item[0] === 'string' ? item[0] : '')
+    .filter(Boolean)
+  return textParts.join('')
+}
+
+async function translatePromptTagWithMyMemory(text: string): Promise<string> {
+  const url = new URL('https://api.mymemory.translated.net/get')
+  url.searchParams.set('q', text)
+  url.searchParams.set('langpair', 'en|ja')
+  const data = await fetchJson<unknown>(url.toString(), PROMPT_TAG_TRANSLATION_TIMEOUT_MS)
+  if (!data || typeof data !== 'object') throw new Error('Unexpected MyMemory translation response')
+  const responseData = (data as { responseData?: { translatedText?: unknown } }).responseData
+  if (typeof responseData?.translatedText !== 'string') throw new Error('MyMemory did not return a translation')
+  return responseData.translatedText
+}
+
+function normalizePromptTagTranslation(value: string): string {
+  const normalized = value
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_PROMPT_TAG_TRANSLATION_CHARS)
+  if (!normalized) throw new Error('Translation result was empty')
+  assertNoUnsafeControlChars(normalized, 'translation result')
+  return normalized
+}
+
 function firstExistingFile(root: string, candidates: string[]): string | null {
   for (const candidate of candidates) {
     const full = join(root, ...candidate.split(/[\\/]+/))
@@ -1266,6 +1353,15 @@ function validateWorkspaceImageReference(input: unknown): WorkspaceImageReferenc
     return { kind: 'file', path, filename, sizeBytes, lastModifiedAt }
   }
   throw new Error('Invalid workspace image reference')
+}
+
+function validatePromptDictionarySearchRequest(input: unknown): PromptDictionarySearchRequest {
+  assertPlainObject(input, 'prompt dictionary search request')
+  const query = optionalString(input.query, 'prompt dictionary query', 200, {
+    allowWhitespace: true
+  }) ?? ''
+  const limit = boundedInteger(input.limit, 'prompt dictionary limit', 0, 120) ?? 36
+  return { query, limit }
 }
 
 function validateUpscaleComparisonSaveRequest(input: unknown): UpscaleComparisonSaveRequest {
@@ -1685,6 +1781,64 @@ function validateHistoryReviewTags(raw: unknown, label: string): string[] {
     if (tags.length >= 120) break
   }
   return tags
+}
+
+function validateHistoryProRecipeReview(input: unknown): HistoryProRecipeReview | null {
+  if (input == null) return null
+  assertPlainObject(input, 'history pro recipe review')
+  const rating = validateHistoryProRecipeScore(input.rating)
+  const scores = validateHistoryProRecipeScores(input.scores)
+  const parentHistoryId = typeof input.parentHistoryId === 'string'
+    ? validateLooseText(input.parentHistoryId, 'parent history id', 120)
+    : null
+  const updatedAtRaw = typeof input.updatedAt === 'number' ? input.updatedAt : Date.now()
+  return {
+    ...(rating == null ? {} : { rating }),
+    strengths: validateHistoryProRecipeList(input.strengths, 'strengths'),
+    issues: validateHistoryProRecipeList(input.issues, 'issues'),
+    nextActions: validateHistoryProRecipeList(input.nextActions, 'next actions'),
+    ...(scores ? { scores } : {}),
+    ...(parentHistoryId ? { parentHistoryId } : {}),
+    updatedAt: Number.isFinite(updatedAtRaw) ? Math.max(0, Math.floor(updatedAtRaw)) : Date.now()
+  }
+}
+
+function validateHistoryProRecipeList(raw: unknown, label: string): string[] {
+  if (!Array.isArray(raw)) throw new Error(`Invalid ${label}`)
+  const seen = new Set<string>()
+  const items: string[] = []
+  for (const item of raw) {
+    if (typeof item !== 'string') continue
+    const text = validateLooseText(item, label, 220)
+    const key = text.toLowerCase()
+    if (!text || seen.has(key)) continue
+    seen.add(key)
+    items.push(text)
+    if (items.length >= 24) break
+  }
+  return items
+}
+
+function validateHistoryProRecipeScores(raw: unknown): HistoryProRecipeReview['scores'] | undefined {
+  if (!raw) return undefined
+  assertPlainObject(raw, 'history pro recipe scores')
+  const scores: NonNullable<HistoryProRecipeReview['scores']> = {}
+  for (const key of ['thumbnail', 'composition', 'lighting', 'color', 'anatomy', 'styleConsistency', 'reusePotential'] as const) {
+    const score = validateHistoryProRecipeScore(raw[key])
+    if (score != null) scores[key] = score
+  }
+  return Object.keys(scores).length > 0 ? scores : undefined
+}
+
+function validateHistoryProRecipeScore(raw: unknown): number | null {
+  if (raw == null) return null
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) throw new Error('Invalid pro recipe score')
+  return Math.max(0, Math.min(5, Math.round(raw)))
+}
+
+function validateLooseText(raw: string, label: string, maxLength: number): string {
+  assertNoUnsafeControlChars(raw, label)
+  return raw.replace(/\s+/g, ' ').trim().slice(0, maxLength)
 }
 
 function imagePayloadToBuffer(rawImage: string, label: string): Buffer {
@@ -2623,6 +2777,40 @@ async function refreshModelLibraryCivitai(storage: Storage, rawId: string): Prom
     entry = storage.listModelLibrary().find((item) => item.id === id) ?? entry
   }
   if (!entry.sha256) throw new Error('SHA-256 could not be computed')
+  if (isModelLibraryAdapterType(entry.type)) {
+    const meta = await fetchLoraByHash(entry.sha256, settings.civitaiApiKey)
+    if (!meta) throw new Error('Civitai metadata was not found for this file')
+    const sourceMeta: NonNullable<ModelLibraryEntry['sourceMeta']> = {
+      ...(entry.sourceMeta ?? { provider: 'civitai' as const }),
+      provider: 'civitai',
+      name: meta.modelName,
+      pageUrl: meta.civitaiUrl ?? entry.sourceMeta?.pageUrl,
+      thumbnailUrl: meta.thumbnailUrl,
+      expectedSha256: entry.sha256,
+      modelId: meta.modelId,
+      modelVersionId: meta.modelVersionId,
+      versionName: meta.versionName,
+      baseModel: meta.baseModel,
+      description: meta.description ?? entry.sourceMeta?.description ?? null,
+      tags: meta.tags ?? entry.sourceMeta?.tags ?? [],
+      trainedWords: meta.trainedWords ?? [],
+      recommendedPrompts: meta.recommendedPrompts ?? []
+    }
+    let previewPath = entry.previewPath ?? sourceMeta.previewPath ?? null
+    if (meta.thumbnailUrl) {
+      previewPath = await cacheModelPreview(storage, entry.id, meta.thumbnailUrl).catch(() => previewPath)
+    }
+    return storage.upsertModelLibraryEntry({
+      ...entry,
+      source: 'civitai',
+      sourceMeta: { ...sourceMeta, previewPath },
+      previewPath,
+      civitai: {
+        url: meta.civitaiUrl ?? undefined,
+        expectedSha256: entry.sha256
+      }
+    })
+  }
   const rec = await fetchByHash(entry.sha256, settings.civitaiApiKey)
   if (!rec) throw new Error('Civitai metadata was not found for this file')
 
@@ -2639,7 +2827,9 @@ async function refreshModelLibraryCivitai(storage: Storage, rawId: string): Prom
     versionName: rec.versionName,
     baseModel: rec.baseModel,
     description: rec.description ?? entry.sourceMeta?.description ?? null,
-    tags: rec.tags ?? entry.sourceMeta?.tags ?? []
+    tags: rec.tags ?? entry.sourceMeta?.tags ?? [],
+    trainedWords: rec.trainedWords ?? entry.sourceMeta?.trainedWords ?? [],
+    recommendedPrompts: entry.sourceMeta?.recommendedPrompts ?? []
   }
   let previewPath = entry.previewPath ?? sourceMeta.previewPath ?? null
   if (rec.thumbnailUrl) {
@@ -2727,18 +2917,28 @@ function validateModelLibraryCivitaiBatchRequest(raw: unknown): {
 function needsCivitaiMetadata(entry: ModelLibraryEntry): boolean {
   if (entry.sourceMeta?.provider !== 'civitai') return true
   if (!entry.sourceMeta.modelId || !entry.sourceMeta.modelVersionId) return true
+  if (isModelLibraryAdapterType(entry.type) && (entry.sourceMeta.trainedWords?.length ?? 0) === 0 && (entry.sourceMeta.recommendedPrompts?.length ?? 0) === 0) return true
   if (!entry.sourceMeta.description && !entry.notes) return true
   if (!entry.previewPath && !entry.sourceMeta.previewPath) return true
   return false
+}
+
+function isModelLibraryAdapterType(type: ModelLibraryEntryType): boolean {
+  return type === 'LORA' || type === 'LoCon' || type === 'LyCORIS'
 }
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function recoverModelLibrary(storage: Storage): Promise<ModelLibraryRecoveryResult> {
+interface ModelLibraryRecoveryOptions {
+  staleOnly?: boolean
+}
+
+async function recoverModelLibrary(storage: Storage, options: ModelLibraryRecoveryOptions = {}): Promise<ModelLibraryRecoveryResult> {
   const settings = storage.getSettings()
   await scanModelLibrary(settings.forgePath, storage).catch(() => null)
+  const now = Date.now()
 
   let recoveredJobs = 0
   let completedJobsFixed = 0
@@ -2755,6 +2955,7 @@ async function recoverModelLibrary(storage: Storage): Promise<ModelLibraryRecove
         })
         completedJobsFixed += 1
       } else {
+        if (options.staleOnly !== false && now - job.updatedAt <= STALE_DOWNLOAD_MS) continue
         storage.updateDownloadJob(job.id, {
           status: 'failed',
           bytesDownloaded: partial?.isFile() ? partial.size : job.bytesDownloaded,
@@ -2835,6 +3036,404 @@ function queueMissingModelHashes(storage: Storage, entries: ModelLibraryEntry[])
     }
   })()
   return queue.length
+}
+
+const STALE_DOWNLOAD_MS = 10 * 60 * 1000
+const SLOW_FORGE_READY_MS = 30_000
+
+async function inspectPersonalEnvironmentHealth(
+  storage: Storage,
+  manager: ForgeManager,
+  startupMetrics: StartupMetrics
+): Promise<PersonalEnvironmentHealthReport> {
+  const checkedAt = Date.now()
+  const status = manager.getStatus()
+  const settings = storage.diagnoseSettingsFile()
+  const [integrity, processInfo] = await Promise.all([
+    checkLibraryIntegrity(storage),
+    listRelatedProcesses(settings.forgePath).catch(() => ({
+      relatedForgeProcesses: [] as PersonalHealthProcess[],
+      relatedElectronProcesses: [] as PersonalHealthProcess[]
+    }))
+  ])
+  const jobs = storage.listDownloadJobs()
+  const staleRunningJobs = jobs.filter((job) =>
+    job.status === 'running' && checkedAt - job.updatedAt > STALE_DOWNLOAD_MS
+  )
+  const samples = storage.listStartupMetricsSamples(20)
+  const forgeReadyValues = samples
+    .map((sample) => sample.forgeReadyMs)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+  const rendererValues = samples
+    .map((sample) => sample.rendererLoadedMs)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+  const startup = {
+    recentSamples: samples.length,
+    forgeReadyAvgMs: average(forgeReadyValues),
+    forgeReadyMinMs: forgeReadyValues.length ? Math.min(...forgeReadyValues) : null,
+    forgeReadyMaxMs: forgeReadyValues.length ? Math.max(...forgeReadyValues) : null,
+    rendererLoadedAvgMs: average(rendererValues),
+    slowForgeReady: forgeReadyValues.some((value) => value > SLOW_FORGE_READY_MS),
+    signals: buildStartupSignals(status, samples)
+  }
+  const orphanPartials = integrity.issues.filter((issue) =>
+    !issue.jobId && issue.path?.toLowerCase().includes('.partial')
+  ).length
+  const report: PersonalEnvironmentHealthReport = {
+    checkedAt,
+    settings,
+    processes: {
+      currentPid: process.pid,
+      forgeManagedByThisApp: status.kind === 'starting' || status.kind === 'ready',
+      ...processInfo
+    },
+    downloads: {
+      total: jobs.length,
+      running: jobs.filter((job) => job.status === 'running').length,
+      staleRunning: staleRunningJobs.length,
+      failed: jobs.filter((job) => job.status === 'failed').length,
+      partialIssues: integrity.totals.partialDownloads,
+      orphanPartials
+    },
+    library: {
+      entries: integrity.totals.entries,
+      missingFiles: integrity.totals.missingFiles,
+      shaMissing: integrity.totals.shaMissing,
+      partialDownloads: integrity.totals.partialDownloads,
+      issues: integrity.totals.issues
+    },
+    startup,
+    issues: []
+  }
+  report.issues = buildPersonalHealthIssues(report)
+  return report
+}
+
+async function runPersonalEnvironmentRecovery(
+  storage: Storage,
+  manager: ForgeManager,
+  startupMetrics: StartupMetrics
+): Promise<PersonalEnvironmentRecoveryResult> {
+  const checkedAt = Date.now()
+  const actions: PersonalHealthRecoveryAction[] = []
+  const settingsBefore = storage.diagnoseSettingsFile()
+  let settingsNormalized = false
+
+  if (!settingsBefore.parseOk) {
+    actions.push({
+      id: 'settings-parse-skipped',
+      area: 'settings',
+      status: 'failed',
+      title: 'Settings repair needs manual edit',
+      detail: 'settings.json could not be parsed, so automatic normalization was skipped.'
+    })
+  } else if (!settingsBefore.exists || settingsBefore.normalizedChanged || settingsBefore.inlineSecretPresent) {
+    try {
+      storage.getSettings()
+      settingsNormalized = true
+      actions.push({
+        id: 'settings-normalized',
+        area: 'settings',
+        status: 'applied',
+        title: 'Settings normalized',
+        detail: 'settings.json was recreated or normalized, and inline secrets were migrated when present.'
+      })
+    } catch (e) {
+      actions.push({
+        id: 'settings-normalize-failed',
+        area: 'settings',
+        status: 'failed',
+        title: 'Settings normalization failed',
+        detail: (e as Error).message
+      })
+    }
+  }
+
+  let modelLibrary: ModelLibraryRecoveryResult = emptyModelLibraryRecoveryResult()
+  try {
+    modelLibrary = await recoverModelLibrary(storage, { staleOnly: true })
+    const modelRecoveryCount =
+      modelLibrary.recoveredJobs +
+      modelLibrary.completedJobsFixed +
+      modelLibrary.metadataRefetched +
+      modelLibrary.previewsRefetched +
+      modelLibrary.hashesQueued
+    actions.push({
+      id: 'model-library-recovery',
+      area: 'library',
+      status: modelRecoveryCount > 0 ? 'applied' : 'skipped',
+      title: modelRecoveryCount > 0 ? 'Model Library recovery ran' : 'Model Library already stable',
+      detail: `jobs=${modelLibrary.recoveredJobs + modelLibrary.completedJobsFixed}, metadata=${modelLibrary.metadataRefetched}, previews=${modelLibrary.previewsRefetched}, hashesQueued=${modelLibrary.hashesQueued}`
+    })
+  } catch (e) {
+    actions.push({
+      id: 'model-library-recovery-failed',
+      area: 'library',
+      status: 'failed',
+      title: 'Model Library recovery failed',
+      detail: (e as Error).message
+    })
+  }
+
+  const report = await inspectPersonalEnvironmentHealth(storage, manager, startupMetrics)
+  const unmanagedForgeProcesses = report.processes.relatedForgeProcesses.length - (report.processes.forgeManagedByThisApp ? 1 : 0)
+  if (unmanagedForgeProcesses > 0) {
+    actions.push({
+      id: 'process-manual-review',
+      area: 'process',
+      status: 'skipped',
+      title: 'Process cleanup needs confirmation',
+      detail: `${unmanagedForgeProcesses} Forge-related process(es) still need manual review before stopping.`
+    })
+  }
+  if (report.downloads.orphanPartials > 0) {
+    actions.push({
+      id: 'orphan-partial-manual-review',
+      area: 'download',
+      status: 'skipped',
+      title: 'Orphan partial cleanup needs confirmation',
+      detail: `${report.downloads.orphanPartials} orphan partial file(s) remain. Delete from the integrity list after checking the filename.`
+    })
+  }
+  if (actions.length === 0) {
+    actions.push({
+      id: 'no-safe-action-needed',
+      area: 'startup',
+      status: 'skipped',
+      title: 'No safe automatic recovery was needed',
+      detail: 'The current report did not contain a settings or stale download issue that can be repaired automatically.'
+    })
+  }
+
+  return {
+    checkedAt,
+    settingsNormalized,
+    modelLibrary,
+    actions,
+    report
+  }
+}
+
+function emptyModelLibraryRecoveryResult(): ModelLibraryRecoveryResult {
+  return {
+    recoveredJobs: 0,
+    completedJobsFixed: 0,
+    metadataRefetched: 0,
+    previewsRefetched: 0,
+    hashesQueued: 0,
+    hashAlreadyRunning: false
+  }
+}
+
+function buildPersonalHealthIssues(report: PersonalEnvironmentHealthReport): PersonalHealthIssue[] {
+  const issues: PersonalHealthIssue[] = []
+  for (const detail of report.settings.issues) {
+    issues.push({
+      id: `settings-${issues.length}`,
+      area: 'settings',
+      severity: report.settings.parseOk ? 'warn' : 'error',
+      title: report.settings.parseOk ? 'Settings needs review' : 'Settings is broken',
+      detail,
+      action: report.settings.parseOk ? 'Open Settings and save once after confirming values.' : 'Repair userdata/settings.json or let defaults be recreated from backup.'
+    })
+  }
+  if (!report.settings.launchPyExists) {
+    issues.push({
+      id: 'forge-launch-missing',
+      area: 'forge',
+      severity: 'error',
+      title: 'Forge launch.py is missing',
+      detail: report.settings.forgePath,
+      action: 'Set Forge path to a valid runtime/forge folder.'
+    })
+  }
+  if (report.processes.relatedForgeProcesses.length > (report.processes.forgeManagedByThisApp ? 1 : 0)) {
+    issues.push({
+      id: 'process-extra-forge',
+      area: 'process',
+      severity: 'warn',
+      title: 'Extra Forge process may remain',
+      detail: `${report.processes.relatedForgeProcesses.length} Forge-related process(es) were found.`,
+      action: 'Stop Forge from the title bar, or restart the app if a previous process is stale.'
+    })
+  }
+  if (report.processes.relatedElectronProcesses.length > 1) {
+    issues.push({
+      id: 'process-extra-electron',
+      area: 'process',
+      severity: 'warn',
+      title: 'Extra Electron process may remain',
+      detail: `${report.processes.relatedElectronProcesses.length} Electron process(es) for this project were found.`,
+      action: 'Close hidden windows or relaunch from Yoitomoshi.bat.'
+    })
+  }
+  if (report.downloads.staleRunning > 0) {
+    issues.push({
+      id: 'download-stale-running',
+      area: 'download',
+      severity: 'warn',
+      title: 'Stale running download job',
+      detail: `${report.downloads.staleRunning} running job(s) have not updated for more than 10 minutes.`,
+      action: 'Run Model Library recovery, then resume or discard the job.'
+    })
+  }
+  if (report.downloads.failed > 0) {
+    issues.push({
+      id: 'download-failed',
+      area: 'download',
+      severity: 'warn',
+      title: 'Failed download jobs remain',
+      detail: `${report.downloads.failed} failed job(s) are in userdata/downloads/jobs.json.`,
+      action: 'Open Model Library downloads and resume or discard them.'
+    })
+  }
+  if (report.downloads.orphanPartials > 0) {
+    issues.push({
+      id: 'download-orphan-partial',
+      area: 'download',
+      severity: 'warn',
+      title: 'Orphan partial model files',
+      detail: `${report.downloads.orphanPartials} partial file(s) are not associated with a DownloadJob.`,
+      action: 'Run Integrity check and delete only the listed .partial files.'
+    })
+  }
+  if (report.library.missingFiles > 0) {
+    issues.push({
+      id: 'library-missing-files',
+      area: 'library',
+      severity: 'error',
+      title: 'Indexed models are missing',
+      detail: `${report.library.missingFiles} indexed model file(s) no longer exist.`,
+      action: 'Rescan Model Library.'
+    })
+  }
+  if (report.library.shaMissing > 0) {
+    issues.push({
+      id: 'library-sha-missing',
+      area: 'library',
+      severity: 'info',
+      title: 'Model hashes are still queued',
+      detail: `${report.library.shaMissing} model file(s) do not have SHA-256 yet.`,
+      action: 'Run Recovery or hash one item at a time.'
+    })
+  }
+  if (report.startup.slowForgeReady) {
+    issues.push({
+      id: 'startup-slow-forge',
+      area: 'startup',
+      severity: 'warn',
+      title: 'Forge ready is slow',
+      detail: `Recent max: ${formatMsForIssue(report.startup.forgeReadyMaxMs)}.`,
+      action: 'Check the startup signals below before disabling extensions or changing ControlNet.'
+    })
+  }
+  return issues
+}
+
+async function listRelatedProcesses(forgePath: string): Promise<{
+  relatedForgeProcesses: PersonalHealthProcess[]
+  relatedElectronProcesses: PersonalHealthProcess[]
+}> {
+  const rows = await listWindowsProcessRows()
+  const normalizedForge = forgePath.toLowerCase().replace(/\//g, '\\')
+  const projectRoot = resolve(forgePath, '..', '..').toLowerCase().replace(/\//g, '\\')
+  const currentPid = process.pid
+  const relatedForgeProcesses = rows.filter((row) => {
+    const command = row.commandLine.toLowerCase().replace(/\//g, '\\')
+    return command.includes(normalizedForge) && command.includes('launch.py')
+  })
+  const relatedElectronProcesses = rows.filter((row) => {
+    const name = row.name.toLowerCase()
+    const command = row.commandLine.toLowerCase().replace(/\//g, '\\')
+    if (row.pid === currentPid) return true
+    return name.includes('electron') && command.includes(projectRoot)
+  })
+  return {
+    relatedForgeProcesses,
+    relatedElectronProcesses
+  }
+}
+
+async function listWindowsProcessRows(): Promise<PersonalHealthProcess[]> {
+  if (process.platform !== 'win32') return []
+  const command = [
+    '$rows = Get-CimInstance Win32_Process |',
+    'Where-Object { $_.CommandLine -and ($_.Name -match "python|electron|Yoitomoshi" -or $_.CommandLine -match "Yoitomoshi-Art-Generator|launch.py") } |',
+    'Select-Object ProcessId,Name,CommandLine;',
+    '$rows | ConvertTo-Json -Compress'
+  ].join(' ')
+  const raw = await new Promise<string>((resolve) => {
+    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', command], {
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true
+    })
+    let stdout = ''
+    child.stdout?.on('data', (data: Buffer) => { stdout += data.toString('utf8') })
+    child.on('error', () => resolve(''))
+    child.on('exit', () => resolve(stdout.trim()))
+  })
+  if (!raw) return []
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return []
+  }
+  const rows = Array.isArray(parsed) ? parsed : [parsed]
+  return rows
+    .filter((row): row is Record<string, unknown> => !!row && typeof row === 'object')
+    .map((row) => ({
+      pid: typeof row.ProcessId === 'number' ? row.ProcessId : 0,
+      name: typeof row.Name === 'string' ? row.Name : '',
+      commandLine: typeof row.CommandLine === 'string' ? row.CommandLine.slice(0, 800) : ''
+    }))
+    .filter((row) => row.pid > 0 && row.commandLine)
+}
+
+function buildStartupSignals(
+  status: ReturnType<ForgeManager['getStatus']>,
+  samples: StartupMetricsSample[]
+): PersonalHealthStartupSignal[] {
+  const logTail = 'logTail' in status ? status.logTail ?? [] : []
+  const slow = samples.some((sample) => typeof sample.forgeReadyMs === 'number' && sample.forgeReadyMs > SLOW_FORGE_READY_MS)
+  return [
+    startupSignal('python', 'Python / Torch initialization', /python|torch|cuda|xformers|install|requirement/i, logTail, slow),
+    startupSignal('extensions', 'Forge extension loading', /extension|extensions|load scripts|error loading script|error calling/i, logTail, slow || (status.kind === 'ready' && status.brokenExtensions.length > 0)),
+    startupSignal('controlnet', 'ControlNet initialization', /controlnet|control net|sd_forge_controlnet/i, logTail, false),
+    startupSignal('model', 'Checkpoint / VAE loading', /loading weights|checkpoint|vae|model loaded|sd_model/i, logTail, false),
+    startupSignal('api', 'API readiness polling', /api|sdapi|running on local url|options/i, logTail, status.kind === 'starting')
+  ]
+}
+
+function startupSignal(
+  id: PersonalHealthStartupSignal['id'],
+  label: string,
+  pattern: RegExp,
+  logTail: string[],
+  fallbackWarn: boolean
+): PersonalHealthStartupSignal {
+  const evidence = logTail
+    .filter((line) => pattern.test(line))
+    .slice(-3)
+  return {
+    id,
+    label,
+    severity: evidence.length > 0 || fallbackWarn ? 'warn' : 'info',
+    confidence: evidence.length >= 2 ? 'high' : evidence.length === 1 ? 'medium' : fallbackWarn ? 'low' : 'low',
+    evidence: evidence.length > 0
+      ? evidence
+      : [fallbackWarn ? 'Recent startup samples were slow, but the current log tail has no detailed phase timing.' : 'No signal in current log tail.']
+  }
+}
+
+function average(values: number[]): number | null {
+  if (values.length === 0) return null
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+}
+
+function formatMsForIssue(value: number | null): string {
+  if (value == null) return '-'
+  return `${Math.round(value / 100) / 10}s`
 }
 
 async function cacheModelPreview(storage: Storage, entryId: string, rawUrl: string): Promise<string | null> {
@@ -3365,9 +3964,11 @@ export function registerIpcHandlers(deps: {
   api: ForgeApi
   storage: Storage
   library: PromptLibrary
+  resourcesDir: string
+  dataRoot: string
   startupMetrics: StartupMetrics
 }): void {
-  const { win, manager, api, storage, library, startupMetrics } = deps
+  const { win, manager, api, storage, library, resourcesDir, dataRoot, startupMetrics } = deps
   const userPickedModelFiles = new Set<string>()
   let startupMetricsPersisted = false
 
@@ -3531,6 +4132,12 @@ export function registerIpcHandlers(deps: {
   ipcMain.handle(IPC.toolsCancelModelMerger, () => cancelModelMerger(win))
   ipcMain.handle(IPC.toolsInspectCharacterCompositeIntegrations, () =>
     inspectCharacterCompositeIntegrations(storage)
+  )
+  ipcMain.handle(IPC.toolsInspectPersonalHealth, () =>
+    inspectPersonalEnvironmentHealth(storage, manager, startupMetrics)
+  )
+  ipcMain.handle(IPC.toolsRunPersonalHealthRecovery, () =>
+    runPersonalEnvironmentRecovery(storage, manager, startupMetrics)
   )
 
   // Generation with progress streaming. Both txt2img and img2img share the
@@ -4065,6 +4672,12 @@ export function registerIpcHandlers(deps: {
     if (job.status === 'completed' && existsSync(job.destPath)) {
       throw new Error('Download job is already completed')
     }
+    if (job.status === 'running' && inflightDownloads.has(job.url)) {
+      throw new Error('Download job is still active. Cancel the current download before resuming it.')
+    }
+    if (job.status === 'running' && Date.now() - job.updatedAt <= STALE_DOWNLOAD_MS) {
+      throw new Error('Download job is marked running but is not stale yet. Run recovery after it becomes stale.')
+    }
     const provider = job.source?.provider === 'huggingface' ? 'huggingface' : 'civitai'
     const req = {
       url: job.url,
@@ -4082,6 +4695,14 @@ export function registerIpcHandlers(deps: {
 
   ipcMain.handle(IPC.toolsDiscardDownloadJob, (_e, rawId: string) => {
     const id = validateDownloadJobId(rawId)
+    const job = storage.getDownloadJob(id)
+    if (!job) throw new Error('Download job not found')
+    if (job.status === 'running' && inflightDownloads.has(job.url)) {
+      throw new Error('Download job is still active. Cancel the current download before discarding it.')
+    }
+    if (job.status === 'running' && Date.now() - job.updatedAt <= STALE_DOWNLOAD_MS) {
+      throw new Error('Running download jobs can only be discarded after they become stale.')
+    }
     return storage.deleteDownloadJob(id, { deletePartial: true })
   })
 
@@ -4212,6 +4833,9 @@ export function registerIpcHandlers(deps: {
   ipcMain.handle(IPC.storageSetHistoryTagReview, (_e, id: string, review: HistoryTagReview | null) =>
     storage.setHistoryTagReview(id, validateHistoryTagReview(review))
   )
+  ipcMain.handle(IPC.storageSetHistoryProRecipeReview, (_e, id: string, review: HistoryProRecipeReview | null) =>
+    storage.setHistoryProRecipeReview(id, validateHistoryProRecipeReview(review))
+  )
   ipcMain.handle(IPC.storageListPresets, () => storage.listPresets())
   ipcMain.handle(IPC.storageSavePreset, (_e, input) => storage.savePreset(input))
   ipcMain.handle(IPC.storageDeletePreset, (_e, id) => storage.deletePreset(id))
@@ -4221,6 +4845,15 @@ export function registerIpcHandlers(deps: {
   ipcMain.handle(IPC.storageSaveQuickPreset, (_e, input) => storage.saveQuickPreset(input))
   ipcMain.handle(IPC.storageDeleteQuickPreset, (_e, id: string) =>
     storage.deleteQuickPreset(id)
+  )
+  ipcMain.handle(IPC.storageListPromptComposerSlotTemplates, () =>
+    storage.listPromptComposerSlotTemplates()
+  )
+  ipcMain.handle(IPC.storageSavePromptComposerSlotTemplate, (_e, input) =>
+    storage.savePromptComposerSlotTemplate(input)
+  )
+  ipcMain.handle(IPC.storageDeletePromptComposerSlotTemplate, (_e, id: string) =>
+    storage.deletePromptComposerSlotTemplate(id)
   )
   ipcMain.handle(IPC.storageGetLoraFavorites, () => storage.getLoraFavorites())
   ipcMain.handle(IPC.storageSetLoraFavorites, (_e, names: string[]) =>
@@ -4283,6 +4916,20 @@ export function registerIpcHandlers(deps: {
   }))
   ipcMain.handle(IPC.libraryGetCustom, () => storage.getCustomLibrary())
   ipcMain.handle(IPC.librarySaveCustom, (_e, cats) => storage.saveCustomLibrary(cats))
+
+  // Prompt dictionary ----------------------------------------------------
+  ipcMain.handle(IPC.promptDictionarySearch, (_e, input) =>
+    searchPromptDictionary(library, storage.getCustomLibrary(), validatePromptDictionarySearchRequest(input), {
+      resourcesDir,
+      dataRoot
+    })
+  )
+
+  // Translation ----------------------------------------------------------
+  ipcMain.handle(IPC.translationPromptTag, (_e, input) => translatePromptTag(input))
+  ipcMain.handle(IPC.translationPromptText, (_e, input) => translatePromptText(input))
+  ipcMain.handle(IPC.translationPromptRuntimeStatus, () => inspectPromptTranslationRuntimeStatus())
+  ipcMain.handle(IPC.translationPreparePromptRuntime, () => preparePromptTranslationRuntime())
 
   // Misc -----------------------------------------------------------------
   ipcMain.handle(IPC.appStartupMetrics, () => ({ ...startupMetrics }))

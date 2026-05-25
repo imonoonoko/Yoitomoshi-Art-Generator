@@ -6,9 +6,13 @@ import { useT, t as tStatic } from '@/lib/i18n'
 import { getExtensionGuardIssues } from '@/lib/extension-guards'
 import { baseModelsCompatible } from '@/lib/lora-suggest'
 import { approxTokenCount, formatPromptText, promptAppend, promptNeedsFormatting } from '@/lib/prompt-utils'
+import type { CheckpointPromptProfile, CheckpointRelatedModelReference } from '@shared/types'
 import {
   checkpointPromptContextFromModel,
+  checkpointPromptProfileParamsChanged,
+  checkpointPromptProfileParamsPatch,
   checkpointPromptProfileSuggests,
+  defaultCheckpointPromptProfile,
   findCheckpointPromptProfile,
   formatPromptForCheckpoint
 } from '@/lib/checkpoint-prompt-profile'
@@ -28,10 +32,12 @@ export function GenerationPreflightPanel(): JSX.Element {
   const state = useStore((s) => s)
   const t = useT()
   const items = useMemo(() => buildPreflightItems(state), [state])
+  const relatedModelGroups = useMemo(() => buildPreflightRelatedModelGroups(state), [state])
   const blockers = items.filter((item) => item.severity === 'block').length
   const warnings = items.filter((item) => item.severity === 'warn').length
   const ok = blockers === 0 && warnings === 0
   const visibleItems = items.filter((item) => item.severity !== 'ok').slice(0, 6)
+  const hasRelatedModels = relatedModelGroups.some((group) => group.items.length > 0)
 
   return (
     <section
@@ -110,6 +116,51 @@ export function GenerationPreflightPanel(): JSX.Element {
               )}
             </div>
           )})}
+        </div>
+      )}
+      {hasRelatedModels && (
+        <div
+          className="mt-2 rounded-md border border-line/80 bg-bg-1/55 p-1.5"
+          data-testid="preflight-related-models"
+          data-preflight-related-loras={relatedModelGroups.find((group) => group.key === 'loras')?.items.length ?? 0}
+          data-preflight-related-vaes={relatedModelGroups.find((group) => group.key === 'vaes')?.items.length ?? 0}
+          data-preflight-related-controlnets={relatedModelGroups.find((group) => group.key === 'controlnets')?.items.length ?? 0}
+        >
+          <div className="mb-1 flex items-center gap-1 text-[10px] font-medium text-ink-2">
+            <Info className="h-3 w-3 text-accent" />
+            {t('preflight.relatedModels')}
+          </div>
+          <div className="grid grid-cols-1 gap-1 sm:grid-cols-3">
+            {relatedModelGroups.filter((group) => group.items.length > 0).map((group) => (
+              <div
+                key={group.key}
+                className="min-w-0 rounded border border-line/70 bg-bg-0/60 p-1"
+                data-testid={`preflight-related-${group.key}`}
+                data-related-count={group.items.length}
+              >
+                <div className="mb-1 flex items-center gap-1 text-[10px] text-ink-3">
+                  <span className="min-w-0 truncate">{t(group.labelKey)}</span>
+                  <span className="ml-auto rounded border border-line bg-bg-2 px-1 font-mono text-[9px] text-ink-2">
+                    {group.items.length}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {group.items.slice(0, 4).map((item, index) => (
+                    <span
+                      key={`${group.key}-${item.name}-${index}`}
+                      className="max-w-full truncate rounded border border-accent/25 bg-accent/10 px-1.5 py-0.5 text-[10px] text-ink-2"
+                      title={[item.name, item.meta, item.notes].filter(Boolean).join('\n')}
+                      data-testid={`preflight-related-${group.key}-${index}`}
+                      data-related-status={item.status}
+                    >
+                      {item.name}
+                      {item.meta && <span className="text-ink-3"> · {item.meta}</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </section>
@@ -201,6 +252,7 @@ export function buildPreflightItems(state: AppState): PreflightItem[] {
     checkpointPromptContext,
     checkpointPromptProfile
   )
+  const effectiveCheckpointProfile = checkpointPromptProfile ?? positiveModelFormat.profile
   if (
     checkpointPromptProfileSuggests(positiveModelFormat.profile) &&
     (positiveModelFormat.modelChanged || negativeModelFormat.modelChanged)
@@ -211,6 +263,49 @@ export function buildPreflightItems(state: AppState): PreflightItem[] {
       messageKey: 'preflight.modelPromptFormatSuggested',
       params: { family: positiveModelFormat.family }
     })
+  }
+  if (
+    checkpointPromptProfileSuggests(checkpointPromptProfile) &&
+    checkpointPromptProfileParamsChanged(state.params, checkpointPromptProfile)
+  ) {
+    items.push({
+      severity: 'warn',
+      key: 'model-profile-settings',
+      messageKey: 'preflight.modelProfileSettingsSuggested',
+      params: { family: positiveModelFormat.family }
+    })
+  }
+  if (checkpointPromptProfileSuggests(effectiveCheckpointProfile)) {
+    const recommendedAspect = recommendedAspectRatioForParams(
+      state.params.width,
+      state.params.height,
+      effectiveCheckpointProfile
+    )
+    if (recommendedAspect) {
+      items.push({
+        severity: 'warn',
+        key: 'model-profile-aspect',
+        messageKey: 'preflight.modelProfileAspectSuggested',
+        params: {
+          width: state.params.width,
+          height: state.params.height,
+          recommended: `${recommendedAspect.label} ${recommendedAspect.width}x${recommendedAspect.height}`
+        }
+      })
+    }
+    const loraRange = effectiveCheckpointProfile?.recommendedLoraCount ?? null
+    if (loraRange && (state.activeLoras.length < loraRange.min || state.activeLoras.length > loraRange.max)) {
+      items.push({
+        severity: 'warn',
+        key: 'model-profile-lora-count',
+        messageKey: 'preflight.modelProfileLoraCountSuggested',
+        params: {
+          count: state.activeLoras.length,
+          min: loraRange.min,
+          max: loraRange.max
+        }
+      })
+    }
   }
   if (hasDynamicPromptSyntax(state.prompt) || hasDynamicPromptSyntax(state.negativePrompt)) {
     const context = buildDynamicPromptContext({
@@ -361,7 +456,12 @@ export function buildPreflightItems(state: AppState): PreflightItem[] {
 }
 
 function canQuickFixPreflightItem(key: string): boolean {
-  return key === 'lora-trigger' || key === 'sdxl-size' || key === 'prompt-format' || key === 'model-prompt-format'
+  return key === 'lora-trigger' ||
+    key === 'sdxl-size' ||
+    key === 'prompt-format' ||
+    key === 'model-prompt-format' ||
+    key === 'model-profile-settings' ||
+    key === 'model-profile-aspect'
 }
 
 function quickFixPreflightItem(key: string): void {
@@ -394,6 +494,36 @@ function quickFixPreflightItem(key: string): void {
     if (negativeResult.changed) state.setNegativePrompt(negativeResult.prompt)
     toast.success(tStatic('preflight.fixedModelPromptFormat'))
     focusPreflightItem('prompt-tokens')
+    return
+  }
+
+  if (key === 'model-profile-settings') {
+    const selectedModel = state.models.find((model) => model.title === state.selectedModelTitle) ?? null
+    const context = checkpointPromptContextFromModel(selectedModel, state.recommendation)
+    const profile = findCheckpointPromptProfile(state.checkpointPromptProfiles, context)
+    if (!checkpointPromptProfileParamsChanged(state.params, profile)) {
+      focusPreflightItem(key)
+      return
+    }
+    state.patchParams(checkpointPromptProfileParamsPatch(profile))
+    toast.success(tStatic('preflight.fixedModelProfileSettings'))
+    focusPreflightItem(key)
+    return
+  }
+
+  if (key === 'model-profile-aspect') {
+    const selectedModel = state.models.find((model) => model.title === state.selectedModelTitle) ?? null
+    const context = checkpointPromptContextFromModel(selectedModel, state.recommendation)
+    const profile = findCheckpointPromptProfile(state.checkpointPromptProfiles, context) ??
+      defaultCheckpointPromptProfile(context)
+    const recommendedAspect = recommendedAspectRatioForParams(state.params.width, state.params.height, profile)
+    if (!recommendedAspect) {
+      focusPreflightItem(key)
+      return
+    }
+    state.patchParams({ width: recommendedAspect.width, height: recommendedAspect.height })
+    toast.success(tStatic('preflight.fixedModelProfileAspect'))
+    focusPreflightItem(key)
     return
   }
 
@@ -442,6 +572,127 @@ function uniqueNonEmpty(words: string[]): string[] {
   return out
 }
 
+function recommendedAspectRatioForParams(
+  width: number,
+  height: number,
+  profile: CheckpointPromptProfile | null | undefined
+): NonNullable<CheckpointPromptProfile['recommendedAspectRatios']>[number] | null {
+  const ratios = profile?.recommendedAspectRatios ?? []
+  if (ratios.length === 0 || width <= 0 || height <= 0) return null
+  const currentRatio = width / height
+  const matched = ratios.some((ratio) => {
+    const targetRatio = ratio.width / ratio.height
+    return Math.abs(currentRatio - targetRatio) <= 0.02
+  })
+  return matched ? null : ratios[0]
+}
+
+interface PreflightRelatedModelGroup {
+  key: 'loras' | 'vaes' | 'controlnets'
+  labelKey: string
+  items: PreflightRelatedModelItem[]
+}
+
+interface PreflightRelatedModelItem {
+  name: string
+  meta: string
+  notes: string
+  status: 'active' | 'selected' | 'enabled' | 'available' | 'memo'
+}
+
+function buildPreflightRelatedModelGroups(state: AppState): PreflightRelatedModelGroup[] {
+  const selectedModel = state.models.find((model) => model.title === state.selectedModelTitle) ?? null
+  const modelContext = checkpointPromptContextFromModel(selectedModel, state.recommendation)
+  const context = selectedModel
+    ? modelContext
+    : { ...modelContext, title: state.selectedModelTitle, name: state.selectedModelTitle }
+  const profile = findCheckpointPromptProfile(state.checkpointPromptProfiles, context)
+  const related = profile?.relatedModels
+  const activeLoraNames = state.activeLoras.map((lora) => lora.name)
+  const availableLoraNames = state.loras.map((lora) => lora.name)
+  const availableVaeNames = state.vaes.map((vae) => vae.modelName)
+  const enabledControlNetNames = state.controlnet.units
+    .filter((unit) => unit.enabled && unit.model !== 'None')
+    .map((unit) => unit.model)
+  const availableControlNetNames = state.controlnetModelList
+
+  return [
+    {
+      key: 'loras',
+      labelKey: 'preflight.relatedLoras',
+      items: summarizeRelatedModels(related?.loras ?? [], (item) => {
+        if (hasRelatedName(activeLoraNames, item.name)) return 'active'
+        if (hasRelatedName(availableLoraNames, item.name)) return 'available'
+        return 'memo'
+      })
+    },
+    {
+      key: 'vaes',
+      labelKey: 'preflight.relatedVaes',
+      items: summarizeRelatedModels(related?.vaes ?? [], (item) => {
+        if (relatedNamesMatch(state.selectedVae, item.name)) return 'selected'
+        if (hasRelatedName(availableVaeNames, item.name)) return 'available'
+        return 'memo'
+      })
+    },
+    {
+      key: 'controlnets',
+      labelKey: 'preflight.relatedControlNets',
+      items: summarizeRelatedModels(related?.controlNets ?? [], (item) => {
+        if (hasRelatedName(enabledControlNetNames, item.name)) return 'enabled'
+        if (hasRelatedName(availableControlNetNames, item.name)) return 'available'
+        return 'memo'
+      })
+    }
+  ]
+}
+
+function summarizeRelatedModels(
+  items: CheckpointRelatedModelReference[],
+  statusFor: (item: CheckpointRelatedModelReference) => PreflightRelatedModelItem['status']
+): PreflightRelatedModelItem[] {
+  return items
+    .filter((item) => item.name.trim())
+    .map((item) => ({
+      name: item.name.trim(),
+      meta: relatedModelMeta(item),
+      notes: (item.notes ?? []).join('\n'),
+      status: statusFor(item)
+    }))
+}
+
+function relatedModelMeta(item: CheckpointRelatedModelReference): string {
+  const parts: string[] = []
+  if (item.role?.trim()) parts.push(item.role.trim())
+  if (item.weight != null) parts.push(`w ${formatRelatedWeight(item.weight)}`)
+  const firstNote = item.notes?.find((note) => note.trim())?.trim()
+  if (firstNote) parts.push(firstNote)
+  return parts.join(' / ')
+}
+
+function formatRelatedWeight(weight: number): string {
+  return Number.isInteger(weight) ? String(weight) : weight.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+}
+
+function hasRelatedName(names: string[], target: string): boolean {
+  return names.some((name) => relatedNamesMatch(name, target))
+}
+
+function relatedNamesMatch(left: string | null | undefined, right: string | null | undefined): boolean {
+  const a = normalizeRelatedName(left)
+  const b = normalizeRelatedName(right)
+  if (!a || !b) return false
+  return a === b || a.includes(b) || b.includes(a)
+}
+
+function normalizeRelatedName(value: string | null | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/\[[a-f0-9]{6,}\]/g, '')
+    .replace(/\.(safetensors|ckpt|pt|pth|bin)$/g, '')
+    .replace(/[^a-z0-9]+/g, '')
+}
+
 interface PreflightTarget {
   tab?: AppState['currentTab']
   sideTab?: 'library' | 'lora' | 'history' | 'presets'
@@ -459,13 +710,16 @@ function preflightTargetForKey(key: string): PreflightTarget | null {
   if (key === 'prompt-tokens' || key === 'prompt-format' || key === 'model-prompt-format' || key.startsWith('adapter-')) {
     return { tab: 'txt2img', testIds: ['prompt-positive-section'] }
   }
+  if (key === 'model-profile-settings' || key === 'model-profile-aspect') {
+    return { tab: 'txt2img', testIds: ['parameters-panel'] }
+  }
   if (key === 'dynamic-prompt') {
     return { tab: 'txt2img', testIds: ['dynamic-prompt-lab', 'prompt-positive-section'] }
   }
   if (key === 'lora-trigger') {
     return { tab: 'txt2img', sideTab: 'lora', testIds: ['generation-create-lora', 'side-content-lora'] }
   }
-  if (key === 'lora' || key === 'lora-base') {
+  if (key === 'lora' || key === 'lora-base' || key === 'model-profile-lora-count') {
     return { tab: 'txt2img', sideTab: 'lora', testIds: ['side-tab-lora', 'side-content-lora'] }
   }
   if (key === 'sdxl-size') {

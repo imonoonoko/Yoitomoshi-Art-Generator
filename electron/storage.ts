@@ -1,5 +1,5 @@
 import { safeStorage } from 'electron'
-import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync, existsSync, readdirSync, unlinkSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type {
@@ -12,17 +12,31 @@ import type {
   GeneratedVideoSaveRequest,
   GeneratedVideoSaveResult,
   HistoryItem,
+  HistoryProRecipeReview,
   HistoryTagReview,
   HistoryLabel,
   CheckpointPromptFamily,
+  CheckpointNegativeStrategy,
   CheckpointPromptProfile,
   CheckpointPromptProfileMode,
+  CheckpointPromptStyle,
   LoraCivitaiMetadata,
   LoraPromptOverride,
   LoraUsageRecord,
   ModelLibraryEntry,
   ModelSourceMetadata,
+  PersonalEnvironmentHealthReport,
   PromptCategory,
+  PromptGroup,
+  PromptGroupTag,
+  PromptLibraryDocumentV2,
+  PromptComposerSlotKey,
+  PromptComposerSlotTemplate,
+  PromptComposerSlotTemplateSaveInput,
+  PromptComposerSlots,
+  PromptTagPolarity,
+  PromptTagSource,
+  PromptTagSourceKind,
   PromptPreset,
   QuickPreset,
   StartupMetrics,
@@ -43,14 +57,105 @@ const DOWNLOAD_JOB_STATUSES = new Set<DownloadJobStatus>([
   'failed',
   'canceled'
 ])
-const HISTORY_LABELS = new Set<HistoryLabel>(['favorite', 'candidate', 'rejected', 'asset'])
+const HISTORY_LABELS = new Set<HistoryLabel>(['favorite', 'candidate', 'rejected', 'asset', 'social', 'reference'])
 const MAX_HISTORY_REVIEW_TAGS = 120
 const MAX_HISTORY_REVIEW_TAG_LENGTH = 80
+const MAX_HISTORY_PRO_RECIPE_ITEMS = 24
+const MAX_HISTORY_PRO_RECIPE_ITEM_LENGTH = 220
 const MAX_LORA_PROMPT_OVERRIDES = 1000
 const MAX_LORA_OVERRIDE_PROMPT_CHARS = 4000
 const MAX_CHECKPOINT_PROMPT_PROFILES = 1000
 const MAX_CHECKPOINT_PROFILE_TAGS = 80
 const MAX_CHECKPOINT_PROFILE_TAG_CHARS = 160
+const MAX_CHECKPOINT_PROFILE_NOTES = 24
+const MAX_CHECKPOINT_PROFILE_NOTE_CHARS = 260
+const MAX_CHECKPOINT_PROFILE_ASPECT_RATIOS = 8
+const MAX_CHECKPOINT_PROFILE_RELATED_MODELS = 24
+const MAX_PROMPT_COMPOSER_SLOT_TEMPLATES = 200
+const MAX_PROMPT_COMPOSER_SLOT_CHARS = 1200
+const MAX_PROMPT_COMPOSER_TEMPLATE_NAME_CHARS = 100
+const MAX_PROMPT_COMPOSER_TEMPLATE_NOTES_CHARS = 500
+const MAX_TAG_LIBRARY_BACKUPS = 40
+const PROMPT_COMPOSER_SLOT_KEYS = new Set<PromptComposerSlotKey>([
+  'qualityPrefix',
+  'subject',
+  'composition',
+  'expressionPose',
+  'lighting',
+  'color',
+  'clothingProps',
+  'background',
+  'textureStyle',
+  'finishing',
+  'avoidFailures'
+])
+const PROMPT_TAG_SOURCE_KINDS = new Set<PromptTagSourceKind>([
+  'built-in',
+  'manual',
+  'import',
+  'civitai',
+  'tagger',
+  'history',
+  'migration'
+])
+
+function normalizePromptTagCanonical(value: string): string {
+  return value.trim().replace(/\s+/g, ' ')
+}
+
+function normalizePromptTagLookupKey(value: string): string {
+  return normalizePromptTagCanonical(value).toLowerCase()
+}
+
+function sanitizePromptTagStringList(values: unknown): string[] {
+  if (!Array.isArray(values)) return []
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const value of values) {
+    if (typeof value !== 'string') continue
+    const cleaned = normalizePromptTagCanonical(value)
+    const key = normalizePromptTagLookupKey(cleaned)
+    if (!cleaned || seen.has(key)) continue
+    seen.add(key)
+    out.push(cleaned)
+  }
+  return out.slice(0, 80)
+}
+
+function sanitizePromptTagAliases(values: unknown, canonical: string): string[] {
+  const canonicalKey = normalizePromptTagLookupKey(canonical)
+  return sanitizePromptTagStringList(values).filter((alias) => normalizePromptTagLookupKey(alias) !== canonicalKey)
+}
+
+function sanitizePromptTagPolarity(
+  value: unknown,
+  categoryName: string,
+  groupName: string
+): PromptTagPolarity {
+  if (value === 'positive' || value === 'negative' || value === 'both') return value
+  const haystack = `${categoryName} ${groupName}`.toLowerCase()
+  return haystack.includes('negative') || haystack.includes('ネガティブ') ? 'negative' : 'positive'
+}
+
+function sanitizePromptTagSources(values: unknown, createdAt: string | null): PromptTagSource[] {
+  if (!Array.isArray(values)) {
+    return [{ kind: createdAt ? 'migration' : 'manual', confidence: 1, ...(createdAt ? { at: createdAt } : {}) }]
+  }
+  const out: PromptTagSource[] = []
+  for (const value of values) {
+    if (!value || typeof value !== 'object') continue
+    const source = value as Partial<PromptTagSource>
+    if (!source.kind || !PROMPT_TAG_SOURCE_KINDS.has(source.kind)) continue
+    const cleaned: PromptTagSource = { kind: source.kind }
+    if (typeof source.model === 'string' && source.model.trim()) cleaned.model = source.model.trim().slice(0, 160)
+    if (typeof source.confidence === 'number' && Number.isFinite(source.confidence)) {
+      cleaned.confidence = Math.max(0, Math.min(1, source.confidence))
+    }
+    if (typeof source.at === 'string' && source.at.trim()) cleaned.at = source.at.trim()
+    out.push(cleaned)
+  }
+  return out.length > 0 ? out.slice(0, 12) : [{ kind: 'manual', confidence: 1 }]
+}
 
 /**
  * Filesystem-backed JSON storage. Phase 1 stays JSON-only — when history grows past
@@ -198,8 +303,21 @@ export class Storage {
       scale: input.scale,
       criteria: input.criteria,
       candidates: input.candidates.map((candidate, index) => ({
+        method: candidate.method ?? input.method,
+        scale: candidate.scale ?? input.scale,
+        upscaler: candidate.upscaler ?? null,
         denoise: candidate.denoise,
         tileControlNetEnabled: candidate.tileControlNetEnabled,
+        tileWidth: candidate.tileWidth ?? null,
+        tileHeight: candidate.tileHeight ?? null,
+        tileOverlap: candidate.tileOverlap ?? null,
+        ultimateMaskBlur: candidate.ultimateMaskBlur ?? null,
+        ultimatePadding: candidate.ultimatePadding ?? null,
+        ultimateRedrawMode: candidate.ultimateRedrawMode ?? null,
+        ultimateSeamsFixType: candidate.ultimateSeamsFixType ?? null,
+        tileControlNetModule: candidate.tileControlNetModule ?? null,
+        tileControlNetModel: candidate.tileControlNetModel ?? null,
+        tileControlNetWeight: candidate.tileControlNetWeight ?? null,
         imagePath: join(dir, `candidate-${index + 1}-${candidate.tileControlNetEnabled ? 'tile-on' : 'tile-off'}-d${String(candidate.denoise).replace('.', '')}.png`)
       }))
     }
@@ -462,6 +580,80 @@ export class Storage {
     return settings
   }
 
+  diagnoseSettingsFile(): PersonalEnvironmentHealthReport['settings'] {
+    const path = join(this.root, 'settings.json')
+    const defaults = defaultSettings(this.projectRoot)
+    const issues: string[] = []
+    if (!existsSync(path)) {
+      const forgePath = defaults.forgePath
+      return {
+        path,
+        exists: false,
+        parseOk: true,
+        normalizedChanged: false,
+        inlineSecretPresent: false,
+        forgePath,
+        forgePathExists: existsSync(forgePath),
+        webuiExists: existsSync(join(forgePath, 'webui')),
+        launchPyExists: existsSync(join(forgePath, 'webui', 'launch.py')),
+        forgePort: defaults.forgePort,
+        autoStartForge: defaults.autoStartForge,
+        forgeExtraArgs: defaults.forgeExtraArgs,
+        issues: ['settings.json is missing; defaults will be recreated']
+      }
+    }
+
+    let parsed: Partial<AppSettings>
+    try {
+      parsed = JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, '')) as Partial<AppSettings>
+    } catch (e) {
+      const forgePath = defaults.forgePath
+      return {
+        path,
+        exists: true,
+        parseOk: false,
+        normalizedChanged: false,
+        inlineSecretPresent: false,
+        forgePath,
+        forgePathExists: existsSync(forgePath),
+        webuiExists: existsSync(join(forgePath, 'webui')),
+        launchPyExists: existsSync(join(forgePath, 'webui', 'launch.py')),
+        forgePort: defaults.forgePort,
+        autoStartForge: defaults.autoStartForge,
+        forgeExtraArgs: defaults.forgeExtraArgs,
+        issues: [`settings.json parse failed: ${(e as Error).message}`]
+      }
+    }
+
+    const settings = normalizeSettings({ ...defaults, ...parsed }, this.projectRoot)
+    const normalizedChanged =
+      JSON.stringify({ ...settings, civitaiApiKey: null }) !== JSON.stringify({ ...parsed, civitaiApiKey: null })
+    const inlineSecretPresent = typeof parsed.civitaiApiKey === 'string' && parsed.civitaiApiKey.length > 0
+    const webuiExists = existsSync(join(settings.forgePath, 'webui'))
+    const launchPyExists = existsSync(join(settings.forgePath, 'webui', 'launch.py'))
+    if (!existsSync(settings.forgePath)) issues.push(`Forge path does not exist: ${settings.forgePath}`)
+    if (!webuiExists) issues.push('Forge webui folder is missing')
+    if (!launchPyExists) issues.push('Forge launch.py is missing')
+    if (normalizedChanged) issues.push('settings.json contains values that will be normalized on next save')
+    if (inlineSecretPresent) issues.push('Civitai API key is still present in settings.json and will be migrated to secrets.local.json')
+
+    return {
+      path,
+      exists: true,
+      parseOk: true,
+      normalizedChanged,
+      inlineSecretPresent,
+      forgePath: settings.forgePath,
+      forgePathExists: existsSync(settings.forgePath),
+      webuiExists,
+      launchPyExists,
+      forgePort: settings.forgePort,
+      autoStartForge: settings.autoStartForge,
+      forgeExtraArgs: settings.forgeExtraArgs,
+      issues
+    }
+  }
+
   setSettings(s: AppSettings): void {
     const settings = normalizeSettings({ ...defaultSettings(this.projectRoot), ...s }, this.projectRoot)
     this.setSecret('civitaiApiKey', settings.civitaiApiKey)
@@ -593,7 +785,9 @@ export class Storage {
     const path = this.historyIndexPath()
     if (!existsSync(path)) return []
     try {
-      return JSON.parse(readFileSync(path, 'utf8')) as HistoryItem[]
+      const raw = JSON.parse(readFileSync(path, 'utf8')) as unknown
+      if (!Array.isArray(raw)) return []
+      return raw.map((item) => normalizeHistoryItem(item)).filter((item): item is HistoryItem => Boolean(item))
     } catch {
       return []
     }
@@ -663,6 +857,16 @@ export class Storage {
     if (index < 0) return null
     const nextReview = review ? sanitizeHistoryTagReview(review) : null
     all[index] = { ...all[index], tagReview: nextReview }
+    writeFileSync(this.historyIndexPath(), JSON.stringify(all, null, 2))
+    return all[index]
+  }
+
+  setHistoryProRecipeReview(id: string, review: HistoryProRecipeReview | null): HistoryItem | null {
+    const all = this.listHistory()
+    const index = all.findIndex((h) => h.id === id)
+    if (index < 0) return null
+    const nextReview = review ? sanitizeHistoryProRecipeReview(review) : null
+    all[index] = { ...all[index], proRecipeReview: nextReview }
     writeFileSync(this.historyIndexPath(), JSON.stringify(all, null, 2))
     return all[index]
   }
@@ -797,6 +1001,54 @@ export class Storage {
       : []
     const filtered = all.filter((p) => p.id !== id)
     writeFileSync(this.quickPresetsPath(), JSON.stringify(filtered, null, 2))
+  }
+
+  private promptComposerSlotTemplatesPath(): string {
+    return join(this.root, 'prompt-composer-slot-templates.json')
+  }
+
+  listPromptComposerSlotTemplates(): PromptComposerSlotTemplate[] {
+    if (!existsSync(this.promptComposerSlotTemplatesPath())) return []
+    try {
+      const raw = JSON.parse(readFileSync(this.promptComposerSlotTemplatesPath(), 'utf8'))
+      if (!Array.isArray(raw)) return []
+      return raw
+        .map((item) => normalizePromptComposerSlotTemplate(item))
+        .filter((item): item is PromptComposerSlotTemplate => Boolean(item))
+        .slice(0, MAX_PROMPT_COMPOSER_SLOT_TEMPLATES)
+    } catch {
+      return []
+    }
+  }
+
+  savePromptComposerSlotTemplate(input: PromptComposerSlotTemplateSaveInput): PromptComposerSlotTemplate {
+    const all = this.listPromptComposerSlotTemplates()
+    const id = cleanStorageString(input.id, 300) ?? randomUUID()
+    const existing = all.find((item) => item.id === id) ?? null
+    const now = Date.now()
+    const normalized = normalizePromptComposerSlotTemplate({
+      ...input,
+      id,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+      lastUsedAt: input.lastUsedAt ?? existing?.lastUsedAt ?? null
+    })
+    if (!normalized) throw new Error('Invalid Prompt Composer slot template')
+    const idx = all.findIndex((item) => item.id === normalized.id)
+    if (idx >= 0) all[idx] = normalized
+    else all.unshift(normalized)
+    writeFileSync(
+      this.promptComposerSlotTemplatesPath(),
+      JSON.stringify(all.slice(0, MAX_PROMPT_COMPOSER_SLOT_TEMPLATES), null, 2)
+    )
+    return normalized
+  }
+
+  deletePromptComposerSlotTemplate(id: string): void {
+    if (typeof id !== 'string' || id.length === 0 || id.length > 300) return
+    const all = this.listPromptComposerSlotTemplates()
+    const filtered = all.filter((item) => item.id !== id)
+    writeFileSync(this.promptComposerSlotTemplatesPath(), JSON.stringify(filtered, null, 2))
   }
 
   // -- LoRA Civitai cache (separate file from checkpoint civitai cache) ----
@@ -978,12 +1230,15 @@ export class Storage {
     return join(this.root, 'custom-prompt-library.json')
   }
 
+  private customLibraryBackupDir(): string {
+    return join(this.root, 'backups', 'tag-library')
+  }
+
   getCustomLibrary(): PromptCategory[] {
     if (!existsSync(this.customLibraryPath())) return []
     try {
-      const raw = JSON.parse(readFileSync(this.customLibraryPath(), 'utf8'))
-      if (!Array.isArray(raw)) return []
-      return (raw as PromptCategory[]).map((c) => ({ ...c, editable: true }))
+      const raw = JSON.parse(readFileSync(this.customLibraryPath(), 'utf8').replace(/^\uFEFF/, ''))
+      return this.extractCustomLibraryCategories(raw).map((c) => ({ ...c, editable: true }))
     } catch {
       return []
     }
@@ -992,8 +1247,105 @@ export class Storage {
   saveCustomLibrary(cats: PromptCategory[]): void {
     // Strip the `editable` marker before persisting — it's a render-time hint,
     // re-applied on read.
-    const cleaned = cats.map(({ editable: _editable, ...rest }) => rest)
-    writeFileSync(this.customLibraryPath(), JSON.stringify(cleaned, null, 2))
+    const updatedAt = new Date().toISOString()
+    const cleaned = this.normalizeCustomLibraryCategories(cats, updatedAt)
+    const document: PromptLibraryDocumentV2 = {
+      schemaVersion: 2,
+      updatedAt,
+      categories: cleaned
+    }
+    this.backupCustomLibraryIfPresent()
+    this.atomicWriteJson(this.customLibraryPath(), document)
+  }
+
+  private extractCustomLibraryCategories(raw: unknown): PromptCategory[] {
+    if (Array.isArray(raw)) return this.normalizeCustomLibraryCategories(raw as PromptCategory[], null)
+    if (!raw || typeof raw !== 'object') return []
+    const doc = raw as Partial<PromptLibraryDocumentV2>
+    if (doc.schemaVersion === 2 && Array.isArray(doc.categories)) {
+      return this.normalizeCustomLibraryCategories(doc.categories, null)
+    }
+    return []
+  }
+
+  private normalizeCustomLibraryCategories(cats: PromptCategory[], createdAt: string | null): PromptCategory[] {
+    const out: PromptCategory[] = []
+    for (const cat of cats) {
+      if (!cat || typeof cat.name !== 'string' || !Array.isArray(cat.groups)) continue
+      const catName = cat.name.trim()
+      if (!catName) continue
+      const groups: PromptGroup[] = []
+      for (const group of cat.groups) {
+        if (!group || typeof group.name !== 'string' || !Array.isArray(group.tags)) continue
+        const groupName = group.name.trim()
+        if (!groupName) continue
+        const tags = group.tags
+          .map((tag) => this.normalizePromptTag(tag, catName, groupName, createdAt))
+          .filter((tag): tag is PromptGroupTag => tag !== null)
+        groups.push({
+          name: groupName,
+          color: typeof group.color === 'string' && group.color.trim() ? group.color : 'rgba(120, 120, 130, .35)',
+          tags
+        })
+      }
+      out.push({ name: catName, groups })
+    }
+    return out
+  }
+
+  private normalizePromptTag(
+    tag: PromptGroupTag,
+    categoryName: string,
+    groupName: string,
+    createdAt: string | null
+  ): PromptGroupTag | null {
+    if (!tag || typeof tag.en !== 'string') return null
+    const en = tag.en.trim()
+    if (!en) return null
+    const canonical = normalizePromptTagCanonical(tag.canonical || en)
+    return {
+      en,
+      ja: typeof tag.ja === 'string' ? tag.ja.trim() : '',
+      canonical,
+      aliases: sanitizePromptTagAliases(tag.aliases, canonical),
+      polarity: sanitizePromptTagPolarity(tag.polarity, categoryName, groupName),
+      modelFamilies: sanitizePromptTagStringList(tag.modelFamilies),
+      source: sanitizePromptTagSources(tag.source, createdAt),
+      usage: {
+        count: Number.isFinite(tag.usage?.count) ? Math.max(0, Math.round(tag.usage?.count ?? 0)) : 0,
+        lastUsedAt: typeof tag.usage?.lastUsedAt === 'number' && Number.isFinite(tag.usage.lastUsedAt)
+          ? tag.usage.lastUsedAt
+          : null
+      }
+    }
+  }
+
+  private backupCustomLibraryIfPresent(): void {
+    const source = this.customLibraryPath()
+    if (!existsSync(source)) return
+    const dir = this.customLibraryBackupDir()
+    mkdirSync(dir, { recursive: true })
+    const stamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14)
+    const backupPath = join(dir, `custom-prompt-library-${stamp}-${randomUUID().slice(0, 8)}.json`)
+    copyFileSync(source, backupPath)
+    this.pruneCustomLibraryBackups(dir)
+  }
+
+  private pruneCustomLibraryBackups(dir: string): void {
+    const backups = readdirSync(dir)
+      .filter((name) => /^custom-prompt-library-\d{14}-[a-f0-9]{8}\.json$/i.test(name))
+      .sort()
+    const removeCount = backups.length - MAX_TAG_LIBRARY_BACKUPS
+    if (removeCount <= 0) return
+    for (const name of backups.slice(0, removeCount)) {
+      try { unlinkSync(join(dir, name)) } catch { /* ignore stale backup cleanup failures */ }
+    }
+  }
+
+  private atomicWriteJson(path: string, value: unknown): void {
+    const tempPath = `${path}.${process.pid}.${randomUUID()}.tmp`
+    writeFileSync(tempPath, JSON.stringify(value, null, 2))
+    renameSync(tempPath, path)
   }
 
   // -- Civitai community stats cache -------------------------------------
@@ -1095,6 +1447,67 @@ function sanitizeHistoryTagReview(review: HistoryTagReview): HistoryTagReview {
   }
 }
 
+function normalizeHistoryItem(raw: unknown): HistoryItem | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const item = raw as HistoryItem
+  const obj = raw as Record<string, unknown>
+  if (!('proRecipeReview' in obj)) return item
+  return { ...item, proRecipeReview: sanitizeHistoryProRecipeReview(obj.proRecipeReview) }
+}
+
+function sanitizeHistoryProRecipeReview(raw: unknown): HistoryProRecipeReview | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const obj = raw as Record<string, unknown>
+  const scores = sanitizeHistoryProRecipeScores(obj.scores)
+  const parentHistoryId = typeof obj.parentHistoryId === 'string'
+    ? obj.parentHistoryId.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 120) || null
+    : null
+  const rating = sanitizeHistoryProRecipeScore(obj.rating)
+  return {
+    ...(rating == null ? {} : { rating }),
+    strengths: sanitizeHistoryProRecipeList(obj.strengths),
+    issues: sanitizeHistoryProRecipeList(obj.issues),
+    nextActions: sanitizeHistoryProRecipeList(obj.nextActions),
+    ...(scores ? { scores } : {}),
+    ...(parentHistoryId ? { parentHistoryId } : {}),
+    updatedAt: typeof obj.updatedAt === 'number' && Number.isFinite(obj.updatedAt)
+      ? Math.max(0, Math.floor(obj.updatedAt))
+      : Date.now()
+  }
+}
+
+function sanitizeHistoryProRecipeList(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const items: string[] = []
+  for (const item of raw) {
+    if (typeof item !== 'string') continue
+    const text = item.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, MAX_HISTORY_PRO_RECIPE_ITEM_LENGTH)
+    const key = text.toLowerCase()
+    if (!text || seen.has(key)) continue
+    seen.add(key)
+    items.push(text)
+    if (items.length >= MAX_HISTORY_PRO_RECIPE_ITEMS) break
+  }
+  return items
+}
+
+function sanitizeHistoryProRecipeScores(raw: unknown): HistoryProRecipeReview['scores'] | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const obj = raw as Record<string, unknown>
+  const scores: NonNullable<HistoryProRecipeReview['scores']> = {}
+  for (const key of ['thumbnail', 'composition', 'lighting', 'color', 'anatomy', 'styleConsistency', 'reusePotential'] as const) {
+    const score = sanitizeHistoryProRecipeScore(obj[key])
+    if (score != null) scores[key] = score
+  }
+  return Object.keys(scores).length > 0 ? scores : undefined
+}
+
+function sanitizeHistoryProRecipeScore(raw: unknown): number | null {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return null
+  return Math.max(0, Math.min(5, Math.round(raw)))
+}
+
 function sanitizeHistoryReviewTags(raw: unknown): string[] {
   if (!Array.isArray(raw)) return []
   const seen = new Set<string>()
@@ -1126,6 +1539,16 @@ function normalizeSourceMetadata(raw: unknown): ModelSourceMetadata | undefined 
     out.tags = obj.tags
       .filter((item): item is string => typeof item === 'string' && item.length > 0 && item.length <= 80)
       .slice(0, 40)
+  }
+  if (Array.isArray(obj.trainedWords)) {
+    out.trainedWords = obj.trainedWords
+      .filter((item): item is string => typeof item === 'string' && item.length > 0 && item.length <= 120)
+      .slice(0, 40)
+  }
+  if (Array.isArray(obj.recommendedPrompts)) {
+    out.recommendedPrompts = obj.recommendedPrompts
+      .filter((item): item is string => typeof item === 'string' && item.length > 0 && item.length <= 400)
+      .slice(0, 12)
   }
   const thumbnailUrl = obj.thumbnailUrl
   if (typeof thumbnailUrl === 'string' && thumbnailUrl.length <= 2048) out.thumbnailUrl = thumbnailUrl
@@ -1373,6 +1796,40 @@ function normalizeLoraPromptOverride(raw: unknown): LoraPromptOverride | null {
   }
 }
 
+function normalizePromptComposerSlotTemplate(raw: unknown): PromptComposerSlotTemplate | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const obj = raw as Record<string, unknown>
+  const id = cleanStorageString(obj.id, 300)
+  const name = cleanStorageString(obj.name, MAX_PROMPT_COMPOSER_TEMPLATE_NAME_CHARS)
+  const slots = normalizePromptComposerSlots(obj.slots)
+  if (!id || !name || Object.keys(slots).length === 0) return null
+  return {
+    id,
+    name,
+    slots,
+    family: normalizeNullableCheckpointPromptFamily(obj.family),
+    promptStyle: normalizeNullableCheckpointPromptStyle(obj.promptStyle),
+    negativeStrategy: normalizeNullableCheckpointNegativeStrategy(obj.negativeStrategy),
+    notes: cleanStorageString(obj.notes, MAX_PROMPT_COMPOSER_TEMPLATE_NOTES_CHARS, true) ?? '',
+    createdAt: safeNumber(obj.createdAt) ?? Date.now(),
+    updatedAt: safeNumber(obj.updatedAt) ?? Date.now(),
+    lastUsedAt: safeNumber(obj.lastUsedAt)
+  }
+}
+
+function normalizePromptComposerSlots(raw: unknown): PromptComposerSlots {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const obj = raw as Record<string, unknown>
+  const out: PromptComposerSlots = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (!PROMPT_COMPOSER_SLOT_KEYS.has(key as PromptComposerSlotKey)) continue
+    const text = cleanStorageString(value, MAX_PROMPT_COMPOSER_SLOT_CHARS, true)
+    if (!text) continue
+    out[key as PromptComposerSlotKey] = text
+  }
+  return out
+}
+
 function normalizeOptionalNumber(value: unknown, min: number, max: number, integer: boolean): number | null {
   const number = safeNumber(value)
   if (number === null) return null
@@ -1392,10 +1849,24 @@ function normalizeCheckpointPromptProfile(raw: unknown): CheckpointPromptProfile
     checkpointName: cleanStorageString(obj.checkpointName, 500) ?? undefined,
     checkpointPath: cleanStorageString(obj.checkpointPath, 2000) ?? undefined,
     checkpointSha256: cleanSha256(obj.checkpointSha256),
+    baseModel: cleanStorageString(obj.baseModel, 120) ?? undefined,
     family: normalizeCheckpointPromptFamily(obj.family),
+    promptStyle: normalizeCheckpointPromptStyle(obj.promptStyle),
+    negativeStrategy: normalizeCheckpointNegativeStrategy(obj.negativeStrategy),
     positivePrefix: normalizePromptTagList(obj.positivePrefix),
     positiveAppend: normalizePromptTagList(obj.positiveAppend),
     negativeAppend: normalizePromptTagList(obj.negativeAppend),
+    sampler: cleanStorageString(obj.sampler, 120) ?? undefined,
+    steps: normalizeOptionalNumber(obj.steps, 1, 150, true),
+    cfgScale: normalizeOptionalNumber(obj.cfgScale, 1, 30, false),
+    width: normalizeOptionalNumber(obj.width, 64, 4096, true),
+    height: normalizeOptionalNumber(obj.height, 64, 4096, true),
+    clipSkip: normalizeOptionalNumber(obj.clipSkip, 1, 12, true),
+    recommendedAspectRatios: normalizeCheckpointAspectRatios(obj.recommendedAspectRatios),
+    recommendedLoraCount: normalizeCheckpointLoraCount(obj.recommendedLoraCount),
+    relatedModels: normalizeCheckpointRelatedModels(obj.relatedModels),
+    compatibilityNotes: normalizeCheckpointNotes(obj.compatibilityNotes),
+    recipeNotes: normalizeCheckpointNotes(obj.recipeNotes),
     mode: normalizeCheckpointPromptMode(obj.mode),
     updatedAt: safeNumber(obj.updatedAt) ?? Date.now()
   }
@@ -1414,8 +1885,118 @@ function normalizeCheckpointPromptFamily(value: unknown): CheckpointPromptFamily
     : 'custom'
 }
 
+function normalizeNullableCheckpointPromptFamily(value: unknown): CheckpointPromptFamily | null {
+  return value == null ? null : normalizeCheckpointPromptFamily(value)
+}
+
 function normalizeCheckpointPromptMode(value: unknown): CheckpointPromptProfileMode {
   return value === 'manual' || value === 'auto' || value === 'suggest' ? value : 'suggest'
+}
+
+function normalizeCheckpointPromptStyle(value: unknown): CheckpointPromptStyle {
+  return value === 'tag' || value === 'natural' || value === 'structured' || value === 'hybrid' ? value : 'tag'
+}
+
+function normalizeNullableCheckpointPromptStyle(value: unknown): CheckpointPromptStyle | null {
+  return value == null ? null : normalizeCheckpointPromptStyle(value)
+}
+
+function normalizeCheckpointNegativeStrategy(value: unknown): CheckpointNegativeStrategy {
+  return value === 'classic' || value === 'minimal' || value === 'positive-replacement' ? value : 'classic'
+}
+
+function normalizeNullableCheckpointNegativeStrategy(value: unknown): CheckpointNegativeStrategy | null {
+  return value == null ? null : normalizeCheckpointNegativeStrategy(value)
+}
+
+function normalizeCheckpointAspectRatios(value: unknown): CheckpointPromptProfile['recommendedAspectRatios'] {
+  if (!Array.isArray(value)) return []
+  const out: NonNullable<CheckpointPromptProfile['recommendedAspectRatios']> = []
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+    const obj = item as Record<string, unknown>
+    const label = cleanStorageString(obj.label, 80) || 'Ratio'
+    const width = normalizeOptionalNumber(obj.width, 64, 4096, true)
+    const height = normalizeOptionalNumber(obj.height, 64, 4096, true)
+    if (!width || !height) continue
+    out.push({ label, width, height })
+    if (out.length >= MAX_CHECKPOINT_PROFILE_ASPECT_RATIOS) break
+  }
+  return out
+}
+
+function normalizeCheckpointLoraCount(value: unknown): CheckpointPromptProfile['recommendedLoraCount'] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const obj = value as Record<string, unknown>
+  const min = normalizeOptionalNumber(obj.min, 0, 12, true)
+  const max = normalizeOptionalNumber(obj.max, 0, 12, true)
+  if (min == null || max == null) return null
+  return { min: Math.min(min, max), max: Math.max(min, max) }
+}
+
+function normalizeCheckpointRelatedModels(value: unknown): CheckpointPromptProfile['relatedModels'] {
+  const source = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+  return {
+    loras: normalizeCheckpointRelatedModelList(source.loras, 'lora'),
+    vaes: normalizeCheckpointRelatedModelList(source.vaes, 'vae'),
+    controlNets: normalizeCheckpointRelatedModelList(source.controlNets, 'controlnet')
+  }
+}
+
+function normalizeCheckpointRelatedModelList(
+  value: unknown,
+  kind: NonNullable<CheckpointPromptProfile['relatedModels']>['loras'][number]['kind']
+): NonNullable<CheckpointPromptProfile['relatedModels']>['loras'] {
+  if (!Array.isArray(value)) return []
+  const out: NonNullable<CheckpointPromptProfile['relatedModels']>['loras'] = []
+  const seen = new Set<string>()
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+    const obj = item as Record<string, unknown>
+    const name = cleanStorageString(obj.name, 220)
+    if (!name) continue
+    const path = cleanStorageString(obj.path, 2000) ?? null
+    const sha256 = cleanSha256(obj.sha256)
+    const role = cleanStorageString(obj.role, 80) ?? null
+    const weight = normalizeOptionalNumber(obj.weight, -2, 2, false)
+    const notes = normalizeCheckpointNotes(obj.notes).slice(0, 6)
+    const key = [kind, name.toLowerCase(), path?.toLowerCase() ?? '', sha256 ?? ''].join('|')
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({
+      kind,
+      name,
+      path,
+      sha256,
+      role,
+      weight,
+      notes
+    })
+    if (out.length >= MAX_CHECKPOINT_PROFILE_RELATED_MODELS) break
+  }
+  return out
+}
+
+function normalizeCheckpointNotes(value: unknown): string[] {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/\n/)
+      : []
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    const note = cleanStorageString(item, MAX_CHECKPOINT_PROFILE_NOTE_CHARS)
+    if (!note) continue
+    const key = note.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(note)
+    if (out.length >= MAX_CHECKPOINT_PROFILE_NOTES) break
+  }
+  return out
 }
 
 function normalizePromptTagList(value: unknown): string[] {

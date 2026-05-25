@@ -62,6 +62,12 @@ export function buildWorkspaceSnapshot(
     controlnet,
     regionalPrompter: { ...s.regionalPrompter },
     fabric,
+    referenceBoard: {
+      items: s.referenceBoardItems.map((item) => ({
+        ...item,
+        imageDataUrl: includeImages ? item.imageDataUrl : null
+      }))
+    },
     adetailer: { ...s.adetailer },
     dynThres: { ...s.dynThres },
     freeu: { ...s.freeu }
@@ -89,6 +95,11 @@ export function buildWorkspaceImageReferences(s: StoreSnapshot): WorkspaceSnapsh
   const fabricNegative = s.fabric.negative.map((item) =>
     item.path ? fileRef(item.path, item.filename) : null
   )
+  const referenceBoard = s.referenceBoardItems.map((item) => {
+    if (item.sourceHistoryId) return historyRef(item.sourceHistoryId, item.filename)
+    if (item.sourcePath) return fileRef(item.sourcePath, item.filename)
+    return null
+  })
 
   return {
     inputImage,
@@ -98,7 +109,8 @@ export function buildWorkspaceImageReferences(s: StoreSnapshot): WorkspaceSnapsh
     upscaleOutputImage: s.upscale.outputHistoryId ? historyRef(s.upscale.outputHistoryId, 'upscale-output.png') : null,
     controlnetUnits,
     fabricPositive,
-    fabricNegative
+    fabricNegative,
+    referenceBoard
   }
 }
 

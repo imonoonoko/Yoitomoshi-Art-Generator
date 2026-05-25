@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yoitomoshi Forge Studio - Pro AI Illustration Implementation Progress</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101215;
+      --panel: #171a20;
+      --panel-2: #1d2128;
+      --line: #303743;
+      --ink: #eef2f8;
+      --muted: #a8b1c2;
+      --dim: #748094;
+      --accent: #78a6ff;
+      --ok: #63d790;
+      --warn: #f1c35d;
+      --risk: #ff7b89;
+      --purple: #b58cff;
+      --cyan: #5fd4d8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+      line-height: 1.6;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: #14171c;
+    }
+    .wrap {
+      width: min(1180px, calc(100vw - 36px));
+      margin: 0 auto;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 28px;
+      padding: 38px 0 30px;
+      align-items: end;
+    }
+    h1, h2, h3 { line-height: 1.25; margin: 0; }
+    h1 {
+      font-size: clamp(30px, 4vw, 52px);
+      letter-spacing: 0;
+    }
+    h2 { font-size: 23px; margin-bottom: 14px; }
+    h3 { font-size: 16px; }
+    p { margin: 0; }
+    .lead {
+      margin-top: 18px;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--ok);
+      display: inline-block;
+    }
+    .hero-panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .score {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #12151a;
+    }
+    .score b {
+      display: block;
+      color: var(--ink);
+      font-size: 24px;
+      line-height: 1.1;
+    }
+    .score span {
+      color: var(--dim);
+      font-size: 12px;
+    }
+    main { padding: 30px 0 54px; }
+    section { margin-top: 32px; }
+    .section-head {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .section-head p {
+      color: var(--muted);
+      font-size: 13px;
+      max-width: 720px;
+    }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      align-items: stretch;
+    }
+    .flow-step {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 14px;
+      min-height: 134px;
+      position: relative;
+    }
+    .flow-step::after {
+      content: "";
+      position: absolute;
+      right: -8px;
+      top: 50%;
+      width: 14px;
+      height: 1px;
+      background: var(--line);
+    }
+    .flow-step:last-child::after { display: none; }
+    .flow-step strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    .flow-step small {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .phase-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+    .phase {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .phase-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .badge {
+      flex: 0 0 auto;
+      min-width: 46px;
+      text-align: center;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      padding: 4px 7px;
+      color: #101215;
+      background: var(--accent);
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .badge.ok { background: var(--ok); }
+    .badge.warn { background: var(--warn); }
+    .badge.cyan { background: var(--cyan); }
+    .badge.purple { background: var(--purple); }
+    .phase h3 { margin-bottom: 3px; }
+    .phase .sub { color: var(--muted); font-size: 12px; }
+    ul {
+      margin: 12px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    li + li { margin-top: 5px; }
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+    figure {
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #0e1013;
+    }
+    figcaption {
+      padding: 12px 14px;
+      border-top: 1px solid var(--line);
+    }
+    figcaption strong { display: block; font-size: 14px; }
+    figcaption span { color: var(--muted); font-size: 12px; }
+    .matrix {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr .9fr;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+    }
+    .matrix > div {
+      padding: 12px 14px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      min-height: 58px;
+      font-size: 13px;
+    }
+    .matrix > div:nth-child(3n) { border-right: none; }
+    .matrix .head {
+      background: var(--panel-2);
+      color: var(--ink);
+      font-weight: 700;
+    }
+    .matrix .muted { color: var(--muted); }
+    code {
+      background: #0c0e12;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 2px 5px;
+      color: #d9e4ff;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: .92em;
+    }
+    .verify {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .check {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .check strong {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--ink);
+      margin-bottom: 7px;
+    }
+    .check strong::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--ok);
+    }
+    .next {
+      border: 1px solid #66542b;
+      background: #1d1a13;
+      border-radius: 8px;
+      padding: 16px;
+      color: var(--muted);
+    }
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    @media (max-width: 980px) {
+      .hero, .phase-grid, .gallery, .verify { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .flow-step::after { display: none; }
+      .matrix { grid-template-columns: 1fr; }
+      .matrix > div { border-right: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap hero">
+      <div>
+        <h1>Yoitomoshi Forge Studio<br />Pro AI Illustration 実装進捗レポート</h1>
+        <p class="lead">
+          Stable Diffusion / Forge の生成UIを、プロAIイラスト制作向けの「モデル作法、Prompt仕様書、候補選別、Recipe保存、Civitai観測」ワークフローへ拡張した作業記録です。
+        </p>
+        <div class="meta">
+          <span class="pill"><span class="dot"></span>Phase 1-5 実装完了</span>
+          <span class="pill">作成日: 2026-05-25</span>
+          <span class="pill">対象: Yoitomoshi Forge Studio</span>
+          <span class="pill">Forge / 8GB VRAM 前提を維持</span>
+        </div>
+      </div>
+      <div class="hero-panel">
+        <div class="score-grid">
+          <div class="score"><b>5</b><span>完了フェーズ</span></div>
+          <div class="score"><b>7</b><span>GUI進捗スクリーンショット</span></div>
+          <div class="score"><b>5+</b><span>DOM QA / fixture検証</span></div>
+          <div class="score"><b>0</b><span>起動時の外部API強制呼び出し</span></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <div class="section-head">
+        <div>
+          <h2>制作ループの変化</h2>
+          <p>今回の実装は、単にPromptを長くする機能ではなく、成功条件を保存して次の制作判断へ戻す流れを作ったものです。</p>
+        </div>
+      </div>
+      <div class="flow">
+        <div class="flow-step">
+          <strong>1. モデル作法を読む</strong>
+          <small>Checkpoint Profile Pro が baseModel、Prompt形式、Negative方針、推奨比率、LoRA数を提示。</small>
+        </div>
+        <div class="flow-step">
+          <strong>2. 仕様書からPrompt化</strong>
+          <small>Prompt Composer Slots が主題、構図、光、色、背景、破綻回避をモデル向けに整形。</small>
+        </div>
+        <div class="flow-step">
+          <strong>3. batch候補を選別</strong>
+          <small>Candidate Board で seed、index、ラベル、送信先を同じ面で操作。</small>
+        </div>
+        <div class="flow-step">
+          <strong>4. Pro Recipe保存</strong>
+          <small>Historyへ rating、強み、弱点、次アクションを保存し、偶然の成功を再利用可能に。</small>
+        </div>
+        <div class="flow-step">
+          <strong>5. Civitai傾向を戻す</strong>
+          <small>Model Libraryが trigger words、recommended prompts、community傾向を制作UIへ渡す。</small>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <div>
+          <h2>実装フェーズ</h2>
+          <p>Phase 1からPhase 5までを実装済み。Phase 6は設計確認のみで、次の任意フェーズとして残しています。</p>
+        </div>
+      </div>
+      <div class="phase-grid">
+        <article class="phase">
+          <div class="phase-top">
+            <span class="badge ok">P1</span>
+            <div>
+              <h3>Pro Recipe Review MVP</h3>
+              <p class="sub">Historyに制作判断を保存</p>
+            </div>
+          </div>
+          <ul>
+            <li><code>HistoryProRecipeReview</code> と保存IPCを追加。</li>
+            <li>rating、strengths、issues、nextActionsをHistory GUIから編集。</li>
+            <li><code>tagReview</code> と責務を分離し、既存履歴の後方互換を維持。</li>
+          </ul>
+        </article>
+
+        <article class="phase">
+          <div class="phase-top">
+            <span class="badge">P2</span>
+            <div>
+              <h3>Model Profile Pro</h3>
+              <p class="sub">モデルごとのPrompt作法と推奨設定</p>
+            </div>
+          </div>
+          <ul>
+            <li><code>baseModel</code>、Prompt形式、Negative方針、推奨比率、LoRA数を追加。</li>
+            <li>Preflightがモデル推奨と現在設定の差分を表示。</li>
+            <li>Model Library内にコンパクトなプロファイル編集面を追加。</li>
+          </ul>
+        </article>
+
+        <article class="phase">
+          <div class="phase-top">
+            <span class="badge purple">P3</span>
+            <div>
+              <h3>Pro Prompt Composer Slots</h3>
+              <p class="sub">視覚仕様書からPromptを生成</p>
+            </div>
+          </div>
+          <ul>
+            <li>品質/Score、主題、構図、表情/ポーズ、光、色、服/小物、背景、質感、仕上げ、破綻回避slotを追加。</li>
+            <li>タグ型、自然文型、構造化型をCheckpoint Profileに連動。</li>
+            <li>品質/Scoreと仕上げを分離し、Ponyは品質先頭、Animagineは品質末尾、Fluxは自然文寄りのプロ順に整理。</li>
+            <li>Libraryクリックをslotへ入れるON/OFFを追加。</li>
+            <li>破綻回避slotからNegative Promptへ反映。</li>
+          </ul>
+        </article>
+
+        <article class="phase">
+          <div class="phase-top">
+            <span class="badge cyan">P4</span>
+            <div>
+              <h3>Candidate Board</h3>
+              <p class="sub">batch候補の選別と次工程への送信</p>
+            </div>
+          </div>
+          <ul>
+            <li>最新batchをHistoryから抽出し、候補グリッドとして表示。</li>
+            <li><code>favorite</code>、<code>candidate</code>、<code>rejected</code> を候補カード上で保存。</li>
+            <li>候補画像クリックで中央Previewへfull image表示。</li>
+            <li>候補画像をimg2img、Upscale、Pro Recipeへ送信。</li>
+          </ul>
+        </article>
+
+        <article class="phase">
+          <div class="phase-top">
+            <span class="badge warn">P5</span>
+            <div>
+              <h3>Civitai Recipe / Trend Importer</h3>
+              <p class="sub">流通レシピをModel LibraryとPrompt Composerへ</p>
+            </div>
+          </div>
+          <ul>
+            <li><code>trainedWords</code> と <code>recommendedPrompts</code> をModel Library metadataへ追加。</li>
+            <li>LoRA系のCivitai更新を <code>fetchLoraByHash()</code> に接続。</li>
+            <li>community statsからSampler、Steps、CFG、Size、LoRA、共通phraseを表示。</li>
+          </ul>
+        </article>
+
+        <article class="phase">
+          <div class="phase-top">
+            <span class="badge">P6</span>
+            <div>
+              <h3>Reference Board / Optional Backends</h3>
+              <p class="sub">次フェーズ。今回は設計確認のみ</p>
+            </div>
+          </div>
+          <ul>
+            <li>参照画像slot、ControlNet、Workspace image referenceの既存契約を確認。</li>
+            <li>外部backendはForge標準生成payloadへ混ぜない方針を維持。</li>
+            <li>実装はPhase 1-5の制作ループ安定後に回す。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <div>
+          <h2>GUI進捗</h2>
+          <p>プロ仕様のGUIとして、常用する制作判断を小さい操作面へ集約しました。</p>
+        </div>
+      </div>
+      <div class="gallery">
+        <figure>
+          <img src="screenshots/model-profile-pro-gui-2026-05-25.png" alt="Model Profile Pro GUI screenshot" />
+          <figcaption>
+            <strong>Model Profile Pro</strong>
+            <span>モデルごとのPrompt形式、Negative方針、推奨比率、制作メモを編集。</span>
+          </figcaption>
+        </figure>
+        <figure>
+          <img src="screenshots/prompt-composer-slots-gui-2026-05-25.png" alt="Prompt Composer Slots GUI screenshot" />
+          <figcaption>
+            <strong>Pro Prompt Composer Slots</strong>
+            <span>品質/Scoreと仕上げを分け、モデル系統に合わせたプロ順で仕様書入力。</span>
+          </figcaption>
+        </figure>
+        <figure>
+          <img src="screenshots/prompt-composer-library-slot-insert-gui-2026-05-25.png" alt="Prompt Composer Library slot insert screenshot" />
+          <figcaption>
+            <strong>Library to Slots</strong>
+            <span>LibraryクリックをON/OFFでPro Prompt Composer Slotsへ直接投入。入力先slotも同じ面で切替。</span>
+          </figcaption>
+        </figure>
+        <figure>
+          <img src="screenshots/candidate-board-gui-2026-05-25.png" alt="Candidate Board GUI screenshot" />
+          <figcaption>
+            <strong>Candidate Board</strong>
+            <span>batch結果を比較し、採用候補、没、img2img、Upscale、Recipeへ送信。</span>
+          </figcaption>
+        </figure>
+        <figure>
+          <img src="screenshots/candidate-board-side-tab-gui-2026-05-25.png" alt="Candidate Board side tab screenshot" />
+          <figcaption>
+            <strong>Candidate Board Side Tab</strong>
+            <span>右カラムの候補タブへ分離し、生成batchの全体画像を見ながら比較。</span>
+          </figcaption>
+        </figure>
+        <figure>
+          <img src="screenshots/candidate-board-click-preview-gui-2026-05-25.png" alt="Candidate Board click preview screenshot" />
+          <figcaption>
+            <strong>Candidate Click Preview</strong>
+            <span>候補画像クリックで中央Previewへfull image表示。小さい候補は比較用、中央は検品用。</span>
+          </figcaption>
+        </figure>
+        <figure>
+          <img src="screenshots/candidate-board-practical-gui-2026-05-25.png" alt="Candidate Board practical workflow screenshot" />
+          <figcaption>
+            <strong>Candidate Decision Panel</strong>
+            <span>選択中候補のseed、設定、ラベル、復元、img2img、Upscale、Pro Recipeを一面に集約。</span>
+          </figcaption>
+        </figure>
+        <figure>
+          <img src="screenshots/model-library-recipe-gui-2026-05-25.png" alt="Model Library Recipe GUI screenshot" />
+          <figcaption>
+            <strong>Civitai Recipe Trends</strong>
+            <span>trigger word、recommended prompt、community傾向をModel Library上で確認。</span>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <div>
+          <h2>主な変更ファイル</h2>
+          <p>既存タブ構成を崩さず、History、Prompt、Model Library、Civitai、storageに必要な契約を追加しました。</p>
+        </div>
+      </div>
+      <div class="matrix">
+        <div class="head">領域</div>
+        <div class="head">変更内容</div>
+        <div class="head">代表ファイル</div>
+
+        <div>履歴 / Recipe</div>
+        <div class="muted">Pro Recipe保存、右カラム候補タブ化したCandidate Board、選択中候補panel、ラベル集計、没の非表示、img2img/Upscale/Recipe送信。</div>
+        <div><code>HistoryGallery.tsx</code><br /><code>SidePanel.tsx</code><br /><code>store.ts</code></div>
+
+        <div>Prompt制作</div>
+        <div class="muted">仕様書slot、品質/Score分離、モデル別prompt style / プロ順、Libraryクリックからslotへ送るON/OFF導線、active LoRA由来のRecipeヒント。</div>
+        <div><code>PromptComposerPanel.tsx</code><br /><code>PromptLibrary.tsx</code><br /><code>prompt-composer.ts</code></div>
+
+        <div>Model Library</div>
+        <div class="muted">Checkpoint Profile Pro、Civitai trigger/recommended prompts、community trend表示。</div>
+        <div><code>ToolsWorkspace.tsx</code><br /><code>checkpoint-prompt-profile.ts</code></div>
+
+        <div>Civitai / IPC</div>
+        <div class="muted">LoRA hash metadata、community stats、nsfw=false既定、fixture DOM QA。</div>
+        <div><code>civitai-api.ts</code><br /><code>ipc-handlers.ts</code><br /><code>dom-qa.cjs</code></div>
+
+        <div>ドキュメント</div>
+        <div class="muted">ロードマップ、maps、requirementsログ、進捗スクリーンショット。</div>
+        <div><code>docs/PRO_AI_ILLUSTRATION_IMPLEMENTATION_ROADMAP_2026-05-25.md</code><br /><code>docs/maps/*.md</code></div>
+
+        <div>デスクトップ起動</div>
+        <div class="muted">起動済みElectronが非表示で残った場合でも、ショートカットから既存GUIを再表示。</div>
+        <div><code>scripts/launch-electron.ps1</code><br /><code>electron/main.ts</code><br /><code>create-desktop-shortcut.ps1</code></div>
+
+        <div>Candidate Board導線</div>
+        <div class="muted">生成完了後、2枚以上のbatchは履歴保存を経由して右カラムの候補タブへ自動表示。候補クリックで中央Previewへ拡大表示。</div>
+        <div><code>App.tsx</code><br /><code>HistoryGallery.tsx</code><br /><code>docs/maps/04-history-metadata-flow.md</code></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <div>
+          <h2>デスクトップ起動修正</h2>
+          <p>ショートカットを押してもGUIが出ない状態を、起動済みプロセスとウィンドウ可視状態から切り分けました。</p>
+        </div>
+      </div>
+      <div class="matrix">
+        <div class="head">確認項目</div>
+        <div class="head">結果</div>
+        <div class="head">対応</div>
+
+        <div>ショートカット</div>
+        <div class="muted"><code>C:\Users\Humin\OneDrive\デスクトップ\Yoitomoshi Art Generator.lnk</code> は正しい <code>Yoitomoshi.bat</code> を参照。</div>
+        <div>作成先とtarget、working directoryを確認。</div>
+
+        <div>原因</div>
+        <div class="muted">DOM確認で残ったElectronが、Win32上は非表示ウィンドウとして残存。ランチャーは起動済みと判断して終了。</div>
+        <div>既存ウィンドウをWin32 APIで <code>SW_SHOW</code> / <code>SW_RESTORE</code> して前面化。</div>
+
+        <div>アプリ本体</div>
+        <div class="muted">2回目起動時のElectron <code>second-instance</code> が hidden window を再表示できるように変更。</div>
+        <div><code>show()</code>、<code>restore()</code>、<code>moveTop()</code>、<code>focus()</code> を共通化。</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <div>
+          <h2>検証結果</h2>
+          <p>GUI変更はDOM QAで、保存契約はfixtureと型チェックで確認しました。</p>
+        </div>
+      </div>
+      <div class="verify">
+        <div class="check">
+          <strong>型 / Build</strong>
+          <code>npm.cmd run typecheck</code> passed<br />
+          <code>npm.cmd run build</code> passed
+        </div>
+        <div class="check">
+          <strong>Candidate Board</strong>
+          <code>npm.cmd run qa:dom:candidate-board -- --port=9338</code> passed
+        </div>
+        <div class="check">
+          <strong>Prompt Composer</strong>
+          <code>npm.cmd run qa:dom:prompt-composer -- --port=9338</code> passed<br />
+          Library to Slots / professional slot order verified
+        </div>
+        <div class="check">
+          <strong>Model Library Recipe</strong>
+          <code>npm.cmd run qa:dom:model-library-recipe -- --port=9338</code> passed
+        </div>
+        <div class="check">
+          <strong>差分衛生</strong>
+          <code>node --check scripts\dom-qa.cjs</code> passed<br />
+          <code>git diff --check</code> passed
+        </div>
+        <div class="check">
+          <strong>デスクトップ起動</strong>
+          <code>cmd /c Yoitomoshi.bat</code> passed<br />
+          Win32 window check: <code>Visible=True</code>
+        </div>
+        <div class="check">
+          <strong>Candidate Board</strong>
+          右カラムの独立タブへ移動<br />
+          選択中候補panel / 没の非表示までDOM QA済み
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="next">
+        <h2>次に残したもの</h2>
+        <p>
+          Phase 6のReference Boardは、既存の <code>WorkspaceImageReference</code>、ControlNet unit、img2img入力、Workspace保存契約を確認した段階です。
+          実装する場合は、構図、ポーズ、顔、服、配色、スタイルの参照slotを作り、ControlNet / img2img / 将来のIP-Adapter候補へ送る導線を追加します。
+        </p>
+        <div class="links">
+          <a class="pill" href="PRO_AI_ILLUSTRATION_IMPLEMENTATION_ROADMAP_2026-05-25.md">実装ロードマップ</a>
+          <a class="pill" href="PRO_AI_ILLUSTRATION_WORKFLOW_RESEARCH_REPORT_2026-05-25.html">元の調査レポート</a>
+          <a class="pill" href="maps/03-lora-civitai-model-flow.md">LoRA / Civitai / Model Flow</a>
+          <a class="pill" href="maps/04-history-metadata-flow.md">History / Metadata Flow</a>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

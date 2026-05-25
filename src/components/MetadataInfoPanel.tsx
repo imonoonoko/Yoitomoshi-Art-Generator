@@ -214,7 +214,7 @@ export function MetadataInfoPanel(): JSX.Element | null {
   }
 
   return (
-    <div className="border-t border-line bg-bg-1">
+    <div className="border-t border-line bg-bg-1" data-testid="metadata-info-panel">
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}

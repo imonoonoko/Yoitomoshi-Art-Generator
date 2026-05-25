@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "builtAt": "2026-05-25T16:47:25.517Z",
+  "generator": "scripts/build-prompt-dictionary-db.cjs",
+  "electron": "42.1.0",
+  "node": "24.15.0",
+  "sqlite": "3.51.3",
+  "entryCount": 4007,
+  "sources": [
+    {
+      "sourceId": "prompt-library-ja",
+      "file": "prompt-library.ja.yaml",
+      "label": "Prompt Library",
+      "exists": true
+    },
+    {
+      "sourceId": "yoitomoshi-prompt-library",
+      "file": "prompt-library.yoitomoshi.ja.yaml",
+      "label": "Yoitomoshi Prompt Library",
+      "exists": true
+    },
+    {
+      "sourceId": "yoitomoshi-prompt-daijiten-seed",
+      "file": "prompt-dictionary.yoitomoshi.ja.yaml",
+      "label": "Yoitomoshi Daijiten",
+      "exists": true
+    }
+  ]
+}

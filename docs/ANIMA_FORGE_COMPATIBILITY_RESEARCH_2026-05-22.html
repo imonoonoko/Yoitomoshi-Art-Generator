@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Animaモデル Forge互換性リサーチ 2026-05-22</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1115;
+      --panel: #171b22;
+      --panel2: #202630;
+      --line: #303947;
+      --text: #eef3f8;
+      --muted: #a9b5c4;
+      --ok: #83d892;
+      --warn: #f1c85b;
+      --bad: #ff8d8d;
+      --info: #8fbfff;
+      --accent: #d9a46d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.68;
+    }
+    header, main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+    header { padding-top: 42px; }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 31px;
+      letter-spacing: 0;
+      line-height: 1.25;
+    }
+    h2 {
+      margin: 36px 0 14px;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+    p { margin: 8px 0; }
+    a { color: #9bc7ff; }
+    code {
+      background: #0b0d11;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 0.94em;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 24px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      vertical-align: top;
+    }
+    th {
+      background: #242b36;
+      text-align: left;
+      color: #f5f8fb;
+    }
+    td { background: var(--panel); }
+    ul { margin: 8px 0 18px 22px; padding: 0; }
+    li { margin: 6px 0; }
+    .lead {
+      color: var(--muted);
+      max-width: 960px;
+      font-size: 15px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .k {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .v {
+      margin-top: 4px;
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    .info { color: var(--info); }
+    .accent { color: var(--accent); }
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      background: var(--panel2);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .verdict {
+      border-left: 5px solid var(--bad);
+      background: linear-gradient(90deg, rgba(255, 141, 141, 0.14), rgba(23, 27, 34, 0.96));
+      padding: 16px 18px;
+      border-radius: 8px;
+      margin: 20px 0 10px;
+    }
+    .verdict strong { color: #ffdada; }
+    .note {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    @media (max-width: 900px) {
+      header, main { padding: 20px; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      table { font-size: 13px; }
+    }
+    @media (max-width: 560px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="pill">調査日: 2026-05-22 / 対象: Yoitomoshi Art Generator + Stable Diffusion WebUI Forge</p>
+    <h1>AnimaモデルはYoitomoshi Forge Studioで使えるか</h1>
+    <p class="lead">
+      CircleStone Labs / Comfy Org の公式Anima、Civitai公式配布、Stable Diffusion WebUI Forge本家、Forge Neo、
+      ComfyUI、二次情報、Yoitomoshiローカル実装と過去エラー記録を照合した互換性レポート。
+    </p>
+
+    <div class="verdict">
+      <strong>結論:</strong>
+      現在のYoitomoshi Forge Studioが同梱している <code>lllyasviel/stable-diffusion-webui-forge</code> 経路では、
+      公式Anima Base v1.0を通常のStable Diffusion checkpointとしては使わない。
+      実際に <code>anima-base-v1.0.safetensors</code> 選択で
+      <code>Failed to recognize model type!</code> が出た記録があり、現行コードもAnima系DiTを
+      <code>unsupported_diffusion</code> として隔離する設計になっている。
+      使うなら、最短はComfyUI経路。Forge風GUIで使うならForge Neoを別runtimeとして検証する必要がある。
+    </div>
+
+    <section class="grid">
+      <div class="card">
+        <div class="k">現在のYoitomoshi Forge</div>
+        <div class="v bad">公式Anima非対応</div>
+      </div>
+      <div class="card">
+        <div class="k">公式推奨実行環境</div>
+        <div class="v ok">ComfyUI</div>
+      </div>
+      <div class="card">
+        <div class="k">Forge系での有力候補</div>
+        <div class="v warn">Forge Neo</div>
+      </div>
+      <div class="card">
+        <div class="k">ライセンス</div>
+        <div class="v warn">非商用中心</div>
+      </div>
+    </section>
+  </header>
+
+  <main>
+    <h2>判定サマリー</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>経路</th>
+          <th>判定</th>
+          <th>根拠</th>
+          <th>Yoitomoshiでの扱い</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>現在のYoitomoshi Forge Studio<br><code>runtime/forge/webui</code></td>
+          <td><span class="bad">不可</span></td>
+          <td>
+            Yoitomoshi同梱Forgeは <code>lllyasviel/stable-diffusion-webui-forge</code> mainの
+            <code>dfdcbab6</code>。公式Animaの <code>net.blocks.*</code> / <code>net.llm_adapter.*</code>
+            形式をStable Diffusion checkpointとして読み込めず、過去にAPI 500を確認済み。
+          </td>
+          <td>
+            公式Anima Baseや同系DiTは <code>models/Stable-diffusion</code> に入れない。
+            <code>Unsupported-StableDiffusion</code> に隔離する。
+          </td>
+        </tr>
+        <tr>
+          <td>ComfyUI</td>
+          <td><span class="ok">可</span></td>
+          <td>
+            公式Hugging Faceが「ComfyUIにnative support」と明記。
+            配置先も <code>diffusion_models</code>、<code>text_encoders</code>、<code>vae</code> の3系統。
+          </td>
+          <td>
+            YoitomoshiのComfyUI専用 sibling app / ComfyUI V2 経路で扱うのが最も自然。
+            既存Forge runtimeには混ぜない。
+          </td>
+        </tr>
+        <tr>
+          <td>Forge Neo<br><code>Haoming02/sd-webui-forge-classic</code> neo</td>
+          <td><span class="warn">バックエンド単体なら可</span></td>
+          <td>
+            Forge Neo公式READMEがAnima supportを明記し、WikiにもAnimaのモデル、text encoder、VAE配置先がある。
+            二次情報でもForge NeoでのAnima生成手順が確認できる。
+          </td>
+          <td>
+            既存Forgeを上書きせず、別runtimeでAPI互換性を検証する。YoitomoshiのForge API、拡張payload、
+            AnimateDiff patch、モデルライブラリとの整合確認が必要。
+          </td>
+        </tr>
+        <tr>
+          <td>Anima派生のForge向けcheckpoint</td>
+          <td><span class="warn">条件付き</span></td>
+          <td>
+            ローカルの <code>dasiwaAnima_luminousLabyrinthV1.safetensors</code> は
+            <code>model.diffusion_model.*</code> キーを持ち、YoitomoshiではCheckpoint扱いになっている。
+            一方、<code>lizanima_v10.safetensors</code> は <code>net.blocks.*</code> 系でUnsupported扱い。
+          </td>
+          <td>
+            「Animaという名前」だけでは判定しない。safetensors headerと実生成smokeで確認する。
+            公式Anima互換とは別物として扱う。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>一次情報の要点</h2>
+    <h3>1. 公式Animaの構成</h3>
+    <ul>
+      <li>配布元は <a href="https://huggingface.co/circlestone-labs/Anima" target="_blank" rel="noopener">circlestone-labs/Anima</a>。</li>
+      <li>2B text-to-image model。CircleStone Labs と Comfy Org の協力によるアニメ、イラスト、非写実系コンテンツ向けモデル。</li>
+      <li>公式の実行先はComfyUI。Hugging Face上では <code>diffusion-single-file</code> と <code>comfyui</code> タグが付いている。</li>
+      <li>必要ファイルは <code>anima-base-v1.0.safetensors</code>、<code>qwen_3_06b_base.safetensors</code>、<code>qwen_image_vae.safetensors</code>。</li>
+      <li>推奨設定はおおむね 512^2 から 1536^2、30から50 steps、CFG 4から5、samplerは <code>er_sde</code>、<code>euler_a</code>、<code>dpmpp_2m_sde_gpu</code> など。</li>
+    </ul>
+
+    <h3>2. 公式ファイルサイズとハッシュ</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ファイル</th>
+          <th>役割</th>
+          <th>サイズ</th>
+          <th>SHA-256</th>
+          <th>公式配置先</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>anima-base-v1.0.safetensors</code></td>
+          <td>Diffusion model / DiT本体</td>
+          <td>4,182,218,328 bytes</td>
+          <td class="mono">bd43b7cffe1ed1153d9c41e7beb2f18cb1273eafbaa3af3edd6a173dc90a006e</td>
+          <td><code>ComfyUI/models/diffusion_models</code></td>
+        </tr>
+        <tr>
+          <td><code>qwen_3_06b_base.safetensors</code></td>
+          <td>Text encoder</td>
+          <td>1,192,135,096 bytes</td>
+          <td class="mono">cd2a512003e2f9f3cd3c32a9c3573f820bb28c940f73c57b1ddaa983d9223eba</td>
+          <td><code>ComfyUI/models/text_encoders</code></td>
+        </tr>
+        <tr>
+          <td><code>qwen_image_vae.safetensors</code></td>
+          <td>VAE</td>
+          <td>253,806,246 bytes</td>
+          <td class="mono">a70580f0213e67967ee9c95f05bb400e8fb08307e017a924bf3441223e023d1f</td>
+          <td><code>ComfyUI/models/vae</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">
+      サイズとSHA-256はHugging Face model API <code>?blobs=true</code> とCivitai APIで照合した。
+      Civitai版のbase-v1.0は 2026-05-14 16:54:16 UTC に公開され、モデル本体、Text Encoder、VAEの3ファイル構成。
+    </p>
+
+    <h3>3. ライセンス上の注意</h3>
+    <ul>
+      <li>公式Hugging Faceは <code>CircleStone Labs Non-Commercial License</code>。</li>
+      <li>モデルと派生物は非商用目的に限定される。商用利用はCircleStone Labsから別ライセンス取得が必要。</li>
+      <li>ライセンス本文ではOutputsの所有権は主張しないとしつつ、モデル利用自体は非商用目的に制限している。生成物の扱いだけを見て商用運用可能と判断しない。</li>
+      <li>Yoitomoshiを公開配布する場合、Anima本体、派生モデル、Anima LoRAを同梱しない方針が安全。</li>
+    </ul>
+
+    <h2>Forge側の一次情報</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Forge系実装</th>
+          <th>一次情報で確認できること</th>
+          <th>Anima判断</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="https://github.com/lllyasviel/stable-diffusion-webui-forge" target="_blank" rel="noopener">lllyasviel/stable-diffusion-webui-forge</a></td>
+          <td>
+            READMEはForgeをA1111系WebUI上のプラットフォームとして説明し、Quick ListではFlux support等を示す。
+            Anima supportはREADME上に確認できない。Yoitomoshi同梱commitは <code>dfdcbab6</code>。
+          </td>
+          <td><span class="bad">現在のYoitomoshi経路では不可</span></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/Haoming02/sd-webui-forge-classic/tree/neo" target="_blank" rel="noopener">Haoming02/sd-webui-forge-classic neo</a></td>
+          <td>
+            READMEのMay featuresにAnima supportがあり、WikiのDownload ModelsにもAnima本体、qwen_3_0.6b text encoder、VAEの配置先がある。
+            2026-05-15時点で2.24 releaseがある。
+          </td>
+          <td><span class="warn">Forge系GUIで使うならこの経路が候補</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Yoitomoshiローカル実装の証拠</h2>
+    <h3>1. 過去の実エラー</h3>
+    <p>
+      <code>docs/FORGE_MODEL_TYPE_ERROR_FIX_2026-05-15.md</code> には、Forgeの選択checkpointが
+      <code>anima-base-v1.0.safetensors</code> になったときに、txt2img APIで
+      <code>Failed to recognize model type!</code> が返ったことが記録されている。
+      原因は、Forgeが期待するStable Diffusion checkpointキー
+      <code>model.diffusion_model.*</code> / <code>conditioner.*</code> / <code>cond_stage_model.*</code>
+      ではなく、Animaの <code>net.blocks.*</code> 系キーだったこと。
+    </p>
+
+    <h3>2. 現行コードの分類</h3>
+    <p>
+      <code>electron/safetensors-inspect.ts</code> はAnima / Flux系のDiTを
+      <code>unsupported_diffusion</code> として分類する。
+      <code>electron/ipc-handlers.ts</code> のモデル自動振り分けでは、この種別を
+      <code>runtime/forge/webui/models/Unsupported-StableDiffusion</code> へ送る。
+      これは「Forgeに無理に読ませない」ための再発防止策として妥当。
+    </p>
+
+    <h3>3. 現在のローカル在庫</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ファイル</th>
+          <th>場所</th>
+          <th>Yoitomoshi分類</th>
+          <th>観察結果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>lizanima_v10.safetensors</code></td>
+          <td><code>runtime/forge/webui/models/Unsupported-StableDiffusion</code></td>
+          <td><span class="bad">Unsupported</span></td>
+          <td>
+            header sampleは <code>net.blocks.*</code>。公式Anima系の構造で、現在のForge checkpointとしては読ませない。
+          </td>
+        </tr>
+        <tr>
+          <td><code>dasiwaAnima_luminousLabyrinthV1.safetensors</code></td>
+          <td><code>runtime/forge/webui/models/Stable-diffusion</code></td>
+          <td><span class="warn">Checkpoint</span></td>
+          <td>
+            header sampleは <code>model.diffusion_model.*</code>。Yoitomoshiモデルライブラリ上はCheckpoint扱い。
+            ただし、公式Anima Baseがそのまま使える根拠ではなく、Forge向けに変換または調整された派生として別扱いにする。
+          </td>
+        </tr>
+        <tr>
+          <td><code>qwen_image_vae.safetensors</code></td>
+          <td><code>runtime/forge/webui/models/VAE</code></td>
+          <td><span class="info">VAE</span></td>
+          <td>
+            公式AnimaのVAEは存在する。一方、必須Text Encoderの <code>qwen_3_06b_base.safetensors</code> は今回のローカル探索では確認できなかった。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>二次情報の傾向</h2>
+    <ul>
+      <li>GIGAZINEは、2026-05-15にAnima-Base正式版公開を取り上げ、ComfyUIでの生成手順、3ファイルの配置、タグと自然言語の混在プロンプトを紹介している。</li>
+      <li>iPentecは、ComfyUI版とForge Neo版の導入記事を分けて掲載している。Forge Neo版ではUI PresetをAnimaにし、Checkpoint、VAE / Text Encoderを指定する手順になっている。</li>
+      <li>noteやRedditでは、ComfyUIよりSD WebUI系GUIでAnimaを触りたいユーザーがForge Neoを選ぶ流れが確認できる。ただしこれはYoitomoshi同梱Forge本家の互換性を意味しない。</li>
+    </ul>
+
+    <h2>実運用への推奨</h2>
+    <h3>推奨1: 公式AnimaはComfyUI側で扱う</h3>
+    <p>
+      公式Animaを最短で使うなら、Yoitomoshi-Art-GeneratorのForge runtimeではなく、
+      <code>C:\宵灯工房アート\Yoitomoshi-Art-Generator-ComfyUI</code> またはComfyUI V2経路に置く。
+      公式ドキュメントと二次情報が同じ方向を指しており、モデル構成もComfyUI前提。
+    </p>
+
+    <h3>推奨2: Forge Neoは別runtimeで検証する</h3>
+    <p>
+      どうしてもA1111 / Forge風GUIでAnimaを触るなら、<code>runtime/forge</code> を置き換えず、
+      <code>runtime/forge-neo</code> のような別ディレクトリで検証する。
+      最低限、<code>/sdapi/v1/options</code>、<code>/sdapi/v1/sd-models</code>、
+      <code>/sdapi/v1/sd-modules</code>、txt2img、img2img、VAE / Text Encoder選択、
+      YoitomoshiのModel Library、Preflight、拡張payload、AnimateDiff周辺のスモークが必要。
+    </p>
+
+    <h3>推奨3: 既存ForgeのStable-diffusion配下に公式Animaを戻さない</h3>
+    <p>
+      <code>anima-base-v1.0.safetensors</code> や <code>lizanima_v10.safetensors</code> のような
+      <code>net.blocks.*</code> 系ファイルをStable-diffusion配下に置くと、モデル一覧には見えても生成時に失敗する可能性が高い。
+      現行の <code>unsupported_diffusion</code> 分類は維持する。
+    </p>
+
+    <h2>次に実装するなら</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>優先</th>
+          <th>作業</th>
+          <th>目的</th>
+          <th>検証</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill">P0</span></td>
+          <td>Model Libraryに「Anima公式はForge不可、ComfyUI推奨」警告を表示</td>
+          <td>再びStable-diffusion配下へ戻して生成失敗する事故を防ぐ</td>
+          <td><code>npm.cmd run typecheck</code>、該当カードのDOM確認</td>
+        </tr>
+        <tr>
+          <td><span class="pill">P1</span></td>
+          <td>ComfyUI側で公式Anima minimal workflow smoke</td>
+          <td>ローカルGPU / VRAM / ファイル配置で本当に動くか確認</td>
+          <td>1枚生成、metadata保存、出力パス確認</td>
+        </tr>
+        <tr>
+          <td><span class="pill">P2</span></td>
+          <td>Forge Neo runtime実験</td>
+          <td>Yoitomoshiの既存GUIをForge Neo APIへ接続できるか判断</td>
+          <td>REST API互換、txt2img/img2img、VAE/Text Encoder、既存Forge拡張の副作用確認</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>参照ソース</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>種別</th>
+          <th>ソース</th>
+          <th>このレポートで使った根拠</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>一次情報</td>
+          <td><a href="https://huggingface.co/circlestone-labs/Anima" target="_blank" rel="noopener">Hugging Face: circlestone-labs/Anima</a></td>
+          <td>公式モデル説明、ComfyUI native support、配置先、推奨設定、制限、ライセンス。</td>
+        </tr>
+        <tr>
+          <td>一次情報</td>
+          <td><a href="https://huggingface.co/circlestone-labs/Anima/blob/main/LICENSE.md" target="_blank" rel="noopener">CircleStone Labs Non-Commercial License</a></td>
+          <td>非商用制限、Derivative、Output、商用利用時の別ライセンス要件。</td>
+        </tr>
+        <tr>
+          <td>一次情報</td>
+          <td><a href="https://civitai.com/api/v1/models/2458426" target="_blank" rel="noopener">Civitai API: Anima model</a> / <a href="https://civitai.com/api/v1/model-versions/2945208" target="_blank" rel="noopener">base-v1.0 version</a></td>
+          <td>base-v1.0公開日時、3ファイル構成、Civitai側ハッシュ、統計、推奨VAE情報。</td>
+        </tr>
+        <tr>
+          <td>一次情報</td>
+          <td><a href="https://github.com/lllyasviel/stable-diffusion-webui-forge" target="_blank" rel="noopener">lllyasviel/stable-diffusion-webui-forge</a></td>
+          <td>Yoitomoshi同梱Forgeの上流。README上の対応モデル傾向とAnima記載なし。</td>
+        </tr>
+        <tr>
+          <td>一次情報</td>
+          <td><a href="https://github.com/Haoming02/sd-webui-forge-classic/tree/neo" target="_blank" rel="noopener">Forge Neo README</a> / <a href="https://github.com/Haoming02/sd-webui-forge-classic/wiki/Download-Models" target="_blank" rel="noopener">Download Models Wiki</a></td>
+          <td>Forge NeoのAnima support、Anima向け配置先、Text Encoder / VAE扱い。</td>
+        </tr>
+        <tr>
+          <td>ローカル一次情報</td>
+          <td><code>docs/FORGE_MODEL_TYPE_ERROR_FIX_2026-05-15.md</code></td>
+          <td>Yoitomoshiで公式Anima選択時にForge API 500が出た実記録。</td>
+        </tr>
+        <tr>
+          <td>ローカル一次情報</td>
+          <td><code>electron/safetensors-inspect.ts</code> / <code>electron/ipc-handlers.ts</code></td>
+          <td>現行の <code>unsupported_diffusion</code> 分類と隔離先。</td>
+        </tr>
+        <tr>
+          <td>二次情報</td>
+          <td><a href="https://gigazine.net/news/20260515-anima-image-generation-ai/" target="_blank" rel="noopener">GIGAZINE: Anima-Base正式版レビュー</a></td>
+          <td>ComfyUIでの導入、生成手順、プロンプト傾向。</td>
+        </tr>
+        <tr>
+          <td>二次情報</td>
+          <td><a href="https://www.ipentec.com/document/ai-image/anima-model-install-stable-diffusion-webui-forge-neo" target="_blank" rel="noopener">iPentec: Forge NeoでAnima</a> / <a href="https://www.ipentec.com/document/ai-image/anima-model-install-comfyui" target="_blank" rel="noopener">iPentec: ComfyUIでAnima</a></td>
+          <td>Forge NeoとComfyUIの実際の配置手順、UI設定。</td>
+        </tr>
+        <tr>
+          <td>二次情報</td>
+          <td><a href="https://note.com/aiaicreate/n/nce0a28e33180" target="_blank" rel="noopener">note: Forge Neoでanimaを使うための基本情報</a></td>
+          <td>Forge Neo利用者目線の導入手順、推奨パラメータ、運用感。</td>
+        </tr>
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>

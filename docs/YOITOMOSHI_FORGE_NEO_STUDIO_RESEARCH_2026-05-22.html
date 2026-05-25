@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yoitomoshi Forge Neo Studio 制作リサーチ 2026-05-22</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1217;
+      --panel: #171c24;
+      --panel2: #202733;
+      --line: #313b4b;
+      --text: #eef3f8;
+      --muted: #aeb9c7;
+      --ok: #80d894;
+      --warn: #f1c966;
+      --bad: #ff8f8f;
+      --info: #91c3ff;
+      --accent: #d6a66e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.68;
+    }
+    header, main {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+    header { padding-top: 42px; }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 32px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 36px 0 14px;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+    p { margin: 8px 0; }
+    a { color: #9dc9ff; }
+    code {
+      background: #0b0e13;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 0.94em;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 24px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      vertical-align: top;
+    }
+    th {
+      background: #242c38;
+      color: #f6f8fb;
+      text-align: left;
+    }
+    td { background: var(--panel); }
+    ul { margin: 8px 0 18px 22px; padding: 0; }
+    li { margin: 6px 0; }
+    .lead {
+      max-width: 980px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .k {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .v {
+      margin-top: 4px;
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    .info { color: var(--info); }
+    .accent { color: var(--accent); }
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      background: var(--panel2);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .verdict {
+      border-left: 5px solid var(--ok);
+      background: linear-gradient(90deg, rgba(128, 216, 148, 0.14), rgba(23, 28, 36, 0.96));
+      padding: 16px 18px;
+      border-radius: 8px;
+      margin: 20px 0 10px;
+    }
+    .verdict strong { color: #dfffe5; }
+    .callout {
+      border-left: 5px solid var(--warn);
+      background: linear-gradient(90deg, rgba(241, 201, 102, 0.14), rgba(23, 28, 36, 0.96));
+      padding: 14px 16px;
+      border-radius: 8px;
+      margin: 14px 0 22px;
+    }
+    .note {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    @media (max-width: 900px) {
+      header, main { padding: 20px; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      table { font-size: 13px; }
+    }
+    @media (max-width: 560px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="pill">調査日: 2026-05-22 / 対象: Yoitomoshi Art Generator 継承版 + Stable Diffusion WebUI Forge Neo</p>
+    <h1>Yoitomoshi Forge Neo Studio 制作リサーチ</h1>
+    <p class="lead">
+      現行Yoitomoshi Forge Studioを土台に、Forge Neoを別runtimeとして採用する新アプリ
+      「Yoitomoshi Forge Neo Studio」を作る案の実現性、リスク、移行方針、最小実装範囲を調査した。
+      Anima対応だけでなく、Qwen-Image、Wan 2.2、Flux.2-Kleinなど新世代モデルGUIへの発展余地も含めて評価する。
+    </p>
+
+    <div class="verdict">
+      <strong>結論:</strong>
+      Yoitomoshi Forge Neo Studioを新規派生アプリとして作る案は現実的。
+      ただし現行 <code>runtime/forge</code> をNeoへ上書きするのではなく、<code>runtime/forge-neo</code> などの別runtime、
+      別ポート、別設定で段階導入するべき。最大の価値は「ComfyUIほどノードを触らず、Anima / Qwen / Wan系をWebUI風に使える」
+      こと。最大のリスクはForge Neo側の更新速度、API差分、拡張互換、AGPL-3.0配布対応。
+    </div>
+
+    <section class="grid">
+      <div class="card">
+        <div class="k">総合判断</div>
+        <div class="v ok">新規派生なら可</div>
+      </div>
+      <div class="card">
+        <div class="k">推奨実装形態</div>
+        <div class="v warn">別runtime</div>
+      </div>
+      <div class="card">
+        <div class="k">最初の価値</div>
+        <div class="v ok">Anima GUI</div>
+      </div>
+      <div class="card">
+        <div class="k">最大注意点</div>
+        <div class="v bad">AGPL / API差分</div>
+      </div>
+    </section>
+  </header>
+
+  <main>
+    <h2>1. 何を作るべきか</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>案</th>
+          <th>評価</th>
+          <th>理由</th>
+          <th>推奨</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>現行Yoitomoshi Forge StudioをNeoへ全面置換</td>
+          <td><span class="bad">非推奨</span></td>
+          <td>
+            現行アプリは同梱Forgeの <code>system/python/python.exe</code> と
+            <code>webui/launch.py</code> を直接spawnし、API専用 <code>--nowebui</code> 運用に最適化されている。
+            NeoはPython 3.13 / uv / venv前提の導入情報があり、起動、依存、API、拡張の差分が大きい。
+          </td>
+          <td>既存の安定Forge経路を残す。</td>
+        </tr>
+        <tr>
+          <td>Yoitomoshi Art Generator内にNeo engineを追加</td>
+          <td><span class="warn">中期なら可</span></td>
+          <td>
+            UI部品と履歴、モデルライブラリを共有できる一方、設定、runtime、生成payload、モデル選択UIが複雑になる。
+            既存ユーザーの安定性を守るにはfeature flagと移行ガードが必要。
+          </td>
+          <td>最初の実験には少し重い。</td>
+        </tr>
+        <tr>
+          <td>Yoitomoshi Forge Neo Studioとして兄弟アプリ化</td>
+          <td><span class="ok">最推奨</span></td>
+          <td>
+            現行Forge版を壊さず、Neo専用のruntime manager、モデルmodule UI、Anima preflightを素直に設計できる。
+            既存YoitomoshiのReact/Electron UX資産は継承しつつ、バックエンド前提を切り替えられる。
+          </td>
+          <td>まずこの形でMVPを作る。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <strong>製品ポジション:</strong>
+      現行Forge Studioは「安定したSD/SDXL制作環境」、Comfy Studioは「workflowを固定して強力なエンジンを隠す環境」、
+      Forge Neo Studioは「新世代モデルをWebUI風GUIで素早く触る環境」として分けると衝突しにくい。
+    </div>
+
+    <h2>2. Forge Neo一次情報の要点</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>項目</th>
+          <th>調査結果</th>
+          <th>Yoitomoshiへの影響</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>プロジェクト状態</td>
+          <td>
+            <a href="https://github.com/Haoming02/sd-webui-forge-classic/tree/neo" target="_blank" rel="noopener">Haoming02/sd-webui-forge-classic</a>
+            のdefault branchは <code>neo</code>。GitHub API調査時点で stars 1,226、forks 143、open issues 10、
+            最新releaseは <code>2.24</code>、公開日は 2026-05-15、直近pushは 2026-05-22。
+          </td>
+          <td>
+            活発だが安定固定ではない。Yoitomoshi側ではtagまたはcommit pinが必要。
+          </td>
+        </tr>
+        <tr>
+          <td>対応モデル</td>
+          <td>
+            READMEはAnima、Flux.2-Klein、Ernie-Image、Z-Image、Wan 2.2、Qwen-Image / Qwen-Image-Edit、
+            Flux Kontext、Nunchaku、Lumina-Image-2.0、Chroma1-HD、MixedPrecisionなどを列挙している。
+          </td>
+          <td>
+            Animaだけのために作るより、「Neo系モデルのGUIハブ」として設計する価値がある。
+          </td>
+        </tr>
+        <tr>
+          <td>Anima配置</td>
+          <td>
+            Forge Neo WikiはAnima本体を <code>models/Stable-diffusion</code>、
+            <code>qwen_3_06b_base.safetensors</code> を <code>models/text_encoder</code>、
+            VAEを <code>models/VAE</code> に置く形で案内している。
+          </td>
+          <td>
+            現行ForgeでUnsupportedに隔離していたAnima系DiTを、Neo Studioでは正規checkpointとして扱える。
+          </td>
+        </tr>
+        <tr>
+          <td>起動環境</td>
+          <td>
+            READMEはuvを推奨し、<code>uv venv venv --python 3.13 --seed</code> と
+            <code>--uv</code> flagを示す。従来方式ではPython 3.13.12が推奨されている。
+          </td>
+          <td>
+            現行ForgeManagerの <code>system/python</code> 直spawnとは合わない。
+            Neo専用start strategyが必要。
+          </td>
+        </tr>
+        <tr>
+          <td>モデル共有</td>
+          <td>
+            READMEは <code>--model-ref</code>、<code>--forge-ref-a1111-home</code>、
+            <code>--forge-ref-comfy-home</code>、<code>--forge-ref-comfy-yaml</code> を案内している。
+          </td>
+          <td>
+            巨大モデルを二重配置しない設計が可能。YoitomoshiのModel Libraryと相性がよい。
+          </td>
+        </tr>
+        <tr>
+          <td>Issue policy</td>
+          <td>
+            READMEは「削除機能」「ユーザーエラー」「AMD GPU」「非公式モデル」「3rd-party extensions」「Stability Matrix起因」のIssueは無視されると明記している。
+          </td>
+          <td>
+            Yoitomoshi側で拡張互換や利用者サポートを肩代わりする前提が必要。
+          </td>
+        </tr>
+        <tr>
+          <td>ライセンス</td>
+          <td>
+            GitHub APIではForge Neoのlicenseは <code>AGPL-3.0</code>。
+            LICENSEはAUTOMATIC1111、lllyasviel、Haoming02の著作権表記を含む。
+          </td>
+          <td>
+            NeoコードをElectron本体へ混ぜない。runtime同梱や改変配布をする場合はソース提供、著作権表示、ライセンス表示を分離して管理する。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>3. 現行Yoitomoshiから継承できるもの</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>領域</th>
+          <th>継承可否</th>
+          <th>根拠</th>
+          <th>Neo化で必要な変更</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Electron / React UI</td>
+          <td><span class="ok">高</span></td>
+          <td>
+            txt2img / img2img / Video / Upscale / Models / Tools の構造は、Neoでも制作UIとして再利用できる。
+          </td>
+          <td>
+            Anima、Qwen、Wanなどのmodel family別に、必要moduleと推奨値を出すpreflightを追加する。
+          </td>
+        </tr>
+        <tr>
+          <td>Forge REST client</td>
+          <td><span class="warn">中</span></td>
+          <td>
+            <code>/sdapi/v1/txt2img</code>、<code>/img2img</code>、<code>/sd-models</code>、
+            <code>/sd-modules</code>、<code>/options</code>、<code>/progress</code> は基本流用できる可能性が高い。
+          </td>
+          <td>
+            Neo用に <code>forge_additional_modules</code> の複数選択、UI preset、Low Bits、model family検出を扱う。
+          </td>
+        </tr>
+        <tr>
+          <td>ForgeManager</td>
+          <td><span class="bad">低から中</span></td>
+          <td>
+            現行は <code>system/python/python.exe</code> と <code>webui/launch.py</code> が必須。
+            Neo標準導入は <code>venv</code> / <code>webui-user.bat</code> / <code>uv</code> 寄り。
+          </td>
+          <td>
+            <code>RuntimeStartStrategy</code> を作り、Classic portableとNeo venvを分離する。
+          </td>
+        </tr>
+        <tr>
+          <td>Model Library</td>
+          <td><span class="ok">高</span></td>
+          <td>
+            既に <code>models/text_encoder</code>、<code>Unsupported-StableDiffusion</code>、
+            safetensors header分類、Civitai/Hugging Face download基盤がある。
+          </td>
+          <td>
+            Text Encoderを一級assetとして扱い、Anima / Qwen / Wanの「本体+modules」セット管理を追加する。
+          </td>
+        </tr>
+        <tr>
+          <td>生成payload</td>
+          <td><span class="warn">中</span></td>
+          <td>
+            現行は <code>override_settings.sd_model_checkpoint</code> と <code>sd_vae</code> が中心。
+            Forge側には <code>forge_additional_modules</code> が存在し、処理中に複数moduleを読む。
+          </td>
+          <td>
+            <code>selectedVae</code> だけではなく <code>selectedModules: string[]</code> を持つ。
+          </td>
+        </tr>
+        <tr>
+          <td>ControlNet / ADetailer / AnimateDiff</td>
+          <td><span class="warn">要検証</span></td>
+          <td>
+            Forge Neoのopen issuesにはControlNetやADetailer絡みがあり、READMEも3rd-party extension問題を上流サポート外としている。
+          </td>
+          <td>
+            MVPではAnima txt2imgを優先し、拡張payloadは段階的に戻す。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4. 推奨アーキテクチャ</h2>
+    <h3>4.1 runtime分離</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>項目</th>
+          <th>現行Forge Studio</th>
+          <th>Forge Neo Studio案</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>runtime path</td>
+          <td><code>runtime/forge</code></td>
+          <td><code>runtime/forge-neo</code></td>
+        </tr>
+        <tr>
+          <td>既定port</td>
+          <td><code>7860</code></td>
+          <td><code>7861</code> 推奨。現行Forgeと同時検証できる。</td>
+        </tr>
+        <tr>
+          <td>起動</td>
+          <td><code>system/python/python.exe webui/launch.py</code></td>
+          <td><code>venv/Scripts/python.exe launch.py</code> または <code>webui-user.bat</code>。
+            まず手動起動でAPI互換を確認してから自動起動を作る。</td>
+        </tr>
+        <tr>
+          <td>モデル</td>
+          <td>Forge配下へ配置</td>
+          <td><code>--model-ref</code> や <code>--forge-ref-comfy-home</code> で共有を優先。
+            ただしAnima smokeでは最初はNeo配下へ最小3ファイルを置く。</td>
+        </tr>
+        <tr>
+          <td>ライセンス</td>
+          <td>現在のElectron appはMIT、Forge runtimeは外部/生成物扱い</td>
+          <td>Neo runtimeはAGPL-3.0として明確に分離。公開配布時はsource offerとnoticeを同梱。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>4.2 engine adapter</h3>
+    <p>
+      UIは現行のYoitomoshiを継承しつつ、生成実行層を次のように分ける。
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>層</th>
+          <th>責務</th>
+          <th>Neo Studioでの変更点</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Renderer UI</td>
+          <td>prompt、negative、size、sampler、LoRA、ControlNet、history、model library</td>
+          <td>model family preset、module bundle、Low Bits、Anima preflightを追加。</td>
+        </tr>
+        <tr>
+          <td>Generation Planner</td>
+          <td>store状態からREST payloadを作る</td>
+          <td>
+            <code>sd_vae</code> 単独ではなく、Neo用に <code>forge_additional_modules</code> 配列を作る。
+            Animaなら <code>qwen_3_06b_base</code> と <code>qwen_image_vae</code> を必須化。
+          </td>
+        </tr>
+        <tr>
+          <td>ForgeNeoApi</td>
+          <td>A1111互換APIとNeo差分APIを包む</td>
+          <td>
+            <code>/sdapi/v1/sd-modules</code>、<code>/options</code>、<code>/scripts</code>、
+            <code>/samplers</code>、<code>/schedulers</code> のresponse差分を実測して型を分ける。
+          </td>
+        </tr>
+        <tr>
+          <td>RuntimeManager</td>
+          <td>起動、停止、ready検知、ログ、プロセス掃除</td>
+          <td>
+            ClassicとNeoを別strategyにする。Neoではuv/venv、FFmpeg、Sage/Flash/Nunchaku等のoptional dependencyを診断する。
+          </td>
+        </tr>
+        <tr>
+          <td>Model Registry</td>
+          <td>ローカルモデルの分類、metadata、download、thumbnail</td>
+          <td>
+            「Checkpoint単体」ではなく「Model Bundle」としてAnima/Qwen/Wanの本体+moduleを束ねる。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>5. 最小MVP</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Phase</th>
+          <th>目的</th>
+          <th>実装内容</th>
+          <th>完了条件</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill">0</span> Neo runtime spike</td>
+          <td>Yoitomoshiから触る前にNeo APIを測る</td>
+          <td>
+            <code>runtime/forge-neo</code> を手動clone、tag <code>2.24</code> または調査時commitへpin、
+            port 7861で起動。<code>/sdapi/v1/options</code>、<code>/sd-models</code>、<code>/sd-modules</code>、
+            <code>/samplers</code>、<code>/schedulers</code>、<code>/txt2img</code> をcurlまたはNodeで確認。
+          </td>
+          <td>API互換表と失敗ログが取れる。</td>
+        </tr>
+        <tr>
+          <td><span class="pill">1</span> Anima minimal</td>
+          <td>Neo Studioの存在価値を証明</td>
+          <td>
+            公式Anima本体、<code>qwen_3_06b_base</code>、<code>qwen_image_vae</code> を配置。
+            UI Preset相当、module選択、512から1024pxのtxt2imgを最小payloadで実行。
+          </td>
+          <td>1枚生成、PNG infotext保存、history登録。</td>
+        </tr>
+        <tr>
+          <td><span class="pill">2</span> UI継承</td>
+          <td>現行Yoitomoshiの使いやすさを維持</td>
+          <td>
+            txt2img画面、Prompt Helper、history、model libraryを移植。
+            Neo専用のmodule bundle selectorとmodel family cardを追加。
+          </td>
+          <td>現行ユーザーがノードなしでAnima生成できる。</td>
+        </tr>
+        <tr>
+          <td><span class="pill">3</span> 既存機能戻し</td>
+          <td>Forge Studio継承の実用性を上げる</td>
+          <td>
+            LoRA、img2img、upscale、ControlNet、ADetailer、Civitai/HF downloadを1つずつNeoで検証。
+          </td>
+          <td>機能別compatibility matrixが埋まる。</td>
+        </tr>
+        <tr>
+          <td><span class="pill">4</span> 配布判断</td>
+          <td>内部利用から配布可能性へ進む</td>
+          <td>
+            AGPL notice、runtime取得方式、モデル非同梱方針、Anima license注意、installer/portable運用を整理。
+          </td>
+          <td>内部利用パッケージが再現可能。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>6. 重要リスク</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>リスク</th>
+          <th>重大度</th>
+          <th>内容</th>
+          <th>対策</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AGPL-3.0</td>
+          <td><span class="bad">高</span></td>
+          <td>
+            Neo runtimeを同梱・改変・配布する場合、AGPL対応が必要。Electron本体へNeoコードを混ぜるとライセンス境界が曖昧になる。
+          </td>
+          <td>
+            別プロセス、別runtime、notice/source URL、pinしたcommit、改変patch一覧を管理する。公開前に法務判断。
+          </td>
+        </tr>
+        <tr>
+          <td>API差分</td>
+          <td><span class="bad">高</span></td>
+          <td>
+            現行YoitomoshiはA1111互換APIに加えForge独自挙動へ依存している。
+            Neoではmodule、preset、Low Bits、video、multi-imageなど差分が増える。
+          </td>
+          <td>
+            API compatibility probeを先に作り、生成payloadを直接移植しない。
+          </td>
+        </tr>
+        <tr>
+          <td>拡張互換</td>
+          <td><span class="warn">中から高</span></td>
+          <td>
+            Forge NeoのREADMEは3rd-party extension問題を上流サポート外としている。
+            open issuesにもControlNet / ADetailer / VRAM / performance系が残る。
+          </td>
+          <td>
+            MVPでは拡張なしAnima txt2imgを最優先。ControlNetとADetailerは後段で個別smoke。
+          </td>
+        </tr>
+        <tr>
+          <td>モデル容量と重複</td>
+          <td><span class="warn">中</span></td>
+          <td>
+            Anima、Qwen、Wan、Flux系は本体、text encoder、VAE、quant版で容量が増えやすい。
+          </td>
+          <td>
+            <code>--model-ref</code> / <code>--forge-ref-comfy-home</code> を活用し、Model Bundle単位で不足表示する。
+          </td>
+        </tr>
+        <tr>
+          <td>Anima license</td>
+          <td><span class="warn">中</span></td>
+          <td>
+            Anima公式は非商用ライセンス。Neo Studio自体が使えても、モデル利用条件は別問題。
+          </td>
+          <td>
+            モデル本体は同梱しない。Model Libraryでlicense warningを表示する。
+          </td>
+        </tr>
+        <tr>
+          <td>既存Forge版の退行</td>
+          <td><span class="bad">高</span></td>
+          <td>
+            同じ設定、同じport、同じruntime配下で試すと現行Forge Studioの安定性を壊す。
+          </td>
+          <td>
+            別アプリ、別設定ファイル、別port、別runtime。共通化はUI部品と型定義から段階的に行う。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>7. 実装チェックリスト</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>分類</th>
+          <th>チェック項目</th>
+          <th>判定基準</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Runtime</td>
+          <td>Neo clean install、tag pin、port 7861、<code>--api</code> / <code>--nowebui</code>可否</td>
+          <td>Yoitomoshiからready検知できる。</td>
+        </tr>
+        <tr>
+          <td>API</td>
+          <td><code>options</code>、<code>sd-models</code>、<code>sd-modules</code>、<code>txt2img</code>、<code>img2img</code></td>
+          <td>現行 <code>ForgeApi</code>との差分表を作る。</td>
+        </tr>
+        <tr>
+          <td>Model</td>
+          <td>Anima 3ファイル、Text Encoder分類、VAE分類、hash照合</td>
+          <td>不足時に生成前blockerを出せる。</td>
+        </tr>
+        <tr>
+          <td>Payload</td>
+          <td><code>forge_additional_modules</code> 複数指定、UI preset相当、sampler/scheduler</td>
+          <td>Animaが手動WebUIと同等設定で生成できる。</td>
+        </tr>
+        <tr>
+          <td>UX</td>
+          <td>ユーザーがノードを触らずAnima生成まで行ける</td>
+          <td>初回成功までの手順が「モデル導入、選択、Generate」に収まる。</td>
+        </tr>
+        <tr>
+          <td>QA</td>
+          <td>txt2img、img2img、LoRA、ControlNet、ADetailer、Upscale、History</td>
+          <td>Neo compatibility matrixをPASS/FAIL/保留で記録。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>8. 最終提案</h2>
+    <p>
+      Yoitomoshi Forge Neo Studioは、現在のForge Studioを置き換えるものではなく、
+      「新世代モデルをWebUI風に扱うYoitomoshi派生」として作るのが妥当。
+      最初のゴールはAnima生成1枚の完全な縦切りに絞る。
+      その後、Qwen-Image、Wan 2.2、Flux.2-Kleinへ広げる。
+    </p>
+    <p>
+      実装開始前に作るべき最小成果物は、<code>runtime/forge-neo</code> を手動で立てて、
+      API互換、Anima payload、module選択、生成結果保存を測る <code>NEO_RUNTIME_SPIKE</code>。
+      ここがPASSしてからElectron統合へ進めば、現行Forge Studioの安定性を守りながらNeo版を作れる。
+    </p>
+
+    <h2>参照ソース</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>種別</th>
+          <th>ソース</th>
+          <th>使った判断材料</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>一次情報</td>
+          <td><a href="https://github.com/Haoming02/sd-webui-forge-classic/tree/neo" target="_blank" rel="noopener">Forge Neo README</a></td>
+          <td>Neoの目的、対応モデル、uv/Python 3.13、model-ref、issue policy。</td>
+        </tr>
+        <tr>
+          <td>一次情報</td>
+          <td><a href="https://github.com/Haoming02/sd-webui-forge-classic/wiki/Download-Models" target="_blank" rel="noopener">Forge Neo Wiki: Download Models</a></td>
+          <td>Anima / Qwen / Wan等のモデル配置、Text Encoder / VAE配置。</td>
+        </tr>
+        <tr>
+          <td>一次情報</td>
+          <td><a href="https://github.com/Haoming02/sd-webui-forge-classic/wiki/Inference-References" target="_blank" rel="noopener">Forge Neo Wiki: Inference References</a></td>
+          <td>Anima、Flux、Qwen、Wan等の参照モデルとmodule参照方針。</td>
+        </tr>
+        <tr>
+          <td>一次情報</td>
+          <td><a href="https://github.com/Haoming02/sd-webui-forge-classic/releases" target="_blank" rel="noopener">Forge Neo Releases</a></td>
+          <td>最新release 2.24、更新頻度、直近変更傾向。</td>
+        </tr>
+        <tr>
+          <td>一次情報</td>
+          <td><a href="https://github.com/Haoming02/sd-webui-forge-classic/issues" target="_blank" rel="noopener">Forge Neo Issues</a></td>
+          <td>ControlNet、ADetailer、VRAM、performance系の未解決リスク。</td>
+        </tr>
+        <tr>
+          <td>一次情報</td>
+          <td><a href="https://huggingface.co/circlestone-labs/Anima" target="_blank" rel="noopener">Hugging Face: Anima</a></td>
+          <td>Animaの公式構成、ComfyUI native support、必要ファイル、ライセンス注意。</td>
+        </tr>
+        <tr>
+          <td>ローカル一次情報</td>
+          <td><code>electron/forge-manager.ts</code>、<code>electron/forge-api.ts</code>、<code>src/lib/generation-utils.ts</code></td>
+          <td>現行Yoitomoshiの起動方式、API client、生成payloadの制約。</td>
+        </tr>
+        <tr>
+          <td>ローカル一次情報</td>
+          <td><code>docs/ANIMA_FORGE_COMPATIBILITY_RESEARCH_2026-05-22.html</code></td>
+          <td>現行Forgeでは公式AnimaをStable Diffusion checkpointとして扱わない判断。</td>
+        </tr>
+        <tr>
+          <td>二次情報</td>
+          <td><a href="https://www.ipentec.com/document/ai-image/anima-model-install-stable-diffusion-webui-forge-neo" target="_blank" rel="noopener">iPentec: AnimaをForge Neoで使う手順</a></td>
+          <td>Anima本体、Text Encoder、VAEの配置とUI設定の実例。</td>
+        </tr>
+        <tr>
+          <td>二次情報</td>
+          <td><a href="https://www.ipentec.com/document/ai-image/software-install-stable-diffusion-webui-forge-neo" target="_blank" rel="noopener">iPentec: Forge Neoインストール</a></td>
+          <td>Python、Git、webui-user.bat、uv、モデル参照オプションの実運用例。</td>
+        </tr>
+        <tr>
+          <td>二次情報</td>
+          <td><a href="https://note.com/aiaicreate/n/nae1f2b3c07c7" target="_blank" rel="noopener">note: Forge Neoの導入と基本操作</a></td>
+          <td>Stability Matrix切替、uv、SageAttention、モデルフォルダ運用の利用者目線。</td>
+        </tr>
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>

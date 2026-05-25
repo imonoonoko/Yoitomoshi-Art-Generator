@@ -104,6 +104,8 @@ export function ADetailerPanel(): JSX.Element {
                 value={u.prompt}
                 onChange={(e) => patchUnit(i, { prompt: e.target.value })}
                 placeholder={t('ad.promptPlaceholder')}
+                data-prompt-dictionary-autocomplete="positive"
+                data-testid={`adetailer-unit-${i}-prompt`}
               />
             </label>
 
@@ -114,6 +116,8 @@ export function ADetailerPanel(): JSX.Element {
                 value={u.negativePrompt}
                 onChange={(e) => patchUnit(i, { negativePrompt: e.target.value })}
                 placeholder={t('ad.negativePromptPlaceholder')}
+                data-prompt-dictionary-autocomplete="negative"
+                data-testid={`adetailer-unit-${i}-negative-prompt`}
               />
             </label>
 

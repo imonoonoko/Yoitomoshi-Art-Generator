@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
-import { CheckCircle2, Languages, ListChecks, Wand2, X } from 'lucide-react'
+import { CheckCircle2, ListChecks, Wand2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore, type WorkspaceTab } from '@/lib/store'
 import { api } from '@/lib/ipc'
@@ -9,12 +9,13 @@ import {
   findCheckpointPromptProfile,
   formatPromptForCheckpoint
 } from '@/lib/checkpoint-prompt-profile'
-import { translatePromptToEnglishTags } from '@/lib/prompt-translate'
 import { hasDynamicPromptSyntax } from '@/lib/dynamic-prompts'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { PromptEditor } from './PromptEditor'
 import { PromptTagChips } from './PromptTagChips'
+import { PromptComposerPanel } from './PromptComposerPanel'
+import { PromptDictionaryPanel } from './PromptDictionaryPanel'
 import { PromptHelperPanel } from './PromptHelperPanel'
 import { DynamicPromptLab } from './DynamicPromptLab'
 import { ResearchWorkflowPanel } from './ResearchWorkflowPanel'
@@ -44,8 +45,6 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
   const setNeg = useStore((s) => s.setNegativePrompt)
   const isGenerating = useStore((s) => s.isGenerating)
   const currentTab = useStore((s) => s.currentTab)
-  const library = useStore((s) => s.library)
-  const customLibrary = useStore((s) => s.customLibrary)
   const state = useStore((s) => s)
   const t = useT()
 
@@ -61,16 +60,6 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
     } catch (e) {
       toast.error(tStatic('toast.interruptFailed', { message: (e as Error).message }))
     }
-  }
-
-  function translateCurrentPrompt(): void {
-    const tags = translatePromptToEnglishTags(prompt, [...library, ...customLibrary])
-    if (tags.length === 0) {
-      toast(tStatic('prompt.translateEmpty'), { icon: 'ℹ' })
-      return
-    }
-    setPrompt(tags.join(', '))
-    toast.success(tStatic('prompt.translated'))
   }
 
   function formatPromptField(target: 'positive' | 'negative'): void {
@@ -121,7 +110,6 @@ export function PromptPanel({ onGenerate }: Props): JSX.Element {
         setNegative={setNeg}
         canGenerate={canGenerate}
         onGenerate={onGenerate}
-        onTranslate={translateCurrentPrompt}
         onFormat={formatPromptField}
         onModelFormat={formatPromptForModelField}
         onPositiveMove={appendPromptTagsToNegative}
@@ -168,7 +156,6 @@ function PromptFields({
   setNegative,
   canGenerate,
   onGenerate,
-  onTranslate,
   onFormat,
   onModelFormat,
   onPositiveMove,
@@ -180,7 +167,6 @@ function PromptFields({
   setNegative(value: string): void
   canGenerate: boolean
   onGenerate(): Promise<void>
-  onTranslate(): void
   onFormat(target: 'positive' | 'negative'): void
   onModelFormat(target: 'positive' | 'negative'): void
   onPositiveMove(tokens: string[]): void
@@ -193,39 +179,21 @@ function PromptFields({
         <div className="flex items-baseline justify-between">
           <div className="flex items-center gap-1.5">
             <span className="label">{t('prompt.label')}</span>
-            <button
-              type="button"
-              className="btn btn-ghost px-1.5 py-0.5 text-[10px] gap-1"
-              onClick={onTranslate}
-              title={t('prompt.translateToEnglish')}
-            >
-              <Languages className="h-3 w-3" />
-              {t('prompt.translateShort')}
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost px-1.5 py-0.5 text-[10px] gap-1"
-              onClick={() => onFormat('positive')}
-              title={t('prompt.formatTitle')}
-              data-testid="prompt-format-positive"
-            >
-              <ListChecks className="h-3 w-3" />
-              {t('prompt.formatShort')}
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost px-1.5 py-0.5 text-[10px] gap-1"
-              onClick={() => onModelFormat('positive')}
-              title={t('prompt.modelFormatTitle')}
-              data-testid="prompt-model-format-positive"
-            >
-              <Wand2 className="h-3 w-3" />
-              {t('prompt.modelFormatShort')}
-            </button>
           </div>
           <TokenMeter text={prompt} />
         </div>
         <QuickPresetBar target="positive" value={prompt} onChange={setPrompt} />
+        <PromptComposerPanel
+          value={prompt}
+          onChange={setPrompt}
+          mode="replace"
+          target="positive"
+          onApplyNegative={(nextNegative) => setNegative(promptAppend(negative, nextNegative))}
+          onModelTune={() => onModelFormat('positive')}
+          testId="prompt-composer"
+          legacyCleanupTestId="prompt-format-positive"
+          legacyModelTuneTestId="prompt-model-format-positive"
+        />
         <PromptEditor
           value={prompt}
           onChange={setPrompt}
@@ -455,6 +423,7 @@ function CreateModePanel({
 function RefineModePanel(): JSX.Element {
   return (
     <>
+      <PromptDictionaryPanel />
       <PromptHelperPanel />
       <DynamicPromptLab />
       <ResearchWorkflowPanel />

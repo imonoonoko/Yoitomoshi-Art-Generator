@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ImageOff, Download, FolderOpen, FileImage, Recycle, Maximize2, Shuffle, Save } from 'lucide-react'
+import { ImageOff, Download, FolderOpen, FileImage, Recycle, Maximize2, Shuffle, Save, Info, ChevronDown, ChevronUp } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useStore } from '@/lib/store'
 import { api } from '@/lib/ipc'
@@ -15,6 +15,7 @@ export function PreviewPanel(): JSX.Element {
   const progress = useStore((s) => s.progress)
   const lastImage = useStore((s) => s.lastImage)
   const lastImageHistoryId = useStore((s) => s.lastImageHistoryId)
+  const inputImage = useStore((s) => s.inputImage)
   const history = useStore((s) => s.history)
   const setPrompt = useStore((s) => s.setPrompt)
   const setNeg = useStore((s) => s.setNegativePrompt)
@@ -24,6 +25,8 @@ export function PreviewPanel(): JSX.Element {
 
   const [dragOver, setDragOver] = useState(false)
   const [variationOpen, setVariationOpen] = useState(false)
+  const inspectorOpen = useStore((s) => s.previewInspectorOpen)
+  const setInspectorOpen = useStore((s) => s.setPreviewInspectorOpen)
   const t = useT()
   const patchUpscale = useStore((s) => s.patchUpscale)
   const setCurrentTab = useStore((s) => s.setCurrentTab)
@@ -32,6 +35,7 @@ export function PreviewPanel(): JSX.Element {
     ? `data:${progress.current_image_mime || 'image/png'};base64,${progress.current_image}`
     : null
   const display = liveImage ?? lastImage
+  const inspectorAvailable = Boolean(lastImage || inputImage || isGenerating)
 
   function progressPct(): number {
     if (!progress) return 0
@@ -182,6 +186,7 @@ export function PreviewPanel(): JSX.Element {
           <img
             src={display}
             alt={t('preview.outputAlt')}
+            data-testid="preview-output-image"
             className={cn(
               'max-w-full max-h-full object-contain rounded shadow-2xl',
               isGenerating && 'opacity-90'
@@ -205,8 +210,12 @@ export function PreviewPanel(): JSX.Element {
         </div>
       )}
 
-      <MetadataInfoPanel />
-      <NextImagePanel onOpenVariation={() => setVariationOpen(true)} />
+      {inspectorOpen && inspectorAvailable && (
+        <div id="preview-inspector" className="shrink-0 bg-bg-1/95" data-testid="preview-inspector">
+          <MetadataInfoPanel />
+          <NextImagePanel onOpenVariation={() => setVariationOpen(true)} />
+        </div>
+      )}
       {variationOpen && <VariationPanel />}
 
       <div className="border-t border-line bg-bg-1 px-3 py-2 flex items-center gap-3 shrink-0">
@@ -246,6 +255,19 @@ export function PreviewPanel(): JSX.Element {
         </div>
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
           <span className="hidden xl:inline text-[10px] uppercase tracking-wider text-ink-3 mr-1">{t('preview.actions')}</span>
+          <button
+            className={cn('btn btn-ghost text-xs gap-1.5 py-1.5', inspectorOpen && 'btn-primary')}
+            disabled={!inspectorAvailable}
+            onClick={() => setInspectorOpen(!inspectorOpen)}
+            title={`${t(inspectorOpen ? 'common.close' : 'common.open')} ${t('mp.title')} / ${t('nextImage.title')}`}
+            data-testid="preview-inspector-toggle"
+            aria-expanded={inspectorOpen}
+            aria-controls="preview-inspector"
+          >
+            <Info className="h-3.5 w-3.5" />
+            <span className="hidden lg:inline">{t('mp.title')}</span>
+            {inspectorOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+          </button>
           <button
             className={cn('btn btn-ghost text-xs gap-1.5 py-1.5', variationOpen && 'btn-primary')}
             disabled={isGenerating}

@@ -53,7 +53,7 @@ export function PresetList(): JSX.Element {
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto">
         <div className="border-b border-line p-2">
-          <WorkspaceCard compact />
+          <WorkspaceCard compact restoreTab={false} />
         </div>
 
         <div className="border-b border-line p-2">

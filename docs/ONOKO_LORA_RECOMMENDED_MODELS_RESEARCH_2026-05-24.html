@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ONOKO LoRA 推奨モデル徹底リサーチ 2026-05-24</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17202a;
+      --muted: #5a6675;
+      --paper: #fbfaf7;
+      --panel: #ffffff;
+      --line: #d8dee8;
+      --blue: #215f8f;
+      --green: #1f7665;
+      --gold: #9a6b14;
+      --red: #9a3f3f;
+      --shade: #eef3f7;
+      --shadow: 0 10px 28px rgba(23, 32, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Yu Gothic", "Meiryo", "Segoe UI", sans-serif;
+      line-height: 1.72;
+    }
+
+    a {
+      color: var(--blue);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(33, 95, 143, 0.32);
+    }
+
+    a:hover {
+      border-bottom-color: currentColor;
+    }
+
+    .hero {
+      background: #17202a;
+      color: #fff;
+      padding: 40px 20px 30px;
+    }
+
+    .hero-inner,
+    main {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: #a9c7dc;
+      font-size: 0.9rem;
+      letter-spacing: 0;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 900px;
+      margin: 18px 0 0;
+      color: #e5edf4;
+      font-size: 1.05rem;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 4px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 6px;
+      color: #edf5fb;
+      background: rgba(255, 255, 255, 0.08);
+      font-size: 0.86rem;
+      white-space: nowrap;
+    }
+
+    main {
+      padding: 28px 0 56px;
+    }
+
+    section {
+      margin-top: 24px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 1.45rem;
+      line-height: 1.35;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 1.08rem;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .span-4 {
+      grid-column: span 4;
+    }
+
+    .span-6 {
+      grid-column: span 6;
+    }
+
+    .span-8 {
+      grid-column: span 8;
+    }
+
+    .span-12 {
+      grid-column: span 12;
+    }
+
+    .verdict {
+      border-left: 5px solid var(--green);
+    }
+
+    .warn {
+      border-left: 5px solid var(--gold);
+    }
+
+    .risk {
+      border-left: 5px solid var(--red);
+    }
+
+    .label {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 2px 8px;
+      border-radius: 5px;
+      background: var(--shade);
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .score {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .score span {
+      display: inline-flex;
+      padding: 2px 8px;
+      border-radius: 5px;
+      border: 1px solid var(--line);
+      font-size: 0.82rem;
+      color: var(--muted);
+      background: #fff;
+    }
+
+    .rank {
+      display: inline-flex;
+      width: 30px;
+      height: 30px;
+      align-items: center;
+      justify-content: center;
+      margin-right: 8px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: #fff;
+      font-weight: 800;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #eef3f7;
+      color: #273443;
+      font-size: 0.88rem;
+      white-space: nowrap;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    code {
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      background: #f1f4f7;
+      border: 1px solid #dde4ec;
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-size: 0.92em;
+    }
+
+    pre {
+      margin: 10px 0 0;
+      padding: 14px;
+      overflow-x: auto;
+      border: 1px solid #d6dde7;
+      border-radius: 8px;
+      background: #111827;
+      color: #eaf1f8;
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    ul,
+    ol {
+      margin: 8px 0 0 1.25rem;
+      padding: 0;
+    }
+
+    li {
+      margin: 5px 0;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .compact td,
+    .compact th {
+      padding: 8px 10px;
+    }
+
+    .note {
+      padding: 12px 14px;
+      border: 1px solid #ccd8e1;
+      border-left: 5px solid var(--blue);
+      border-radius: 8px;
+      background: #f6f9fb;
+    }
+
+    .source-list {
+      columns: 2;
+      column-gap: 28px;
+    }
+
+    .source-list li {
+      break-inside: avoid;
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 860px) {
+      .hero-inner,
+      main {
+        width: min(100% - 24px, 1180px);
+      }
+
+      .span-4,
+      .span-6,
+      .span-8,
+      .span-12 {
+        grid-column: span 12;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+
+      td {
+        white-space: normal;
+        min-width: 180px;
+      }
+
+      .source-list {
+        columns: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">Yoitomoshi Art Generator / ONOKO LoRA research</p>
+      <h1>ONOKO LoRAにおすすめのモデル調査レポート</h1>
+      <p class="lead">
+        2026-05-24時点で、ローカルONOKO LoRAの埋め込みメタデータ、Civitai API、Hugging Faceモデルカード、PromptHero、
+        Tensor.Art、SeaArt、PixAI記事を横断して、実用優先のcheckpoint候補を評価した。
+      </p>
+      <div class="meta">
+        <span class="chip">調査日: 2026-05-24</span>
+        <span class="chip">対象: ONOKO / 0n0k0 LoRA</span>
+        <span class="chip">現物判定: SDXL / Illustrious系</span>
+        <span class="chip">成果物: docs HTML</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="grid">
+      <article class="card span-8 verdict">
+        <span class="label">結論</span>
+        <h2>最優先は <code>n4mik4ILSFWNSFW_v20</code>。次点で <code>WAI-illustrious-SDXL v17</code></h2>
+        <p>
+          ローカルの現行ONOKO LoRAは、safetensorsヘッダー上で
+          <code>n4mik4ILSFWNSFW_v20.safetensors</code> を学習元checkpointとして記録している。
+          そのため、忠実度確認・採用カット作成・LoRA weight調整の基準モデルは
+          <strong>n4mik4__- IL -__SFW/NSFW_ v2.0</strong> で固定するのが最も合理的。
+        </p>
+        <p>
+          量産時の安定性や、より一般的なIllustrious系の質感を見たい場合は
+          <strong>WAI-illustrious-SDXL v17.0</strong> を2本目の比較モデルにする。
+          Animagine XL 4.0、Pony Diffusion V6 XL、NoobAI系は有力だが、ONOKO LoRAの学習元からは外れるため、
+          「本命」ではなく比較・再学習判断用に回す。
+        </p>
+      </article>
+
+      <article class="card span-4 warn">
+        <span class="label">重要</span>
+        <h2>同じSDXLでも系統差は大きい</h2>
+        <p>
+          SDXL / Illustrious / NoobAI / Pony / Animagine は同じ広義SDXL圏でも、タグ作法と内部分布が違う。
+          キャラLoRAは顔・衣装・色が崩れやすいので、まず学習元と同じcheckpointで基準画像を作る。
+        </p>
+      </article>
+    </section>
+
+    <section>
+      <h2>現物LoRA確認</h2>
+      <div class="grid">
+        <article class="card span-6">
+          <h3>検出したONOKO LoRA</h3>
+          <table class="compact">
+            <tr>
+              <th>ファイル</th>
+              <th>学習元</th>
+              <th>構造</th>
+              <th>備考</th>
+            </tr>
+            <tr>
+              <td><code>onoko_0n0k0_sdxl_v3_2_patch_b.safetensors</code></td>
+              <td><code>n4mik4ILSFWNSFW_v20.safetensors</code></td>
+              <td>SDXL LoRA / rank 16 / alpha 8</td>
+              <td>現行推奨テスト対象。dataset合計419 images。</td>
+            </tr>
+            <tr>
+              <td><code>onoko_0n0k0_sdxl_v3_patch_a.safetensors</code></td>
+              <td><code>n4mik4ILSFWNSFW_v20.safetensors</code></td>
+              <td>SDXL LoRA / rank 16 / alpha 8</td>
+              <td>先行版。dataset合計1570 train images相当。</td>
+            </tr>
+          </table>
+        </article>
+
+        <article class="card span-6">
+          <h3>ローカルに存在する関連checkpoint</h3>
+          <table class="compact">
+            <tr>
+              <th>パス</th>
+              <th>評価</th>
+            </tr>
+            <tr>
+              <td><code>runtime\forge\webui\models\Stable-diffusion\n4mik4ILSFWNSFW_v20.safetensors</code></td>
+              <td>ONOKO LoRAの学習元。すでに配置済みなので、最短で検証可能。</td>
+            </tr>
+            <tr>
+              <td><code>runtime\forge\webui\models\Stable-diffusion\counterfeitV30_v30.safetensors</code></td>
+              <td>SD1.5用の比較モデル。現行SDXL ONOKO LoRAには使わない。</td>
+            </tr>
+          </table>
+        </article>
+      </div>
+      <p class="note">
+        トリガー候補はLoRAのタグ頻度上 <code>0n0k0</code> が最上位。初回検証では
+        <code>&lt;lora:onoko_0n0k0_sdxl_v3_2_patch_b:0.65&gt;, 0n0k0</code> を固定し、
+        checkpointだけを変えて比較する。
+      </p>
+    </section>
+
+    <section>
+      <h2>推奨順位</h2>
+      <div class="grid">
+        <article class="card span-6 verdict">
+          <h3><span class="rank">1</span>n4mik4__- IL -__SFW/NSFW_ v2.0</h3>
+          <p>
+            <strong>用途:</strong> ONOKO LoRAの顔・衣装・色・アクセサリー再現の基準。
+            ローカルLoRAの学習元そのものなので、まずこれで基準seedを作る。
+          </p>
+          <p>
+            <strong>根拠:</strong> Civitai model ID <code>2366670</code>、base modelはIllustrious。
+            PromptHeroにも同一ファイル <code>n4mik4ILSFWNSFW_v20.safetensors</code> と
+            <code>sdxl_vae.safetensors</code> が掲載され、LoRA stackingは低weightが良い、通常CFG 4.5という説明がある。
+          </p>
+          <div class="score">
+            <span>ONOKO忠実度: 最上位</span>
+            <span>汎用性: 中</span>
+            <span>導入: 済み</span>
+          </div>
+        </article>
+
+        <article class="card span-6 verdict">
+          <h3><span class="rank">2</span>WAI-illustrious-SDXL v17.0</h3>
+          <p>
+            <strong>用途:</strong> 量産・綺麗なIllustrious系・現在の人気checkpointでの実用比較。
+            Civitai API上ではdownloads 1,364,569、thumbs up 81,375と非常に大きい実績がある。
+          </p>
+          <p>
+            <strong>注意:</strong> Civitai上ではNSFW扱い。ONOKOの顔を強く保ちたい場合はLoRA weightを
+            0.55-0.70から始め、WAI側の画風が勝ちすぎるなら下げる。
+          </p>
+          <div class="score">
+            <span>ONOKO忠実度: 高</span>
+            <span>汎用性: 高</span>
+            <span>導入: 要download</span>
+          </div>
+        </article>
+
+        <article class="card span-4">
+          <h3><span class="rank">3</span>Illustrious XL / Obsession / NoobAI系</h3>
+          <p>
+            Illustrious公式v0.1はLoRA・Adapter学習の土台として明記されているが、美観調整済みの量産モデルではない。
+            ObsessionやNoobAIは強いが、v-pred / eps-predや推奨設定差を確認してから使う。
+          </p>
+        </article>
+
+        <article class="card span-4">
+          <h3><span class="rank">4</span>Animagine XL 4.0 Opt</h3>
+          <p>
+            公式HFモデルカードが充実し、アニメキャラの清潔感と動きに強い。
+            ただしONOKO LoRAの学習元ではないため、互換テストではLoRA weightを低めから始める。
+          </p>
+        </article>
+
+        <article class="card span-4 risk">
+          <h3><span class="rank">5</span>Pony Diffusion V6 XL</h3>
+          <p>
+            すばらしいcheckpointだが、Pony系はprompt templateも分布も別物。
+            ONOKOをPonyで本格運用したいなら、既存LoRA流用よりPony向けLoRA再学習を推奨。
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>候補モデル比較表</h2>
+      <table>
+        <tr>
+          <th>候補</th>
+          <th>系統</th>
+          <th>サイト根拠</th>
+          <th>ONOKO LoRA適性</th>
+          <th>初期設定案</th>
+        </tr>
+        <tr>
+          <td><strong>n4mik4__- IL -__SFW/NSFW_ v2.0</strong><br><span class="muted">Civitai 2366670 / AutoV2 031070AB96</span></td>
+          <td>Illustrious</td>
+          <td>Civitai API、PromptHero、ローカルLoRAヘッダー</td>
+          <td>最優先。学習元checkpointなので忠実度基準。</td>
+          <td>CFG 4.5、steps 24-30、Euler a または DPM++ 2M、LoRA 0.60-0.75。</td>
+        </tr>
+        <tr>
+          <td><strong>WAI-illustrious-SDXL v17.0</strong><br><span class="muted">Civitai 827184 / AutoV2 F116B0C78F</span></td>
+          <td>Illustrious</td>
+          <td>Civitai API、SeaArt、Tensor.Art検索結果</td>
+          <td>高。量産用の本命2本目。画風が強いのでweight調整必須。</td>
+          <td>CFG 5-6、steps 28-30、Euler a、LoRA 0.55-0.70。</td>
+        </tr>
+        <tr>
+          <td><strong>Illustrious XL official v0.1</strong></td>
+          <td>Illustrious base</td>
+          <td>Hugging Face / arXiv</td>
+          <td>検証基準には良いが、見栄えの量産には調整が必要。</td>
+          <td>Euler a、steps 20-28、CFG 5-7.5、quality tagsを明示。</td>
+        </tr>
+        <tr>
+          <td><strong>NoobAI-XL / Obsession</strong><br><span class="muted">Civitai 833294 / 820208</span></td>
+          <td>NoobAI / Illustrious派生</td>
+          <td>Civitai API、Hugging Face NoobAI、Civitaiモデル説明</td>
+          <td>中-高。キャラ・Danbooruタグ理解は強いが、v-pred設定差に注意。</td>
+          <td>モデルカードのv-pred/eps-pred注意に従う。Rescale CFGが必要な版あり。</td>
+        </tr>
+        <tr>
+          <td><strong>Animagine XL 4.0 Opt</strong></td>
+          <td>SDXL anime</td>
+          <td>Hugging Face公式カード、PixAI記事</td>
+          <td>中。綺麗なアニメ絵比較には有力。ONOKO忠実度は要確認。</td>
+          <td>prompt末尾に <code>masterpiece, high score, great score, absurdres</code>。CFG 5、steps 28、Euler a。</td>
+        </tr>
+        <tr>
+          <td><strong>Pony Diffusion V6 XL</strong><br><span class="muted">Civitai 257749 / AutoV2 67AB2FD8EC</span></td>
+          <td>Pony</td>
+          <td>Civitai API、Open Laboratory、Tensor.Art</td>
+          <td>低-中。別系統。Pony向け再学習候補として見る。</td>
+          <td><code>score_9, score_8_up, ...</code> 系template。Clip skip 2。LoRA流用時は0.35-0.55。</td>
+        </tr>
+        <tr>
+          <td><strong>MeinaMix V12 / Counterfeit-V3.0 / AOM3</strong></td>
+          <td>SD1.5 anime</td>
+          <td>Civitai API、Open Laboratory、Hugging Face Counterfeit</td>
+          <td>現行SDXL ONOKOには不可。SD1.5版ONOKO LoRAがある場合だけ有力。</td>
+          <td>512x768または768x512、Clip skip 2から。LoRA 0.70-0.85。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>サイト別の見立て</h2>
+      <div class="grid">
+        <article class="card span-4">
+          <h3>Civitai</h3>
+          <p>
+            最も実用的。base model、version、download数、thumbs up、ファイル名、hash、license系の情報を取得できる。
+            今回の推奨順位はCivitai APIの現行メタデータを主軸にした。
+          </p>
+        </article>
+
+        <article class="card span-4">
+          <h3>Hugging Face</h3>
+          <p>
+            公式モデルカード、Diffusers利用、ライセンス、推奨設定の確認に向く。
+            Animagine XL 4.0、Illustrious XL、SDXL base、SD1.5、Counterfeitの根拠確認に使った。
+          </p>
+        </article>
+
+        <article class="card span-4">
+          <h3>PromptHero</h3>
+          <p>
+            n4mik4 v2.0のファイル名、更新日、説明文を確認できた。
+            Civitai IDに対応するミラーとして、ファイル同定の補助に使える。
+          </p>
+        </article>
+
+        <article class="card span-4">
+          <h3>Tensor.Art</h3>
+          <p>
+            オンライン生成での人気やリプリント状況を見る用途に向く。
+            n4mik4、Pony、WAIなどの掲載を確認したが、配布元としてはCivitaiやHFを優先する。
+          </p>
+        </article>
+
+        <article class="card span-4">
+          <h3>SeaArt</h3>
+          <p>
+            WAI系のオンライン生成実績・モデル設定例を見るのに有効。
+            ただし表示上のbase model分類がCivitaiと揺れることがあるため、ローカル導入判断では補助扱い。
+          </p>
+        </article>
+
+        <article class="card span-4">
+          <h3>PixAI</h3>
+          <p>
+            SDXL anime modelの使い分け記事が参考になる。
+            Animagineは動的キャラ、Illustriousは幅広いアニメスタイル・既存キャラ認識という整理は、ONOKO比較にも使いやすい。
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>推奨テスト手順</h2>
+      <div class="grid">
+        <article class="card span-6">
+          <h3>1. n4mik4で基準seedを作る</h3>
+          <pre>Checkpoint:
+n4mik4ILSFWNSFW_v20.safetensors
+
+Positive:
+&lt;lora:onoko_0n0k0_sdxl_v3_2_patch_b:0.65&gt;,
+0n0k0, solo, looking at viewer, eyewear on head, sunglasses,
+white jacket, skirt, smile, clean lineart, detailed eyes,
+masterpiece, best quality
+
+Negative:
+worst quality, low quality, bad anatomy, bad hands,
+extra digits, text, watermark, logo
+
+Settings:
+832x1216, Euler a, 28 steps, CFG 4.5</pre>
+        </article>
+
+        <article class="card span-6">
+          <h3>2. checkpointだけ差し替えてA/B</h3>
+          <ol>
+            <li>seed、prompt、negative、LoRA weightを固定する。</li>
+            <li><code>n4mik4</code>、<code>WAI v17</code>、<code>Animagine XL 4.0</code>、必要なら <code>NoobAI/Obsession</code> を同条件で比較する。</li>
+            <li>顔の同一性、眼鏡・ジャケット・配色、手、背景、線の濁りを5段階で採点する。</li>
+            <li>ONOKOの特徴が崩れるcheckpointは、画質が良くても「画風用」として二軍にする。</li>
+          </ol>
+        </article>
+
+        <article class="card span-12">
+          <h3>判定表</h3>
+          <table class="compact">
+            <tr>
+              <th>評価項目</th>
+              <th>合格ライン</th>
+              <th>よくある失敗</th>
+            </tr>
+            <tr>
+              <td>キャラ同一性</td>
+              <td>目・輪郭・髪量・主要アクセサリーが維持される</td>
+              <td>WAI/Animagine側の顔へ寄りすぎる</td>
+            </tr>
+            <tr>
+              <td>衣装保持</td>
+              <td>眼鏡、ジャケット、スカート、白系配色が安定</td>
+              <td>タグ不足で汎用衣装へ置換される</td>
+            </tr>
+            <tr>
+              <td>手・全身</td>
+              <td>全身時に手足が大きく破綻しない</td>
+              <td>LoRA weight過多、CFG過多、Hires修正不足</td>
+            </tr>
+            <tr>
+              <td>プロンプト追従</td>
+              <td>ポーズ・視線・背景指定が残る</td>
+              <td>キャラLoRAが強く、構図指定が負ける</td>
+            </tr>
+          </table>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>採用・不採用の判断</h2>
+      <div class="grid">
+        <article class="card span-4 verdict">
+          <h3>今すぐ使う</h3>
+          <ul>
+            <li><code>n4mik4ILSFWNSFW_v20</code> を基準モデルに固定。</li>
+            <li><code>onoko_0n0k0_sdxl_v3_2_patch_b</code> をLoRA本命にする。</li>
+            <li>初期weightは0.65。崩れるなら0.55、弱いなら0.75まで。</li>
+          </ul>
+        </article>
+
+        <article class="card span-4 warn">
+          <h3>追加download候補</h3>
+          <ul>
+            <li><code>WAI-illustrious-SDXL v17.0</code>: 量産用比較。</li>
+            <li><code>Animagine XL 4.0 Opt</code>: 清潔なアニメ画風比較。</li>
+            <li><code>Obsession / NoobAI</code>: Danbooruタグ・照明の比較。</li>
+          </ul>
+        </article>
+
+        <article class="card span-4 risk">
+          <h3>後回し</h3>
+          <ul>
+            <li><code>Pony Diffusion V6 XL</code>: Pony版ONOKOを作る時に再評価。</li>
+            <li>SD1.5 checkpoints: SD1.5 ONOKO LoRAがある時だけ。</li>
+            <li>Anima / Flux / Z-Image系: 現行ONOKO LoRAとは別アーキテクチャ。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>調査データ</h2>
+      <table>
+        <tr>
+          <th>モデル</th>
+          <th>Civitai ID</th>
+          <th>base</th>
+          <th>downloads</th>
+          <th>thumbs up</th>
+          <th>補足</th>
+        </tr>
+        <tr>
+          <td>n4mik4__- IL -__SFW/NSFW_</td>
+          <td>2366670</td>
+          <td>Illustrious</td>
+          <td>2,391</td>
+          <td>226</td>
+          <td>ONOKO LoRAの学習元。数値は小さいが、互換性評価では最重要。</td>
+        </tr>
+        <tr>
+          <td>WAI-illustrious-SDXL</td>
+          <td>827184</td>
+          <td>Illustrious</td>
+          <td>1,364,569</td>
+          <td>81,375</td>
+          <td>Illustrious系の大規模人気checkpoint。</td>
+        </tr>
+        <tr>
+          <td>Pony Diffusion V6 XL</td>
+          <td>257749</td>
+          <td>Pony</td>
+          <td>974,076</td>
+          <td>75,827</td>
+          <td>別系統。Pony向けLoRA再学習判断用。</td>
+        </tr>
+        <tr>
+          <td>NoobAI-XL (NAI-XL)</td>
+          <td>833294</td>
+          <td>NoobAI</td>
+          <td>291,512</td>
+          <td>18,247</td>
+          <td>Danbooru/e621タグ理解が強い。v-pred版は設定注意。</td>
+        </tr>
+        <tr>
+          <td>Obsession (Illustrious-XL)</td>
+          <td>820208</td>
+          <td>NoobAI</td>
+          <td>89,453</td>
+          <td>6,165</td>
+          <td>NoobAI v-pred派生。照明・美観比較用。</td>
+        </tr>
+        <tr>
+          <td>MeinaMix</td>
+          <td>7240</td>
+          <td>SD 1.5</td>
+          <td>522,323</td>
+          <td>40,654</td>
+          <td>SD1.5版ONOKOがある時の有力候補。</td>
+        </tr>
+        <tr>
+          <td>Counterfeit-V3.0</td>
+          <td>4468</td>
+          <td>SD 1.5</td>
+          <td>466,273</td>
+          <td>44,348</td>
+          <td>ローカル導入済み。SD1.5検証用。</td>
+        </tr>
+        <tr>
+          <td>AbyssOrangeMix3</td>
+          <td>9942</td>
+          <td>SD 1.5</td>
+          <td>347,875</td>
+          <td>28,937</td>
+          <td>古典的SD1.5 anime系。VAE差に注意。</td>
+        </tr>
+      </table>
+      <p class="muted">
+        downloads / thumbs up は 2026-05-24 にCivitai APIから取得した値。サイト側の集計更新により変動する。
+      </p>
+    </section>
+
+    <section>
+      <h2>参考ソース</h2>
+      <ul class="source-list">
+        <li><a href="https://civitai.com/models/2366670">Civitai: n4mik4__- IL -__SFW/NSFW_</a></li>
+        <li><a href="https://prompthero.com/ai-models/n4mik4__--il--__sfwnsfw_-2366670-download/n4mik4__--il--__sfwnsfw_-v20">PromptHero: n4mik4 v2.0</a></li>
+        <li><a href="https://civitai.com/models/827184">Civitai: WAI-illustrious-SDXL</a></li>
+        <li><a href="https://www.seaart.ai/models/detail/d8300cd33eb1ab8018baa6685ec4a7e9">SeaArt: WAI-illustrious-SDXL</a></li>
+        <li><a href="https://huggingface.co/cagliostrolab/animagine-xl-4.0">Hugging Face: Animagine XL 4.0</a></li>
+        <li><a href="https://huggingface.co/OnomaAIResearch/Illustrious-xl-early-release-v0">Hugging Face: Illustrious XL v0.1</a></li>
+        <li><a href="https://civitai.com/models/833294">Civitai: NoobAI-XL (NAI-XL)</a></li>
+        <li><a href="https://huggingface.co/Laxhar/noobai-XL-1.1">Hugging Face: NoobAI-XL 1.1</a></li>
+        <li><a href="https://civitai.com/models/820208">Civitai: Obsession (Illustrious-XL)</a></li>
+        <li><a href="https://civitai.com/models/257749">Civitai: Pony Diffusion V6 XL</a></li>
+        <li><a href="https://openlaboratory.com/models/pony-diffusion-v6-xl/">Open Laboratory: Pony Diffusion V6 XL</a></li>
+        <li><a href="https://tensor.art/models/714585990280309972">Tensor.Art: Pony Diffusion V6 XL</a></li>
+        <li><a href="https://civitai.com/models/7240">Civitai: MeinaMix</a></li>
+        <li><a href="https://openlaboratory.com/models/meina-mix/">Open Laboratory: Meina Mix</a></li>
+        <li><a href="https://civitai.com/models/4468">Civitai: Counterfeit-V3.0</a></li>
+        <li><a href="https://huggingface.co/gsdf/Counterfeit-V3.0">Hugging Face: Counterfeit-V3.0</a></li>
+        <li><a href="https://civitai.com/models/9942">Civitai: AbyssOrangeMix3</a></li>
+        <li><a href="https://civitai.com/models/21503">Civitai: AnyOrangeMix</a></li>
+        <li><a href="https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0">Hugging Face: Stable Diffusion XL base 1.0</a></li>
+        <li><a href="https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5">Hugging Face: Stable Diffusion v1.5</a></li>
+        <li><a href="https://blog.pixai.art/ja/sdxl-anime-models-pixai-guide-ja/">PixAI: SDXLアニメモデル選びガイド</a></li>
+        <li><a href="https://blog.pixai.art/en/what-is-lora-beginners-guide/">PixAI: LoRA compatibility guide</a></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>最終メモ</h2>
+      <p>
+        ONOKO LoRAの現行ファイルを見る限り、モデル探しの中心は「人気checkpoint」ではなく
+        「Illustrious系、かつn4mik4に近いcheckpoint」である。最初の採用フローは、
+        <code>n4mik4</code> でキャラの正解を作る、<code>WAI</code> で量産品質を確認する、
+        <code>Animagine / NoobAI / Pony</code> は別系統として崩れ方を記録する、の順が最短。
+      </p>
+    </section>
+  </main>
+</body>
+</html>

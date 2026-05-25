@@ -3,9 +3,10 @@ import { useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useStore } from '@/lib/store'
 import { approxTokenCount, formatPromptText, promptAppend, splitPromptTokensWithRanges } from '@/lib/prompt-utils'
+import { parsePromptComposerTags } from '@/lib/prompt-composer'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { PromptHelperPanel } from './PromptHelperPanel'
+import { PromptComposerPanel } from './PromptComposerPanel'
 import { PromptLibrary } from './PromptLibrary'
 import { PromptTagChips } from './PromptTagChips'
 import { QuickPresetBar } from './QuickPresetBar'
@@ -71,12 +72,16 @@ export function PromptTagsWorkspace(): JSX.Element {
   }
 
   function addTags(nextTarget: TagTarget, raw: string): void {
-    const tags = parseTagInput(raw)
+    const tags = parsePromptComposerTags(raw)
+    addParsedTags(nextTarget, tags)
+    if (raw === draft) setDraft('')
+  }
+
+  function addParsedTags(nextTarget: TagTarget, tags: string[]): void {
     if (tags.length === 0) return
     const current = nextTarget === 'positive' ? prompt : negative
     const next = tags.reduce((text, tag) => promptAppend(text, tag), current)
     changeTarget(nextTarget, next)
-    if (raw === draft) setDraft('')
     toast.success(tStatic('tagsWorkspace.added', { count: tags.length }))
   }
 
@@ -118,7 +123,18 @@ export function PromptTagsWorkspace(): JSX.Element {
 
           <div className="space-y-3">
             <section className="rounded-md border border-line bg-bg-1 p-3" data-testid="tags-workspace-quick-add">
-              <div className="flex flex-wrap items-center gap-2">
+              <PromptComposerPanel
+                value={draft}
+                onChange={setDraft}
+                mode="append"
+                target={target}
+                onApplyTags={(tags) => addParsedTags(target, tags)}
+                onApplyNegative={(_prompt, tags) => addParsedTags('negative', tags)}
+                clearOnApply
+                compact
+                testId="tags-workspace-composer"
+              />
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <SegmentedTarget value={target} onChange={setTarget} />
                 <input
                   className="input min-w-[240px] flex-1 text-xs"
@@ -128,6 +144,8 @@ export function PromptTagsWorkspace(): JSX.Element {
                     if (e.key === 'Enter') addTags(target, draft)
                   }}
                   placeholder={t('tagsWorkspace.addPlaceholder')}
+                  data-prompt-dictionary-autocomplete="tag-list"
+                  data-testid="tags-workspace-quick-add-input"
                 />
                 <button type="button" className="btn btn-primary text-xs gap-1.5" onClick={() => addTags(target, draft)}>
                   <Plus className="h-3.5 w-3.5" />
@@ -181,8 +199,6 @@ export function PromptTagsWorkspace(): JSX.Element {
             </div>
           </div>
         </div>
-
-        <PromptHelperPanel />
       </div>
     </main>
   )
@@ -219,6 +235,8 @@ function TagEditor({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={target === 'positive' ? t('prompt.placeholder') : t('prompt.negativePlaceholder')}
+        data-prompt-dictionary-autocomplete={target}
+        data-testid={`tags-workspace-${target}-editor`}
       />
       <PromptTagChips target={target} value={value} onChange={onChange} onMoveTokens={onMoveTokens} />
       <div className="mt-auto flex items-center gap-2 text-[10px] text-ink-3">
@@ -271,17 +289,4 @@ function TagStat({
       <span className="ml-1 font-mono text-ink-3">/ {tokens} tok</span>
     </div>
   )
-}
-
-function parseTagInput(value: string): string[] {
-  const seen = new Set<string>()
-  const tags: string[] = []
-  for (const raw of value.split(/[,\n]/)) {
-    const tag = raw.trim()
-    const key = tag.toLowerCase().replace(/\s+/g, ' ')
-    if (!tag || seen.has(key)) continue
-    seen.add(key)
-    tags.push(tag)
-  }
-  return tags
 }

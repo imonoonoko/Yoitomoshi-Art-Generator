@@ -1,6 +1,6 @@
 # Yoitomoshi Art Generator ドキュメント索引
 
-最終更新: 2026-05-19
+最終更新: 2026-05-26
 
 `docs/` には調査レポート、実装記録、QA証跡が増えています。初見で迷わないよう、用途別に読む順番を整理します。
 
@@ -10,11 +10,31 @@
 |---|---|
 | 5分で起動したい | [`../はじめに.txt`](../はじめに.txt) |
 | セットアップを丁寧に進めたい | [`SETUP_GUIDE.md`](SETUP_GUIDE.md) |
+| AI/Codexに最初に読ませる地図 | [`AI_PROJECT_MAP.md`](AI_PROJECT_MAP.md) |
+| アプリ全体の流れを1枚で俯瞰したい | [`PROJECT_MAP.md`](PROJECT_MAP.md) |
+| 現在のForge Studio全体像をHTMLで見たい | [`YOITOMOSHI_FORGE_STUDIO_CURRENT_STATE_REPORT_2026-05-25.html`](YOITOMOSHI_FORGE_STUDIO_CURRENT_STATE_REPORT_2026-05-25.html) |
+| 個人利用改善で何が実装されたかをHTMLで見たい | [`YOITOMOSHI_FORGE_STUDIO_PERSONAL_WORKFLOW_IMPLEMENTATION_REPORT_2026-05-26.html`](YOITOMOSHI_FORGE_STUDIO_PERSONAL_WORKFLOW_IMPLEMENTATION_REPORT_2026-05-26.html) |
 | 動画生成のモデル導入から生成まで確認したい | [`VIDEO_GENERATION_GUIDE_2026-05-17.html`](VIDEO_GENERATION_GUIDE_2026-05-17.html) |
 | フォルダ構造とGit管理範囲を知りたい | [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md) |
 | public化前の確認をしたい | [`OPEN_SOURCE_RELEASE_CHECKLIST.md`](OPEN_SOURCE_RELEASE_CHECKLIST.md) |
 | 現在の優先順位を知りたい | [`ROADMAP.md`](ROADMAP.md) |
 | アプリ全体の構造を俯瞰したい | [`APP_MAP_2026-05-15.html`](APP_MAP_2026-05-15.html) / [`APP_MAP_2026-05-15.json`](APP_MAP_2026-05-15.json) |
+
+## プロジェクト地図
+
+| 地図 | ドキュメント |
+|---|---|
+| AI向け入口 | [`AI_PROJECT_MAP.md`](AI_PROJECT_MAP.md) |
+| 人間向け全体地図 | [`PROJECT_MAP.md`](PROJECT_MAP.md) |
+| レイヤと責務 | [`maps/00-overview.md`](maps/00-overview.md) |
+| 画像生成フロー | [`maps/01-image-generation-flow.md`](maps/01-image-generation-flow.md) |
+| Prompt / Tags / Composer | [`maps/02-prompt-management-flow.md`](maps/02-prompt-management-flow.md) |
+| LoRA / Civitai / Models | [`maps/03-lora-civitai-model-flow.md`](maps/03-lora-civitai-model-flow.md) |
+| History / Metadata | [`maps/04-history-metadata-flow.md`](maps/04-history-metadata-flow.md) |
+| Electron IPC | [`maps/05-electron-ipc-flow.md`](maps/05-electron-ipc-flow.md) |
+| Settings / Storage / Workspace | [`maps/06-settings-storage-workspace-flow.md`](maps/06-settings-storage-workspace-flow.md) |
+| Video / Upscale / Tools | [`maps/07-video-upscale-tools-flow.md`](maps/07-video-upscale-tools-flow.md) |
+| import依存サマリ | [`maps/generated/import-graph-summary.md`](maps/generated/import-graph-summary.md) |
 
 ## 実装者向け
 
@@ -35,6 +55,13 @@
 |---|---|
 | sd-dynamic-prompts | [`EXTENSION_RESEARCH_SD_DYNAMIC_PROMPTS_2026-05-16.html`](EXTENSION_RESEARCH_SD_DYNAMIC_PROMPTS_2026-05-16.html) |
 | Prompt format / LyCORIS | [`EXTENSION_RESEARCH_PROMPT_LYCORIS_2026-05-15.html`](EXTENSION_RESEARCH_PROMPT_LYCORIS_2026-05-15.html) |
+| Stable Diffusion / Forge / Civitai / 最新モデル横断 | [`YOITOMOSHI_FORGE_STUDIO_AI_ECOSYSTEM_RESEARCH_REPORT_2026-05-22.html`](YOITOMOSHI_FORGE_STUDIO_AI_ECOSYSTEM_RESEARCH_REPORT_2026-05-22.html) |
+| Animadex API連携 / Prompt Helper / CivitAI強化要件 | [`ANIMADEX_INTEGRATION_REQUIREMENTS_REPORT_2026-05-26.html`](ANIMADEX_INTEGRATION_REQUIREMENTS_REPORT_2026-05-26.html) |
+| プロAIイラスト制作ワークフロー / 最新モデル / Yoitomoshi改善要件 | [`PRO_AI_ILLUSTRATION_WORKFLOW_RESEARCH_REPORT_2026-05-25.html`](PRO_AI_ILLUSTRATION_WORKFLOW_RESEARCH_REPORT_2026-05-25.html) |
+| プロAIイラスト制作ワークフロー実装進捗 / GUI成果 | [`PRO_AI_ILLUSTRATION_IMPLEMENTATION_PROGRESS_REPORT_2026-05-25.html`](PRO_AI_ILLUSTRATION_IMPLEMENTATION_PROGRESS_REPORT_2026-05-25.html) |
+| プロAIイラスト制作ワークフロー実装ロードマップ | [`PRO_AI_ILLUSTRATION_IMPLEMENTATION_ROADMAP_2026-05-25.md`](PRO_AI_ILLUSTRATION_IMPLEMENTATION_ROADMAP_2026-05-25.md) |
+| Codex作業ゲーム化 / デスクトップ放置連携ソフト要件 | [`CODEX_ATELIER_DEV_COMPANION_REQUIREMENTS_REPORT_2026-05-25.html`](CODEX_ATELIER_DEV_COMPANION_REQUIREMENTS_REPORT_2026-05-25.html) |
+| タグライブラリ強化 | [`TAG_LIBRARY_BEST_PRACTICES_RESEARCH_2026-05-22.html`](TAG_LIBRARY_BEST_PRACTICES_RESEARCH_2026-05-22.html) |
 | 生成画面UI設計 | [`GENERATION_MODE_UI_RESEARCH_REPORT_2026-05-16.html`](GENERATION_MODE_UI_RESEARCH_REPORT_2026-05-16.html) |
 | PixAI / Aipictors 公開情報調査 | [`PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html`](PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html) |
 | ROMptnプロンプト調査 | [`ROMPTN_PROMPT_RESEARCH_REPORT_2026-05-16.html`](ROMPTN_PROMPT_RESEARCH_REPORT_2026-05-16.html) |

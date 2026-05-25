@@ -576,24 +576,39 @@ function deriveSuggestedSettings(images: CivitaiImage[]): CivitaiRecommended['su
     }
   }
 
+  const samplers: string[] = []
+  const steps: number[] = []
+  const cfgScales: number[] = []
+  const widths: number[] = []
+  const heights: number[] = []
+  const clipSkips: number[] = []
+  let negativePrompt: string | null = null
+
+  for (const image of withMeta) {
+    const meta = image.meta!
+    if (isString(meta.sampler)) samplers.push(meta.sampler)
+    if (isNumber(meta.steps)) steps.push(meta.steps)
+    if (isNumber(meta.cfgScale)) cfgScales.push(meta.cfgScale)
+    const size = parseSize(meta.Size)
+    if (isNumber(size?.w)) widths.push(size.w)
+    if (isNumber(size?.h)) heights.push(size.h)
+    const rawClipSkip = meta['Clip skip']
+    const clipSkip = typeof rawClipSkip === 'string' ? parseInt(rawClipSkip, 10) : rawClipSkip
+    if (isNumber(clipSkip)) clipSkips.push(clipSkip)
+    if (isString(meta.negativePrompt) && (!negativePrompt || meta.negativePrompt.length > negativePrompt.length)) {
+      negativePrompt = meta.negativePrompt
+    }
+  }
+
   return {
-    sampler: mode(withMeta.map((i) => i.meta!.sampler).filter(isString)),
-    steps: median(withMeta.map((i) => i.meta!.steps).filter(isNumber)),
-    cfgScale: median(withMeta.map((i) => i.meta!.cfgScale).filter(isNumber)),
-    width: median(withMeta.map((i) => parseSize(i.meta!.Size)?.w).filter(isNumber)),
-    height: median(withMeta.map((i) => parseSize(i.meta!.Size)?.h).filter(isNumber)),
-    clipSkip: median(
-      withMeta
-        .map((i) => i.meta!['Clip skip'])
-        .map((v) => (typeof v === 'string' ? parseInt(v, 10) : v))
-        .filter(isNumber)
-    ),
+    sampler: mode(samplers),
+    steps: median(steps),
+    cfgScale: median(cfgScales),
+    width: median(widths),
+    height: median(heights),
+    clipSkip: median(clipSkips),
     // Pick the longest negative prompt — usually the most "complete" reference.
-    negativePrompt:
-      withMeta
-        .map((i) => i.meta!.negativePrompt)
-        .filter(isString)
-        .sort((a, b) => b.length - a.length)[0] ?? null
+    negativePrompt
   }
 }
 
@@ -999,7 +1014,8 @@ interface MinedImage {
 export async function mineCheckpointSamples(
   modelVersionId: number,
   apiKey: string | null,
-  maxImages = 200
+  maxImages = 200,
+  includeNsfw = false
 ): Promise<CivitaiCommunityStats | null> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -1013,7 +1029,7 @@ export async function mineCheckpointSamples(
   // hammering the API on extremely popular models.
   let url: string | null =
     `${CIVITAI_BASE}/images?modelVersionId=${modelVersionId}` +
-    `&sort=Most%20Reactions&limit=${Math.min(200, maxImages)}&nsfw=true`
+    `&sort=Most%20Reactions&limit=${Math.min(200, maxImages)}&nsfw=${includeNsfw ? 'true' : 'false'}`
   let pages = 0
   while (url && collected.length < maxImages && pages < 3) {
     type ImagesResp = {

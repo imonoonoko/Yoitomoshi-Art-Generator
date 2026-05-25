@@ -68,6 +68,8 @@ export const IPC = {
   toolsCancelModelMerger: 'tools:cancel-model-merger',
   toolsModelMergerProgress: 'tools:model-merger-progress',
   toolsInspectCharacterCompositeIntegrations: 'tools:inspect-character-composite-integrations',
+  toolsInspectPersonalHealth: 'tools:inspect-personal-health',
+  toolsRunPersonalHealthRecovery: 'tools:run-personal-health-recovery',
 
   // Civitai
   civitaiLookupByModel: 'civitai:lookup-model',
@@ -95,6 +97,7 @@ export const IPC = {
   storageDeleteHistory: 'storage:delete-history',
   storageSetHistoryLabel: 'storage:set-history-label',
   storageSetHistoryTagReview: 'storage:set-history-tag-review',
+  storageSetHistoryProRecipeReview: 'storage:set-history-pro-recipe-review',
   storageListPresets: 'storage:list-presets',
   storageSavePreset: 'storage:save-preset',
   storageDeletePreset: 'storage:delete-preset',
@@ -103,6 +106,9 @@ export const IPC = {
   storageListQuickPresets: 'storage:list-quick-presets',
   storageSaveQuickPreset: 'storage:save-quick-preset',
   storageDeleteQuickPreset: 'storage:delete-quick-preset',
+  storageListPromptComposerSlotTemplates: 'storage:list-prompt-composer-slot-templates',
+  storageSavePromptComposerSlotTemplate: 'storage:save-prompt-composer-slot-template',
+  storageDeletePromptComposerSlotTemplate: 'storage:delete-prompt-composer-slot-template',
   storageGetLoraFavorites: 'storage:get-lora-favorites',
   storageSetLoraFavorites: 'storage:set-lora-favorites',
   storageListLoraPromptOverrides: 'storage:list-lora-prompt-overrides',
@@ -129,6 +135,15 @@ export const IPC = {
   libraryLoad: 'library:load',
   libraryGetCustom: 'library:get-custom',
   librarySaveCustom: 'library:save-custom',
+
+  // Prompt dictionary
+  promptDictionarySearch: 'prompt-dictionary:search',
+
+  // Translation
+  translationPromptTag: 'translation:prompt-tag',
+  translationPromptText: 'translation:prompt-text',
+  translationPromptRuntimeStatus: 'translation:prompt-runtime-status',
+  translationPreparePromptRuntime: 'translation:prepare-prompt-runtime',
 
   // Misc
   appStartupMetrics: 'app:startup-metrics',

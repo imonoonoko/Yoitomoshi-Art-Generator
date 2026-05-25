@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Activity, AlertTriangle, ChevronDown, ClipboardPaste, Database, Download, ExternalLink, FileSearch, FolderOpen, GitMerge, ImageIcon, Package, Play, RefreshCw, Save, Search, ShieldCheck, Shuffle, Square, Star, Tag, Trash2, Wrench } from 'lucide-react'
+import { Activity, AlertTriangle, ChevronDown, ClipboardPaste, Database, Download, ExternalLink, FileSearch, FolderOpen, GitMerge, ImageIcon, Package, Play, Plus, RefreshCw, Save, Search, Send, ShieldCheck, Shuffle, Square, Star, Tag, Trash2, Wrench } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useStore } from '@/lib/store'
+import { DEFAULT_CONTROLNET_UNIT, useStore, type ControlNetUnitState } from '@/lib/store'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { api } from '@/lib/ipc'
 import { cn } from '@/lib/utils'
@@ -14,8 +14,10 @@ import {
   findCheckpointPromptProfile,
   inferCheckpointPromptFamily,
   joinProfileTags,
+  normalizeCheckpointNegativeStrategy,
   normalizeCheckpointProfileFamily,
   normalizeCheckpointProfileMode,
+  normalizeCheckpointPromptStyle,
   preferredCheckpointPromptProfileId,
   splitProfileTagText
 } from '@/lib/checkpoint-prompt-profile'
@@ -24,6 +26,8 @@ import { TAGGER_CATALOG, taggerTierLabel, type TaggerCatalogItem } from '@/lib/t
 import { DEFAULT_TAGGER_BLACKLIST, DEFAULT_TAGGER_MIN_SCORE, parseTaggerBlacklist } from '@shared/tagger-filter'
 import type {
   DownloadJob,
+  CivitaiCommunityStats,
+  HistoryItem,
   HuggingFaceSearchFile,
   LibraryIntegrityReport,
   CheckpointPromptProfile,
@@ -38,6 +42,10 @@ import type {
   ModelMergerRequest,
   ModelMergerResult,
   ModelMergerSupportReport,
+  PersonalEnvironmentHealthReport,
+  PersonalEnvironmentRecoveryResult,
+  ReferenceBoardItem,
+  ReferenceBoardKind,
   StartupMetrics,
   StartupMetricsSample,
   TaggerRunResult,
@@ -47,6 +55,8 @@ import type {
   WorkspaceImageSaveMode,
   WorkspaceSummary
 } from '@shared/types'
+
+const STALE_DOWNLOAD_MS = 10 * 60 * 1000
 
 /**
  * Tools tab — local utilities that don't need a generation pipeline.
@@ -71,6 +81,9 @@ export function ToolsWorkspace(): JSX.Element {
     <main className="flex-1 overflow-auto p-6">
       <div className="max-w-3xl mx-auto space-y-4">
         <h2 className="text-lg font-semibold text-ink-1">{t('tools.title')}</h2>
+        <ToolSection title={t('tools.personalHealth.title')} icon={<ShieldCheck className="h-4 w-4" />} defaultOpen testId="personal-health">
+          <PersonalEnvironmentHealthCard />
+        </ToolSection>
         <ToolSection title={t('tools.startup.title')} icon={<Activity className="h-4 w-4" />} defaultOpen>
           <StartupDiagnosticsCard />
         </ToolSection>
@@ -79,6 +92,9 @@ export function ToolsWorkspace(): JSX.Element {
         </ToolSection>
         <ToolSection title={t('tools.tagger.title')} icon={<Tag className="h-4 w-4" />} defaultOpen testId="tagger">
           <TaggerCatalogCard />
+        </ToolSection>
+        <ToolSection title={t('tools.referenceBoard.title')} icon={<ImageIcon className="h-4 w-4" />} defaultOpen testId="reference-board">
+          <ReferenceBoardCard />
         </ToolSection>
         <ToolSection title={t('tools.modelHealth.title')} icon={<AlertTriangle className="h-4 w-4" />}>
           <ModelHealthScanCard />
@@ -141,7 +157,13 @@ interface WorkspacePreflightResult {
   issues: WorkspacePreflightIssue[]
 }
 
-export function WorkspaceCard({ compact = false }: { compact?: boolean } = {}): JSX.Element {
+export function WorkspaceCard({
+  compact = false,
+  restoreTab = true
+}: {
+  compact?: boolean
+  restoreTab?: boolean
+} = {}): JSX.Element {
   const t = useT()
   const [name, setName] = useState('')
   const [imageSaveMode, setImageSaveMode] = useState<WorkspaceImageSaveMode>('embed')
@@ -218,7 +240,8 @@ export function WorkspaceCard({ compact = false }: { compact?: boolean } = {}): 
         upscaleOutputRef,
         controlnetRefs,
         fabricPositiveImages,
-        fabricNegativeImages
+        fabricNegativeImages,
+        referenceBoardImages
       ] = await Promise.all([
         snap.inputImageDataUrl ? Promise.resolve(snap.inputImageDataUrl) : resolveImageReference(refs?.inputImage, 'inputImage', missingReferences),
         snap.lastImageDataUrl ? Promise.resolve(snap.lastImageDataUrl) : resolveImageReference(refs?.lastImage, 'lastImage', missingReferences),
@@ -226,7 +249,8 @@ export function WorkspaceCard({ compact = false }: { compact?: boolean } = {}): 
         snap.upscaleOutputImageDataUrl ? Promise.resolve(snap.upscaleOutputImageDataUrl) : resolveImageReference(refs?.upscaleOutputImage, 'upscaleOutputImage', missingReferences),
         Promise.all((refs?.controlnetUnits ?? []).map((ref, index) => resolveImageReference(ref, `controlnet-${index + 1}`, missingReferences))),
         Promise.all((refs?.fabricPositive ?? []).map((ref, index) => resolveImageReference(ref, `fabric-positive-${index + 1}`, missingReferences))),
-        Promise.all((refs?.fabricNegative ?? []).map((ref, index) => resolveImageReference(ref, `fabric-negative-${index + 1}`, missingReferences)))
+        Promise.all((refs?.fabricNegative ?? []).map((ref, index) => resolveImageReference(ref, `fabric-negative-${index + 1}`, missingReferences))),
+        Promise.all((refs?.referenceBoard ?? []).map((ref, index) => resolveImageReference(ref, `reference-board-${index + 1}`, missingReferences)))
       ])
       const rawControlnet = snap.controlnet as Partial<typeof s.controlnet> & { units?: typeof s.controlnet.units }
       const restoredControlnet = {
@@ -247,7 +271,17 @@ export function WorkspaceCard({ compact = false }: { compact?: boolean } = {}): 
         refs?.fabricPositive,
         refs?.fabricNegative
       )
-      s.setCurrentTab(snap.currentTab)
+      const restoredReferenceBoardItems = (snap.referenceBoard?.items ?? []).map((item, index) => {
+        const ref = refs?.referenceBoard?.[index]
+        return {
+          ...item,
+          imageDataUrl: item.imageDataUrl ?? referenceBoardImages[index] ?? null,
+          filename: item.filename ?? imageReferenceFilename(ref),
+          sourceHistoryId: item.sourceHistoryId ?? imageHistoryId(ref),
+          sourcePath: item.sourcePath ?? imageFilePath(ref)
+        }
+      })
+      if (restoreTab) s.setCurrentTab(snap.currentTab)
       s.setPrompt(snap.prompt)
       s.setNegativePrompt(snap.negativePrompt)
       s.patchParams(snap.params)
@@ -272,6 +306,7 @@ export function WorkspaceCard({ compact = false }: { compact?: boolean } = {}): 
       s.patchControlnet(restoredControlnet as Partial<typeof s.controlnet>)
       if (snap.regionalPrompter) s.patchRegionalPrompter(snap.regionalPrompter as Partial<typeof s.regionalPrompter>)
       if (restoredFabric) s.patchFabric(restoredFabric)
+      s.setReferenceBoardItems(restoredReferenceBoardItems)
       s.patchAdetailer(snap.adetailer as Partial<typeof s.adetailer>)
       s.patchDynThres(snap.dynThres as Partial<typeof s.dynThres>)
       s.patchFreeu(snap.freeu as Partial<typeof s.freeu>)
@@ -308,6 +343,16 @@ export function WorkspaceCard({ compact = false }: { compact?: boolean } = {}): 
       <div className="flex items-center gap-2">
         <Save className="h-5 w-5 text-accent" />
         <h3 className="text-sm font-semibold text-ink-1">{t('tools.workspace.title')}</h3>
+        <button
+          type="button"
+          className="btn btn-icon btn-ghost ml-auto"
+          onClick={() => { void load() }}
+          disabled={busy}
+          title={t('common.refresh')}
+          data-testid="workspace-refresh"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
       </div>
       <p className="text-xs text-ink-3 leading-relaxed">{t('tools.workspace.body')}</p>
       <div className="flex gap-2">
@@ -570,6 +615,9 @@ function collectWorkspaceImageReferences(
   for (const [index, ref] of (refs.fabricNegative ?? []).entries()) {
     push(`fabric-negative-${index + 1}`, ref)
   }
+  for (const [index, ref] of (refs.referenceBoard ?? []).entries()) {
+    push(`reference-board-${index + 1}`, ref)
+  }
   return entries
 }
 
@@ -634,6 +682,582 @@ function imageHistoryId(ref: WorkspaceImageReference | null | undefined): string
 
 function imageReferenceFilename(ref: WorkspaceImageReference | null | undefined): string | null {
   return ref?.filename ?? null
+}
+
+const REFERENCE_BOARD_KINDS: ReferenceBoardKind[] = ['pose', 'color', 'character', 'style', 'material', 'other']
+const REFERENCE_BOARD_HISTORY_LABELS = new Set(['reference', 'asset', 'favorite', 'candidate', 'social'])
+
+function ReferenceBoardCard(): JSX.Element {
+  const t = useT()
+  const items = useStore((s) => s.referenceBoardItems)
+  const upsertItem = useStore((s) => s.upsertReferenceBoardItem)
+  const updateItem = useStore((s) => s.updateReferenceBoardItem)
+  const deleteItem = useStore((s) => s.deleteReferenceBoardItem)
+  const setHistory = useStore((s) => s.setHistory)
+  const hasPreview = useStore((s) => Boolean(s.lastImage))
+  const hasInput = useStore((s) => Boolean(s.inputImage))
+  const controlnet = useStore((s) => s.controlnet)
+  const [kind, setKind] = useState<ReferenceBoardKind>('pose')
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  function upsertReference(input: Omit<ReferenceBoardItem, 'id' | 'kind' | 'note' | 'createdAt'>): void {
+    const latestItems = useStore.getState().referenceBoardItems
+    const existing = latestItems.find((item) =>
+      (input.sourceHistoryId && item.sourceHistoryId === input.sourceHistoryId) ||
+      (input.sourcePath && item.sourcePath === input.sourcePath)
+    )
+    upsertItem({
+      id: existing?.id ?? makeReferenceBoardId(),
+      kind,
+      imageDataUrl: input.imageDataUrl,
+      filename: input.filename,
+      sourceType: input.sourceType,
+      sourceLabel: input.sourceLabel,
+      sourceHistoryId: input.sourceHistoryId,
+      sourcePath: input.sourcePath,
+      note: note.trim() || existing?.note || '',
+      createdAt: existing?.createdAt ?? Date.now()
+    })
+  }
+
+  function addPreview(): void {
+    const state = useStore.getState()
+    if (!state.lastImage) {
+      toast(tStatic('tools.referenceBoard.noImage'), { icon: '!' })
+      return
+    }
+    upsertReference({
+      imageDataUrl: state.lastImage,
+      filename: 'last-generation.png',
+      sourceType: 'last',
+      sourceLabel: tStatic('tools.referenceBoard.source.last'),
+      sourceHistoryId: state.lastImageHistoryId,
+      sourcePath: null
+    })
+    toast.success(tStatic('tools.referenceBoard.added'))
+  }
+
+  function addInput(): void {
+    const state = useStore.getState()
+    if (!state.inputImage) {
+      toast(tStatic('tools.referenceBoard.noImage'), { icon: '!' })
+      return
+    }
+    upsertReference({
+      imageDataUrl: state.inputImage,
+      filename: state.inputImageFilename ?? 'input-image.png',
+      sourceType: 'input',
+      sourceLabel: tStatic('tools.referenceBoard.source.input'),
+      sourceHistoryId: state.inputImageHistoryId,
+      sourcePath: state.inputImagePath
+    })
+    toast.success(tStatic('tools.referenceBoard.added'))
+  }
+
+  async function importLabeledHistory(): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    try {
+      const history = await api.storage.listHistory()
+      setHistory(history)
+      const labeled = history
+        .filter((item) => item.label && REFERENCE_BOARD_HISTORY_LABELS.has(item.label))
+        .slice(0, 24)
+      let imported = 0
+      for (const item of labeled) {
+        const image = await api.storage.readHistoryImage(item.id).catch(() => null)
+        if (!image && !item.thumbDataUrl) continue
+        upsertReference({
+          imageDataUrl: image ?? item.thumbDataUrl,
+          filename: referenceHistoryFilename(item),
+          sourceType: 'history',
+          sourceLabel: historySourceLabel(item),
+          sourceHistoryId: item.id,
+          sourcePath: null
+        })
+        const existing = useStore.getState().referenceBoardItems.find((candidate) => candidate.sourceHistoryId === item.id)
+        if (existing && !existing.note) {
+          updateItem(existing.id, { note: referenceNoteFromHistory(item) })
+        }
+        imported += 1
+      }
+      if (imported === 0) {
+        toast(tStatic('tools.referenceBoard.importEmpty'), { icon: '!' })
+      } else {
+        toast.success(tStatic('tools.referenceBoard.imported', { count: imported }))
+      }
+    } catch (e) {
+      toast.error(tStatic('tools.referenceBoard.importFailed', { message: (e as Error).message }))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function sendToImg2Img(item: ReferenceBoardItem): void {
+    if (!item.imageDataUrl) {
+      toast(tStatic('tools.referenceBoard.noImage'), { icon: '!' })
+      return
+    }
+    const state = useStore.getState()
+    state.setInputImage(item.imageDataUrl, item.filename ?? 'reference-board.png', item.sourcePath ?? null, item.sourceHistoryId ?? null)
+    state.setCurrentTab('img2img')
+    toast.success(tStatic('tools.referenceBoard.sentImg2Img'))
+  }
+
+  function sendToInpaint(item: ReferenceBoardItem): void {
+    if (!item.imageDataUrl) {
+      toast(tStatic('tools.referenceBoard.noImage'), { icon: '!' })
+      return
+    }
+    const state = useStore.getState()
+    state.setInputImage(item.imageDataUrl, item.filename ?? 'reference-board.png', item.sourcePath ?? null, item.sourceHistoryId ?? null)
+    state.setInpaintMaskImage(null)
+    state.setCurrentTab('img2img')
+    toast.success(tStatic('tools.referenceBoard.sentInpaint'))
+  }
+
+  function sendToControlNet(item: ReferenceBoardItem): void {
+    if (!item.imageDataUrl) {
+      toast(tStatic('tools.referenceBoard.noImage'), { icon: '!' })
+      return
+    }
+    const state = useStore.getState()
+    const unit = buildReferenceBoardControlNetUnit(item, state.controlnetModuleList, state.controlnetModelList)
+    const currentUnits = state.controlnet.units.length > 0 ? state.controlnet.units : [DEFAULT_CONTROLNET_UNIT]
+    state.patchControlnet({
+      enabled: true,
+      units: currentUnits.map((current, index) => index === 0 ? unit : current)
+    })
+    toast.success(tStatic('tools.referenceBoard.sentControlNet'))
+  }
+
+  return (
+    <div
+      className="card p-4 space-y-3"
+      data-testid="reference-board"
+      data-reference-board-count={items.length}
+      data-controlnet-enabled={controlnet.enabled ? 'true' : 'false'}
+      data-controlnet-unit-module={controlnet.units[0]?.module ?? 'None'}
+      data-controlnet-unit-has-image={controlnet.units[0]?.image ? 'true' : 'false'}
+    >
+      <div className="flex items-start gap-2">
+        <ImageIcon className="h-5 w-5 text-accent shrink-0" />
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-ink-1">{t('tools.referenceBoard.title')}</h3>
+          <p className="text-xs text-ink-3 leading-relaxed">{t('tools.referenceBoard.body')}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-[150px_1fr] gap-2">
+        <select
+          className="input text-xs"
+          value={kind}
+          onChange={(event) => setKind(event.target.value as ReferenceBoardKind)}
+          data-testid="reference-board-kind"
+        >
+          {REFERENCE_BOARD_KINDS.map((value) => (
+            <option key={value} value={value}>{t(`tools.referenceBoard.kind.${value}`)}</option>
+          ))}
+        </select>
+        <input
+          className="input text-xs"
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder={t('tools.referenceBoard.notePlaceholder')}
+          data-testid="reference-board-new-note"
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button className="btn text-xs gap-1.5" onClick={addPreview} disabled={!hasPreview} data-testid="reference-board-add-preview">
+          <Plus className="h-3.5 w-3.5" />
+          {t('tools.referenceBoard.addPreview')}
+        </button>
+        <button className="btn text-xs gap-1.5" onClick={addInput} disabled={!hasInput} data-testid="reference-board-add-input">
+          <Plus className="h-3.5 w-3.5" />
+          {t('tools.referenceBoard.addInput')}
+        </button>
+        <button className="btn text-xs gap-1.5" onClick={() => { void importLabeledHistory() }} disabled={busy} data-testid="reference-board-import-labeled">
+          <ClipboardPaste className="h-3.5 w-3.5" />
+          {busy ? t('common.loading') : t('tools.referenceBoard.importLabeled')}
+        </button>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="rounded-md border border-dashed border-line bg-bg-2/50 p-3 text-xs text-ink-3">
+          {t('tools.referenceBoard.empty')}
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {items.map((item, index) => (
+            <div
+              key={item.id}
+              className="rounded-md border border-line bg-bg-2/60 p-2 space-y-2"
+              data-testid={`reference-board-item-${index}`}
+              data-reference-id={item.id}
+              data-reference-kind={item.kind}
+              data-has-image={item.imageDataUrl ? 'true' : 'false'}
+            >
+              <div className="flex gap-2">
+                <div className="h-20 w-16 shrink-0 overflow-hidden rounded border border-line bg-bg-0">
+                  {item.imageDataUrl ? (
+                    <img className="h-full w-full object-cover" src={item.imageDataUrl} alt="" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-[10px] text-ink-3">
+                      {t('tools.referenceBoard.imageMissing')}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <select
+                    className="input text-[11px] py-1"
+                    value={item.kind}
+                    onChange={(event) => updateItem(item.id, { kind: event.target.value as ReferenceBoardKind })}
+                    data-testid={`reference-board-item-kind-${index}`}
+                  >
+                    {REFERENCE_BOARD_KINDS.map((value) => (
+                      <option key={value} value={value}>{t(`tools.referenceBoard.kind.${value}`)}</option>
+                    ))}
+                  </select>
+                  <div className="truncate text-[10px] text-ink-3">
+                    {item.sourceLabel ?? t('tools.referenceBoard.source.manual')}
+                  </div>
+                  <textarea
+                    className="input min-h-[44px] resize-none text-[11px] leading-snug"
+                    value={item.note}
+                    onChange={(event) => updateItem(item.id, { note: event.target.value })}
+                    placeholder={t('tools.referenceBoard.itemNotePlaceholder')}
+                    data-testid={`reference-board-note-${index}`}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-1">
+                <button className="btn btn-ghost text-[10px] px-1 py-1" onClick={() => sendToImg2Img(item)} disabled={!item.imageDataUrl} data-testid={`reference-board-send-img2img-${index}`}>
+                  img2img
+                </button>
+                <button className="btn btn-ghost text-[10px] px-1 py-1" onClick={() => sendToInpaint(item)} disabled={!item.imageDataUrl} data-testid={`reference-board-send-inpaint-${index}`}>
+                  Inpaint
+                </button>
+                <button className="btn btn-ghost text-[10px] px-1 py-1" onClick={() => sendToControlNet(item)} disabled={!item.imageDataUrl} data-testid={`reference-board-send-controlnet-${index}`}>
+                  <Send className="h-3 w-3" />
+                  CN
+                </button>
+                <button className="btn btn-ghost text-[10px] px-1 py-1" onClick={() => deleteItem(item.id)} data-testid={`reference-board-delete-${index}`}>
+                  <Trash2 className="h-3 w-3" />
+                  {t('common.delete')}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function makeReferenceBoardId(): string {
+  const random = Math.random().toString(36).slice(2, 10)
+  return `ref-${Date.now().toString(36)}-${random}`
+}
+
+function referenceHistoryFilename(item: HistoryItem): string {
+  return `history-${new Date(item.createdAt).toISOString().slice(0, 10)}.png`
+}
+
+function historySourceLabel(item: HistoryItem): string {
+  if (item.label) return tStatic(`history.label.${item.label}`)
+  return tStatic('tools.referenceBoard.source.history')
+}
+
+function referenceNoteFromHistory(item: HistoryItem): string {
+  const review = item.proRecipeReview
+  const lines = [
+    ...(review?.strengths ?? []),
+    ...(review?.issues ?? []).map((line) => `${tStatic('tools.referenceBoard.issuePrefix')}${line}`),
+    ...(review?.nextActions ?? []).map((line) => `${tStatic('tools.referenceBoard.nextPrefix')}${line}`)
+  ].filter(Boolean)
+  return lines[0] ?? item.prompt.slice(0, 120)
+}
+
+function buildReferenceBoardControlNetUnit(
+  item: ReferenceBoardItem,
+  modules: string[],
+  models: string[]
+): ControlNetUnitState {
+  const preset = controlNetPresetForReference(item.kind, modules, models)
+  return {
+    ...DEFAULT_CONTROLNET_UNIT,
+    enabled: true,
+    image: item.imageDataUrl,
+    imagePath: item.sourcePath ?? null,
+    pixelPerfect: true,
+    guidanceStart: 0,
+    guidanceEnd: 1,
+    processorRes: -1,
+    thresholdA: -1,
+    thresholdB: -1,
+    resizeMode: preset.resizeMode,
+    controlMode: preset.controlMode,
+    module: preset.module,
+    model: preset.model,
+    weight: preset.weight
+  }
+}
+
+function controlNetPresetForReference(
+  kind: ReferenceBoardKind,
+  modules: string[],
+  models: string[]
+): {
+  module: string
+  model: string
+  weight: number
+  controlMode: ControlNetUnitState['controlMode']
+  resizeMode: ControlNetUnitState['resizeMode']
+} {
+  if (kind === 'pose') {
+    return {
+      module: pickControlNetModule(modules, ['openpose_full', 'openpose', 'dw_openpose_full', 'dw_openpose'], 'openpose_full'),
+      model: pickControlNetModel(models, [['openpose'], ['pose']], 'None'),
+      weight: 1,
+      controlMode: 2,
+      resizeMode: 1
+    }
+  }
+  if (kind === 'material') {
+    return {
+      module: pickControlNetModule(modules, ['lineart_anime', 'lineart_realistic', 'lineart_standard', 'canny'], 'lineart_anime'),
+      model: pickControlNetModel(models, [['mistoline'], ['lineart'], ['canny']], 'None'),
+      weight: 0.8,
+      controlMode: 2,
+      resizeMode: 1
+    }
+  }
+  return {
+    module: pickControlNetModule(modules, ['reference_only', 'reference_adain+attn', 'reference_adain', 'None'], 'reference_only'),
+    model: 'None',
+    weight: kind === 'color' ? 0.55 : 0.65,
+    controlMode: 1,
+    resizeMode: 0
+  }
+}
+
+function pickControlNetModule(modules: string[], candidates: string[], fallback: string): string {
+  if (modules.length === 0) return fallback
+  for (const candidate of candidates) {
+    const exact = modules.find((moduleName) => moduleName === candidate)
+    if (exact) return exact
+    const fuzzy = modules.find((moduleName) => normalizeControlNetLookup(moduleName).includes(normalizeControlNetLookup(candidate)))
+    if (fuzzy) return fuzzy
+  }
+  return fallback
+}
+
+function pickControlNetModel(models: string[], groups: string[][], fallback: string): string {
+  for (const group of groups) {
+    const found = models.find((model) => {
+      const normalized = normalizeControlNetLookup(model)
+      return group.every((keyword) => normalized.includes(normalizeControlNetLookup(keyword)))
+    })
+    if (found) return found
+  }
+  return fallback
+}
+
+function normalizeControlNetLookup(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ')
+}
+
+function PersonalEnvironmentHealthCard(): JSX.Element {
+  const t = useT()
+  const [report, setReport] = useState<PersonalEnvironmentHealthReport | null>(null)
+  const [recoveryResult, setRecoveryResult] = useState<PersonalEnvironmentRecoveryResult | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [recovering, setRecovering] = useState(false)
+
+  async function load(): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    try {
+      setReport(await api.tools.inspectPersonalHealth())
+    } catch (e) {
+      toast.error(tStatic('tools.personalHealth.loadFailed', { message: (e as Error).message }))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function recover(): Promise<void> {
+    if (recovering) return
+    setRecovering(true)
+    try {
+      const result = await api.tools.runPersonalHealthRecovery()
+      setRecoveryResult(result)
+      setReport(result.report)
+      const applied = result.actions.filter((action) => action.status === 'applied').length
+      const skipped = result.actions.filter((action) => action.status === 'skipped').length
+      const failed = result.actions.filter((action) => action.status === 'failed').length
+      toast.success(tStatic('tools.personalHealth.recoveryDone', {
+        applied,
+        skipped,
+        failed
+      }))
+    } catch (e) {
+      toast.error(tStatic('tools.library.recoveryFailed', { message: (e as Error).message }))
+    } finally {
+      setRecovering(false)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const issueCount = report?.issues.filter((issue) => issue.severity !== 'info').length ?? 0
+
+  return (
+    <div className="card p-4 space-y-3" data-testid="personal-health-card">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="h-5 w-5 text-accent" />
+        <h3 className="text-sm font-semibold text-ink-1">{t('tools.personalHealth.title')}</h3>
+        <button className="btn btn-ghost text-xs ml-auto" onClick={() => { void load() }} disabled={busy}>
+          <RefreshCw className={cn('h-3.5 w-3.5', busy && 'animate-spin')} />
+          {t('common.refresh')}
+        </button>
+      </div>
+      <p className="text-xs text-ink-3 leading-relaxed">{t('tools.personalHealth.body')}</p>
+
+      {report ? (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            <HealthStat
+              label={t('tools.personalHealth.settings')}
+              value={report.settings.parseOk && report.settings.launchPyExists ? 'OK' : t('tools.personalHealth.needsReview')}
+              ok={report.settings.parseOk && report.settings.launchPyExists}
+            />
+            <HealthStat
+              label={t('tools.personalHealth.processes')}
+              value={`${report.processes.relatedForgeProcesses.length}/${report.processes.relatedElectronProcesses.length}`}
+              ok={report.processes.relatedForgeProcesses.length <= (report.processes.forgeManagedByThisApp ? 1 : 0) && report.processes.relatedElectronProcesses.length <= 1}
+            />
+            <HealthStat
+              label={t('tools.personalHealth.downloads')}
+              value={`${report.downloads.running}/${report.downloads.failed}/${report.downloads.orphanPartials}`}
+              ok={report.downloads.staleRunning === 0 && report.downloads.failed === 0 && report.downloads.orphanPartials === 0}
+            />
+            <HealthStat
+              label={t('tools.personalHealth.startup')}
+              value={formatDurationMaybe(report.startup.forgeReadyAvgMs)}
+              ok={!report.startup.slowForgeReady}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            <Stat label={t('tools.personalHealth.modelEntries')} value={String(report.library.entries)} />
+            <Stat label={t('tools.personalHealth.libraryIssues')} value={String(report.library.issues)} />
+            <Stat label={t('tools.personalHealth.shaMissing')} value={String(report.library.shaMissing)} />
+            <Stat label={t('tools.personalHealth.partialIssues')} value={String(report.library.partialDownloads)} />
+          </div>
+
+          <div className="rounded-md border border-line bg-bg-2/60 p-2 text-[11px] text-ink-3">
+            <div className="font-mono truncate">{report.settings.forgePath}</div>
+            <div>
+              {t('tools.personalHealth.settingsMeta', {
+                port: report.settings.forgePort,
+                auto: report.settings.autoStartForge ? 'ON' : 'OFF',
+                args: report.settings.forgeExtraArgs || '-'
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="btn text-xs gap-1.5"
+              onClick={() => { void recover() }}
+              disabled={recovering}
+              data-testid="personal-health-recover"
+            >
+              <Wrench className="h-3.5 w-3.5" />
+              {recovering ? t('tools.personalHealth.recovering') : t('tools.personalHealth.recover')}
+            </button>
+          </div>
+
+          {recoveryResult && (
+            <div className="space-y-1.5" data-testid="personal-health-recovery-result">
+              <div className="text-xs font-semibold text-ink-2">{t('tools.personalHealth.recoveryActions')}</div>
+              {recoveryResult.actions.slice(0, 8).map((action) => (
+                <div key={action.id} className="rounded-md border border-line bg-bg-2/50 p-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold', healthRecoveryStatusClass(action.status))}>
+                      {t(`tools.personalHealth.status.${action.status}`)}
+                    </span>
+                    <span className="font-semibold text-ink-1">{action.title}</span>
+                    <span className="ml-auto text-[10px] uppercase text-ink-3">{action.area}</span>
+                  </div>
+                  <div className="mt-1 text-ink-3">{action.detail}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-1.5" data-testid="personal-health-issues" data-issue-count={issueCount}>
+            <div className="text-xs font-semibold text-ink-2">{t('tools.personalHealth.issues')}</div>
+            {report.issues.length === 0 ? (
+              <div className="rounded-md border border-line bg-bg-2/50 p-2 text-xs text-ok">
+                {t('tools.personalHealth.clean')}
+              </div>
+            ) : (
+              report.issues.slice(0, 8).map((issue) => (
+                <div key={issue.id} className="rounded-md border border-line bg-bg-2/50 p-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className={cn('h-2 w-2 rounded-full', healthSeverityClass(issue.severity))} />
+                    <span className="font-semibold text-ink-1">{issue.title}</span>
+                    <span className="ml-auto text-[10px] uppercase text-ink-3">{issue.area}</span>
+                  </div>
+                  <div className="mt-1 text-ink-3">{issue.detail}</div>
+                  {issue.action && <div className="mt-1 text-ink-2">{issue.action}</div>}
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="space-y-1.5" data-testid="personal-health-startup-signals">
+            <div className="text-xs font-semibold text-ink-2">{t('tools.personalHealth.startupSignals')}</div>
+            {report.startup.signals.map((signal) => (
+              <div key={signal.id} className="rounded-md border border-line bg-bg-2/50 p-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className={cn('h-2 w-2 rounded-full', healthSeverityClass(signal.severity))} />
+                  <span className="font-semibold text-ink-1">{signal.label}</span>
+                  <span className="ml-auto text-[10px] text-ink-3">{signal.confidence}</span>
+                </div>
+                <div className="mt-1 space-y-0.5">
+                  {signal.evidence.slice(0, 2).map((line, index) => (
+                    <div key={index} className="truncate font-mono text-[10px] text-ink-3">{line}</div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="text-xs text-ink-3">{t('common.loading')}</div>
+      )}
+    </div>
+  )
+}
+
+function healthSeverityClass(severity: PersonalEnvironmentHealthReport['issues'][number]['severity']): string {
+  if (severity === 'error') return 'bg-err'
+  if (severity === 'warn') return 'bg-warn'
+  return 'bg-accent'
+}
+
+function healthRecoveryStatusClass(status: PersonalEnvironmentRecoveryResult['actions'][number]['status']): string {
+  if (status === 'applied') return 'border border-ok/40 bg-ok/10 text-ok'
+  if (status === 'failed') return 'border border-err/40 bg-err/10 text-err'
+  return 'border border-warn/40 bg-warn/10 text-warn'
 }
 
 function StartupDiagnosticsCard(): JSX.Element {
@@ -861,6 +1485,8 @@ function TaggerCatalogCard(): JSX.Element {
               className="input mt-1 min-h-12 text-[10px] font-mono"
               value={blacklistText}
               onChange={(e) => setBlacklistText(e.target.value)}
+              data-prompt-dictionary-autocomplete="tag-blacklist"
+              data-testid="tagger-blacklist-input"
             />
           </label>
         </div>
@@ -1041,6 +1667,7 @@ export function ModelLibraryCard(): JSX.Element {
   const deleteCheckpointPromptProfile = useStore((s) => s.deleteCheckpointPromptProfile)
   const selectedModelTitle = useStore((s) => s.selectedModelTitle)
   const recommendation = useStore((s) => s.recommendation)
+  const setPrompt = useStore((s) => s.setPrompt)
   const [busy, setBusy] = useState(false)
   const [summary, setSummary] = useState<ModelLibrarySummary | null>(null)
   const [jobs, setJobs] = useState<DownloadJob[]>([])
@@ -1052,6 +1679,8 @@ export function ModelLibraryCard(): JSX.Element {
   const [favoriteOnly, setFavoriteOnly] = useState(false)
   const [metadataBusyId, setMetadataBusyId] = useState<string | null>(null)
   const [metadataBatchBusy, setMetadataBatchBusy] = useState(false)
+  const [recipeBusyId, setRecipeBusyId] = useState<string | null>(null)
+  const [recipeStatsByEntry, setRecipeStatsByEntry] = useState<Record<string, CivitaiCommunityStats | null>>({})
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({})
   const [overrideDrafts, setOverrideDrafts] = useState<Record<string, ModelLibraryPromptOverrideDraft>>({})
   const [overrideBusyId, setOverrideBusyId] = useState<string | null>(null)
@@ -1336,10 +1965,28 @@ export function ModelLibraryCard(): JSX.Element {
         checkpointName: context.name ?? entry.name,
         checkpointPath: entry.path,
         checkpointSha256: context.sha256 ?? null,
+        baseModel: draft.baseModel.trim() || context.baseModel || null,
         family: normalizeCheckpointProfileFamily(draft.family),
+        promptStyle: normalizeCheckpointPromptStyle(draft.promptStyle),
+        negativeStrategy: normalizeCheckpointNegativeStrategy(draft.negativeStrategy),
         positivePrefix: splitProfileTagText(draft.positivePrefix),
         positiveAppend: splitProfileTagText(draft.positiveAppend),
         negativeAppend: splitProfileTagText(draft.negativeAppend),
+        sampler: draft.sampler.trim() || undefined,
+        steps: parseOptionalDraftNumber(draft.steps, 1, 150, true),
+        cfgScale: parseOptionalDraftNumber(draft.cfgScale, 1, 30, false),
+        width: parseOptionalDraftNumber(draft.width, 64, 4096, true),
+        height: parseOptionalDraftNumber(draft.height, 64, 4096, true),
+        clipSkip: parseOptionalDraftNumber(draft.clipSkip, 1, 12, true),
+        recommendedAspectRatios: parseAspectRatioDraft(draft.recommendedAspectRatios),
+        recommendedLoraCount: parseLoraCountDraft(draft.recommendedLoraMin, draft.recommendedLoraMax),
+        relatedModels: {
+          loras: parseRelatedModelDraft(draft.relatedLoras, 'lora'),
+          vaes: parseRelatedModelDraft(draft.relatedVaes, 'vae'),
+          controlNets: parseRelatedModelDraft(draft.relatedControlNets, 'controlnet')
+        },
+        compatibilityNotes: splitProfileNoteText(draft.compatibilityNotes),
+        recipeNotes: splitProfileNoteText(draft.recipeNotes),
         mode: normalizeCheckpointProfileMode(draft.mode),
         updatedAt: Date.now()
       }
@@ -1428,6 +2075,34 @@ export function ModelLibraryCard(): JSX.Element {
     }
   }
 
+  async function loadRecipeStats(entry: ModelLibraryEntry): Promise<void> {
+    const modelVersionId = entry.sourceMeta?.modelVersionId
+    if (!modelVersionId || !Number.isFinite(modelVersionId)) {
+      toast.error(tStatic('tools.library.recipeNoVersion'))
+      return
+    }
+    setRecipeBusyId(entry.id)
+    try {
+      const stats = await api.civitai.mineCommunity(modelVersionId)
+      setRecipeStatsByEntry((current) => ({ ...current, [entry.id]: stats }))
+      if (stats) {
+        toast.success(tStatic('tools.library.recipeLoaded', { count: stats.sampleCount }))
+      } else {
+        toast(tStatic('tools.library.recipeNoStats'), { icon: 'i' })
+      }
+    } catch (e) {
+      toast.error(tStatic('tools.library.recipeFailed', { message: (e as Error).message }))
+    } finally {
+      setRecipeBusyId(null)
+    }
+  }
+
+  function applyRecipePromptHint(text: string): void {
+    const prompt = useStore.getState().prompt
+    setPrompt(promptAppend(prompt, text))
+    toast.success(tStatic('tools.library.recipeHintApplied'))
+  }
+
   async function openEntryLocation(entry: ModelLibraryEntry): Promise<void> {
     try {
       await api.app.showItemInFolder(entry.path)
@@ -1485,7 +2160,17 @@ export function ModelLibraryCard(): JSX.Element {
   const favoriteCount = (summary?.entries ?? []).filter((entry) => entry.favorite).length
   const missingCivitaiCount = (summary?.entries ?? []).filter(needsCivitaiInfo).length
   const filteredMissingCivitai = filteredEntries.filter(needsCivitaiInfo)
-  const recentJobs = jobs.slice(0, 5)
+  const staleJobs = jobs.filter(isStaleDownloadJob)
+  const runningJobs = jobs.filter((job) => job.status === 'running')
+  const failedJobs = jobs.filter((job) => job.status === 'failed' || job.status === 'canceled')
+  const partialIssues = integrity?.issues.filter(isPartialIntegrityIssue) ?? []
+  const orphanPartialIssues = partialIssues.filter(isOrphanPartialIssue)
+  const focusedPartialIssues = [
+    ...orphanPartialIssues,
+    ...partialIssues.filter((issue) => !isOrphanPartialIssue(issue))
+  ].slice(0, 8)
+  const nonPartialIssues = integrity?.issues.filter((issue) => !isPartialIntegrityIssue(issue)) ?? []
+  const recentJobs = jobs.slice(0, 8)
 
   return (
     <div className="card p-4 space-y-3" data-testid="model-library-card">
@@ -1524,11 +2209,11 @@ export function ModelLibraryCard(): JSX.Element {
       )}
 
       <div className="flex flex-wrap gap-2">
-        <button className="btn text-xs gap-1.5" onClick={() => { void checkIntegrity() }} disabled={busy}>
+        <button className="btn text-xs gap-1.5" onClick={() => { void checkIntegrity() }} disabled={busy} data-testid="model-library-integrity-check">
           <ShieldCheck className="h-3.5 w-3.5" />
           {t('tools.library.integrity')}
         </button>
-        <button className="btn text-xs gap-1.5" onClick={() => { void recoverLibrary() }} disabled={busy}>
+        <button className="btn text-xs gap-1.5" onClick={() => { void recoverLibrary() }} disabled={busy} data-testid="model-library-recover">
           <Wrench className="h-3.5 w-3.5" />
           {t('tools.library.recover')}
         </button>
@@ -1558,6 +2243,84 @@ export function ModelLibraryCard(): JSX.Element {
         </button>
       </div>
 
+      <div className="rounded-md border border-line bg-bg-2/50 p-2 text-xs space-y-2" data-testid="model-library-download-recovery">
+        <div className="flex items-center gap-2">
+          <Download className="h-3.5 w-3.5 text-accent" />
+          <span className="font-semibold text-ink-1">{t('tools.library.cleanupTitle')}</span>
+          <span className="ml-auto text-[10px] text-ink-3">{t('tools.library.cleanupHint')}</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <Stat label={t('tools.library.runningJobs')} value={String(runningJobs.length)} />
+          <Stat label={t('tools.library.staleJobs')} value={String(staleJobs.length)} />
+          <Stat label={t('tools.library.failedJobs')} value={String(failedJobs.length)} />
+          <Stat label={t('tools.library.orphanPartials')} value={integrity ? String(orphanPartialIssues.length) : '-'} />
+        </div>
+        {staleJobs.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded border border-warn/40 bg-warn/10 p-2" data-testid="model-library-stale-downloads">
+            <AlertTriangle className="h-3.5 w-3.5 text-warn" />
+            <span className="min-w-0 flex-1 text-[10px] text-ink-2">
+              {t('tools.library.staleDownloadHint', { count: staleJobs.length })}
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost shrink-0 px-2 py-0.5 text-[10px] gap-1"
+              onClick={() => { void recoverLibrary() }}
+              disabled={busy}
+              data-testid="model-library-stale-recover"
+            >
+              <Wrench className="h-3 w-3" />
+              {t('tools.library.recoverStale')}
+            </button>
+          </div>
+        )}
+        {integrity ? (
+          <div className="rounded border border-line/70 bg-bg-1/40 p-2 space-y-1" data-testid="model-library-partial-issues">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold text-ink-2">{t('tools.library.partialReviewTitle')}</span>
+              <span className="ml-auto text-[10px] text-ink-3">{t('tools.library.partialReviewHint')}</span>
+            </div>
+            {focusedPartialIssues.length === 0 ? (
+              <div className="text-[10px] text-ink-3">{t('tools.library.partialNone')}</div>
+            ) : (
+              focusedPartialIssues.map((issue, index) => (
+                <div
+                  key={`${issue.jobId ?? issue.path ?? 'partial'}-${index}`}
+                  className="flex items-start gap-2 rounded border border-line/70 bg-bg-2/50 p-1.5"
+                  data-testid={`model-library-partial-issue-${index}`}
+                >
+                  <span className={cn(
+                    'shrink-0 rounded px-1.5 py-0.5 text-[9px]',
+                    isOrphanPartialIssue(issue)
+                      ? 'border border-warn/40 bg-warn/10 text-warn'
+                      : 'border border-line bg-bg-3 text-ink-3'
+                  )}>
+                    {isOrphanPartialIssue(issue) ? t('tools.library.orphanPartialBadge') : t('tools.library.jobPartialBadge')}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-[10px] text-ink-3 truncate">{issue.message}</div>
+                    {issue.path && <div className="font-mono text-[9px] text-ink-3 truncate">{issue.path}</div>}
+                  </div>
+                  {issue.path && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost shrink-0 px-1.5 py-0.5 text-[10px] gap-1"
+                      onClick={() => { void deletePartial(issue.path!) }}
+                      disabled={deletingPartialPath === issue.path}
+                      data-testid={`model-library-delete-partial-${index}`}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      {deletingPartialPath === issue.path ? t('tools.library.deletingPartial') : t('tools.library.deletePartial')}
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <div className="text-[10px] text-ink-3">{t('tools.library.checkIntegrityForPartials')}</div>
+        )}
+      </div>
+
       {integrity && (
         <div className="rounded-md border border-line bg-bg-2/50 p-2 text-xs space-y-1">
           <div className="grid grid-cols-3 gap-2">
@@ -1565,7 +2328,7 @@ export function ModelLibraryCard(): JSX.Element {
             <Stat label={t('tools.library.shaMissing')} value={String(integrity.totals.shaMissing)} />
             <Stat label={t('tools.library.partialDownloads')} value={String(integrity.totals.partialDownloads)} />
           </div>
-          {integrity.issues.slice(0, 5).map((issue, index) => (
+          {nonPartialIssues.slice(0, 5).map((issue, index) => (
             <div
               key={`${issue.entryId ?? issue.jobId ?? issue.path ?? 'issue'}-${index}`}
               className="flex items-start gap-2 rounded border border-line/70 bg-bg-1/40 p-1.5"
@@ -1667,6 +2430,12 @@ export function ModelLibraryCard(): JSX.Element {
                   modelLibraryCheckpointProfileDraft(checkpointProfile, entry)
                 const checkpointProfileBusy = checkpointProfileBusyId === entry.id
                 const metadataBusy = metadataBusyId === entry.id
+                const recipeBusy = recipeBusyId === entry.id
+                const recipeStats = recipeStatsByEntry[entry.id] ?? null
+                const trainedWords = entry.sourceMeta?.trainedWords ?? []
+                const recommendedPrompts = entry.sourceMeta?.recommendedPrompts ?? []
+                const hasPromptHints = trainedWords.length > 0 || recommendedPrompts.length > 0
+                const canLoadRecipeStats = typeof entry.sourceMeta?.modelVersionId === 'number'
                 return (
                   <div
                     key={entry.id}
@@ -1705,6 +2474,32 @@ export function ModelLibraryCard(): JSX.Element {
                         ) : (
                           <div className="text-[10px] text-ink-3">{t('tools.library.noDescription')}</div>
                         )}
+                        {hasPromptHints && (
+                          <div className="flex flex-wrap gap-1" data-testid={`model-library-recipe-hints-${index}`}>
+                            {trainedWords.slice(0, 5).map((word) => (
+                              <button
+                                key={`tw-${word}`}
+                                type="button"
+                                className="rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent hover:bg-accent/20"
+                                onClick={() => applyRecipePromptHint(word)}
+                                title={t('tools.library.recipeHintApply')}
+                              >
+                                {word}
+                              </button>
+                            ))}
+                            {recommendedPrompts.slice(0, 2).map((hint, hintIndex) => (
+                              <button
+                                key={`rp-${hintIndex}-${hint}`}
+                                type="button"
+                                className="max-w-full truncate rounded border border-ok/30 bg-ok/10 px-1.5 py-0.5 text-[10px] text-ok hover:bg-ok/20"
+                                onClick={() => applyRecipePromptHint(hint)}
+                                title={hint}
+                              >
+                                {hint}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-1">
@@ -1729,6 +2524,19 @@ export function ModelLibraryCard(): JSX.Element {
                         <RefreshCw className={cn('h-3 w-3', metadataBusy && 'animate-spin')} />
                         {metadataBusy ? t('tools.library.fetchingCivitai') : t('tools.library.fetchCivitai')}
                       </button>
+                      {canLoadRecipeStats && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost text-[10px] py-0.5 gap-1"
+                          onClick={() => { void loadRecipeStats(entry) }}
+                          disabled={Boolean(recipeBusyId)}
+                          title={t('tools.library.recipeStats')}
+                          data-testid={`model-library-recipe-stats-load-${index}`}
+                        >
+                          <Activity className={cn('h-3 w-3', recipeBusy && 'animate-pulse')} />
+                          {recipeBusy ? t('tools.library.recipeLoading') : t('tools.library.recipeStats')}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn btn-ghost text-[10px] py-0.5 gap-1"
@@ -1762,6 +2570,9 @@ export function ModelLibraryCard(): JSX.Element {
                         </button>
                       )}
                     </div>
+                    {recipeStats && (
+                      <ModelLibraryRecipeStats stats={recipeStats} index={index} />
+                    )}
                     {isAdapterEntry && (
                       <div
                         className="mt-2 rounded-md border border-accent/30 bg-bg-1/60 p-2 space-y-2"
@@ -1786,6 +2597,8 @@ export function ModelLibraryCard(): JSX.Element {
                           onChange={(event) => updateOverrideDraft(entry, { positivePrompt: event.target.value })}
                           placeholder={t('loraCard.promptOverridePositivePlaceholder')}
                           aria-label={t('loraCard.promptOverridePositive')}
+                          data-prompt-dictionary-autocomplete="lora-positive"
+                          data-testid={`model-library-lora-positive-prompt-${index}`}
                         />
                         <textarea
                           className="input min-h-[42px] w-full resize-y text-xs"
@@ -1793,6 +2606,8 @@ export function ModelLibraryCard(): JSX.Element {
                           onChange={(event) => updateOverrideDraft(entry, { negativePrompt: event.target.value })}
                           placeholder={t('loraCard.promptOverrideNegativePlaceholder')}
                           aria-label={t('loraCard.promptOverrideNegative')}
+                          data-prompt-dictionary-autocomplete="lora-negative"
+                          data-testid={`model-library-lora-negative-prompt-${index}`}
                         />
                         <div className="flex flex-wrap items-center gap-1.5">
                           <input
@@ -1901,11 +2716,20 @@ export function ModelLibraryCard(): JSX.Element {
                           <span className="rounded border border-accent/40 bg-accent-dim/40 px-1.5 py-0.5 font-semibold text-accent">
                             {t('tools.library.checkpointProfile')}
                           </span>
+                          <input
+                            className="input h-7 w-36 text-[10px]"
+                            value={checkpointProfileDraft.baseModel}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { baseModel: event.target.value })}
+                            placeholder={t('tools.library.checkpointProfileBaseModel')}
+                            aria-label={t('tools.library.checkpointProfileBaseModel')}
+                            data-testid={`model-profile-base-model-${index}`}
+                          />
                           <select
                             className="input h-7 w-32 text-[10px]"
                             value={checkpointProfileDraft.family}
                             onChange={(event) => updateCheckpointProfileDraft(entry, { family: event.target.value })}
                             aria-label={t('tools.library.checkpointProfileFamily')}
+                            data-testid={`model-profile-family-${index}`}
                           >
                             {['pony', 'illustrious', 'noobai', 'animagine', 'sdxl', 'sd15', 'flux', 'custom'].map((family) => (
                               <option key={family} value={family}>{family}</option>
@@ -1916,11 +2740,121 @@ export function ModelLibraryCard(): JSX.Element {
                             value={checkpointProfileDraft.mode}
                             onChange={(event) => updateCheckpointProfileDraft(entry, { mode: event.target.value })}
                             aria-label={t('tools.library.checkpointProfileMode')}
+                            data-testid={`model-profile-mode-${index}`}
                           >
                             <option value="suggest">{t('tools.library.checkpointProfileModeSuggest')}</option>
                             <option value="manual">{t('tools.library.checkpointProfileModeManual')}</option>
                             <option value="auto">{t('tools.library.checkpointProfileModeAuto')}</option>
                           </select>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5" data-testid={`model-profile-pro-guidance-${index}`}>
+                          <select
+                            className="input h-7 text-[10px]"
+                            value={checkpointProfileDraft.promptStyle}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { promptStyle: event.target.value })}
+                            aria-label={t('tools.library.checkpointProfilePromptStyle')}
+                            data-testid={`model-profile-prompt-style-${index}`}
+                          >
+                            <option value="tag">{t('tools.library.checkpointProfilePromptStyleTag')}</option>
+                            <option value="natural">{t('tools.library.checkpointProfilePromptStyleNatural')}</option>
+                            <option value="structured">{t('tools.library.checkpointProfilePromptStyleStructured')}</option>
+                            <option value="hybrid">{t('tools.library.checkpointProfilePromptStyleHybrid')}</option>
+                          </select>
+                          <select
+                            className="input h-7 text-[10px]"
+                            value={checkpointProfileDraft.negativeStrategy}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { negativeStrategy: event.target.value })}
+                            aria-label={t('tools.library.checkpointProfileNegativeStrategy')}
+                            data-testid={`model-profile-negative-strategy-${index}`}
+                          >
+                            <option value="classic">{t('tools.library.checkpointProfileNegativeClassic')}</option>
+                            <option value="minimal">{t('tools.library.checkpointProfileNegativeMinimal')}</option>
+                            <option value="positive-replacement">{t('tools.library.checkpointProfileNegativePositiveReplacement')}</option>
+                          </select>
+                          <input
+                            className="input h-7 text-[10px]"
+                            type="number"
+                            min="0"
+                            max="12"
+                            value={checkpointProfileDraft.recommendedLoraMin}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { recommendedLoraMin: event.target.value })}
+                            placeholder={t('tools.library.checkpointProfileLoraMin')}
+                            aria-label={t('tools.library.checkpointProfileLoraMin')}
+                            data-testid={`model-profile-lora-min-${index}`}
+                          />
+                          <input
+                            className="input h-7 text-[10px]"
+                            type="number"
+                            min="0"
+                            max="12"
+                            value={checkpointProfileDraft.recommendedLoraMax}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { recommendedLoraMax: event.target.value })}
+                            placeholder={t('tools.library.checkpointProfileLoraMax')}
+                            aria-label={t('tools.library.checkpointProfileLoraMax')}
+                            data-testid={`model-profile-lora-max-${index}`}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                          <input
+                            className="input h-7 text-[10px]"
+                            value={checkpointProfileDraft.sampler}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { sampler: event.target.value })}
+                            placeholder={t('tools.library.checkpointProfileSampler')}
+                            aria-label={t('tools.library.checkpointProfileSampler')}
+                          />
+                          <input
+                            className="input h-7 text-[10px]"
+                            type="number"
+                            min="1"
+                            max="150"
+                            value={checkpointProfileDraft.steps}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { steps: event.target.value })}
+                            placeholder={t('tools.library.checkpointProfileSteps')}
+                            aria-label={t('tools.library.checkpointProfileSteps')}
+                          />
+                          <input
+                            className="input h-7 text-[10px]"
+                            type="number"
+                            min="1"
+                            max="30"
+                            step="0.1"
+                            value={checkpointProfileDraft.cfgScale}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { cfgScale: event.target.value })}
+                            placeholder={t('tools.library.checkpointProfileCfg')}
+                            aria-label={t('tools.library.checkpointProfileCfg')}
+                          />
+                          <input
+                            className="input h-7 text-[10px]"
+                            type="number"
+                            min="64"
+                            max="4096"
+                            step="8"
+                            value={checkpointProfileDraft.width}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { width: event.target.value })}
+                            placeholder={t('tools.library.checkpointProfileWidth')}
+                            aria-label={t('tools.library.checkpointProfileWidth')}
+                          />
+                          <input
+                            className="input h-7 text-[10px]"
+                            type="number"
+                            min="64"
+                            max="4096"
+                            step="8"
+                            value={checkpointProfileDraft.height}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { height: event.target.value })}
+                            placeholder={t('tools.library.checkpointProfileHeight')}
+                            aria-label={t('tools.library.checkpointProfileHeight')}
+                          />
+                          <input
+                            className="input h-7 text-[10px]"
+                            type="number"
+                            min="1"
+                            max="12"
+                            value={checkpointProfileDraft.clipSkip}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { clipSkip: event.target.value })}
+                            placeholder={t('tools.library.checkpointProfileClipSkip')}
+                            aria-label={t('tools.library.checkpointProfileClipSkip')}
+                          />
                         </div>
                         <textarea
                           className="input min-h-[38px] w-full resize-y text-xs"
@@ -1928,6 +2862,8 @@ export function ModelLibraryCard(): JSX.Element {
                           onChange={(event) => updateCheckpointProfileDraft(entry, { positivePrefix: event.target.value })}
                           placeholder={t('tools.library.checkpointProfilePositivePrefixPlaceholder')}
                           aria-label={t('tools.library.checkpointProfilePositivePrefix')}
+                          data-prompt-dictionary-autocomplete="profile-positive"
+                          data-testid={`model-profile-positive-prefix-${index}`}
                         />
                         <textarea
                           className="input min-h-[38px] w-full resize-y text-xs"
@@ -1935,6 +2871,8 @@ export function ModelLibraryCard(): JSX.Element {
                           onChange={(event) => updateCheckpointProfileDraft(entry, { positiveAppend: event.target.value })}
                           placeholder={t('tools.library.checkpointProfilePositiveAppendPlaceholder')}
                           aria-label={t('tools.library.checkpointProfilePositiveAppend')}
+                          data-prompt-dictionary-autocomplete="profile-positive"
+                          data-testid={`model-profile-positive-append-${index}`}
                         />
                         <textarea
                           className="input min-h-[38px] w-full resize-y text-xs"
@@ -1942,13 +2880,74 @@ export function ModelLibraryCard(): JSX.Element {
                           onChange={(event) => updateCheckpointProfileDraft(entry, { negativeAppend: event.target.value })}
                           placeholder={t('tools.library.checkpointProfileNegativeAppendPlaceholder')}
                           aria-label={t('tools.library.checkpointProfileNegativeAppend')}
+                          data-prompt-dictionary-autocomplete="profile-negative"
+                          data-testid={`model-profile-negative-append-${index}`}
                         />
+                        <textarea
+                          className="input min-h-[38px] w-full resize-y text-xs"
+                          value={checkpointProfileDraft.recommendedAspectRatios}
+                          onChange={(event) => updateCheckpointProfileDraft(entry, { recommendedAspectRatios: event.target.value })}
+                          placeholder={t('tools.library.checkpointProfileAspectRatiosPlaceholder')}
+                          aria-label={t('tools.library.checkpointProfileAspectRatios')}
+                          data-testid={`model-profile-aspect-ratios-${index}`}
+                        />
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5" data-testid={`model-profile-related-models-${index}`}>
+                          <label className="space-y-1">
+                            <span className="text-[10px] text-ink-3">{t('tools.library.checkpointProfileRelatedLoras')}</span>
+                            <textarea
+                              className="input min-h-[52px] w-full resize-y text-xs"
+                              value={checkpointProfileDraft.relatedLoras}
+                              onChange={(event) => updateCheckpointProfileDraft(entry, { relatedLoras: event.target.value })}
+                              placeholder={t('tools.library.checkpointProfileRelatedLorasPlaceholder')}
+                              data-testid={`model-profile-related-loras-${index}`}
+                            />
+                          </label>
+                          <label className="space-y-1">
+                            <span className="text-[10px] text-ink-3">{t('tools.library.checkpointProfileRelatedVaes')}</span>
+                            <textarea
+                              className="input min-h-[52px] w-full resize-y text-xs"
+                              value={checkpointProfileDraft.relatedVaes}
+                              onChange={(event) => updateCheckpointProfileDraft(entry, { relatedVaes: event.target.value })}
+                              placeholder={t('tools.library.checkpointProfileRelatedVaesPlaceholder')}
+                              data-testid={`model-profile-related-vaes-${index}`}
+                            />
+                          </label>
+                          <label className="space-y-1">
+                            <span className="text-[10px] text-ink-3">{t('tools.library.checkpointProfileRelatedControlNets')}</span>
+                            <textarea
+                              className="input min-h-[52px] w-full resize-y text-xs"
+                              value={checkpointProfileDraft.relatedControlNets}
+                              onChange={(event) => updateCheckpointProfileDraft(entry, { relatedControlNets: event.target.value })}
+                              placeholder={t('tools.library.checkpointProfileRelatedControlNetsPlaceholder')}
+                              data-testid={`model-profile-related-controlnets-${index}`}
+                            />
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <textarea
+                            className="input min-h-[52px] w-full resize-y text-xs"
+                            value={checkpointProfileDraft.compatibilityNotes}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { compatibilityNotes: event.target.value })}
+                            placeholder={t('tools.library.checkpointProfileCompatibilityPlaceholder')}
+                            aria-label={t('tools.library.checkpointProfileCompatibility')}
+                            data-testid={`model-profile-compatibility-${index}`}
+                          />
+                          <textarea
+                            className="input min-h-[52px] w-full resize-y text-xs"
+                            value={checkpointProfileDraft.recipeNotes}
+                            onChange={(event) => updateCheckpointProfileDraft(entry, { recipeNotes: event.target.value })}
+                            placeholder={t('tools.library.checkpointProfileRecipePlaceholder')}
+                            aria-label={t('tools.library.checkpointProfileRecipe')}
+                            data-testid={`model-profile-recipe-notes-${index}`}
+                          />
+                        </div>
                         <div className="flex flex-wrap items-center gap-1.5">
                           <button
                             type="button"
                             className="btn btn-ghost text-[10px] py-0.5 gap-1"
                             onClick={() => resetCheckpointProfileDraft(entry)}
                             title={t('tools.library.checkpointProfileDefault')}
+                            data-testid={`model-profile-default-${index}`}
                           >
                             <RefreshCw className="h-3 w-3" />
                             {t('tools.library.checkpointProfileDefault')}
@@ -1958,6 +2957,7 @@ export function ModelLibraryCard(): JSX.Element {
                             className="btn btn-ghost text-[10px] py-0.5 gap-1 ml-auto"
                             onClick={() => { void saveCheckpointProfile(entry) }}
                             disabled={Boolean(checkpointProfileBusyId)}
+                            data-testid={`model-profile-save-${index}`}
                           >
                             <Save className="h-3 w-3" />
                             {checkpointProfileBusy ? t('common.loading') : t('loraCard.promptOverrideSave')}
@@ -1966,10 +2966,11 @@ export function ModelLibraryCard(): JSX.Element {
                             <button
                               type="button"
                               className="btn btn-ghost text-[10px] py-0.5 gap-1 text-err"
-                              onClick={() => { void removeCheckpointProfile(entry) }}
-                              disabled={Boolean(checkpointProfileBusyId)}
-                              title={t('common.delete')}
-                            >
+                            onClick={() => { void removeCheckpointProfile(entry) }}
+                            disabled={Boolean(checkpointProfileBusyId)}
+                            title={t('common.delete')}
+                            data-testid={`model-profile-delete-${index}`}
+                          >
                               <Trash2 className="h-3 w-3" />
                             </button>
                           )}
@@ -2000,25 +3001,47 @@ export function ModelLibraryCard(): JSX.Element {
           <div className="text-xs text-ink-3">{t('tools.library.noDownloads')}</div>
         ) : (
           <div className="space-y-1.5">
-            {recentJobs.map((job) => (
-              <div key={job.id} className="rounded-md border border-line bg-bg-2/50 p-2 text-xs">
+            {recentJobs.map((job, index) => {
+              const stale = isStaleDownloadJob(job)
+              const canResume = canResumeDownloadJob(job)
+              const canDiscard = canDiscardDownloadJob(job)
+              return (
+              <div
+                key={job.id}
+                className={cn('rounded-md border bg-bg-2/50 p-2 text-xs', stale ? 'border-warn/50' : 'border-line')}
+                data-testid={`model-library-download-job-${index}`}
+                data-download-status={job.status}
+                data-stale={stale ? 'true' : 'false'}
+              >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className={cn('h-2 w-2 rounded-full shrink-0', statusColor(job.status))} />
                   <span className="font-mono text-[11px] text-ink-1 truncate">{job.filename}</span>
+                  {stale && (
+                    <span className="rounded border border-warn/40 bg-warn/10 px-1.5 py-0.5 text-[9px] text-warn">
+                      {t('tools.library.staleBadge')}
+                    </span>
+                  )}
                   <span className="ml-auto text-[10px] text-ink-3 shrink-0">{t(`tools.library.status.${job.status}`)}</span>
                 </div>
                 <div className="mt-1 flex items-center gap-2 text-[10px] text-ink-3">
                   <span>{job.assetType}</span>
                   {job.source?.provider && <span>{job.source.provider}</span>}
                   <span className="font-mono">{formatDownloadProgress(job)}</span>
+                  <span className="ml-auto font-mono">{t('tools.library.jobUpdated', { age: formatDurationMs(Date.now() - job.updatedAt) })}</span>
                 </div>
+                {job.error && (
+                  <div className="mt-1 rounded border border-err/30 bg-err/10 px-1.5 py-1 text-[10px] text-ink-2">
+                    {job.error}
+                  </div>
+                )}
                 <div className="mt-2 flex items-center gap-1">
-                  {(job.status === 'failed' || job.status === 'canceled') && (
+                  {canResume && (
                     <button
                       className="btn btn-ghost text-[10px] py-0.5 gap-1"
                       onClick={() => { void resume(job) }}
                       disabled={busy}
                       title={t('tools.library.resume')}
+                      data-testid={`download-job-resume-${index}`}
                     >
                       <Play className="h-3 w-3" />
                       {t('tools.library.resume')}
@@ -2035,15 +3058,16 @@ export function ModelLibraryCard(): JSX.Element {
                   <button
                     className="btn btn-ghost text-[10px] py-0.5 gap-1 ml-auto"
                     onClick={() => { void discard(job) }}
-                    disabled={busy}
-                    title={t('tools.library.discard')}
+                    disabled={busy || !canDiscard}
+                    title={canDiscard ? t('tools.library.discard') : t('tools.library.discardActiveDisabled')}
+                    data-testid={`download-job-discard-${index}`}
                   >
                     <Trash2 className="h-3 w-3" />
                     {t('tools.library.discard')}
                   </button>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>
@@ -2065,9 +3089,26 @@ interface ModelLibraryPromptOverrideDraft {
 interface ModelLibraryCheckpointProfileDraft {
   family: string
   mode: string
+  baseModel: string
+  promptStyle: string
+  negativeStrategy: string
   positivePrefix: string
   positiveAppend: string
   negativeAppend: string
+  sampler: string
+  steps: string
+  cfgScale: string
+  width: string
+  height: string
+  clipSkip: string
+  recommendedAspectRatios: string
+  recommendedLoraMin: string
+  recommendedLoraMax: string
+  relatedLoras: string
+  relatedVaes: string
+  relatedControlNets: string
+  compatibilityNotes: string
+  recipeNotes: string
 }
 
 function isModelLibraryAdapterEntry(entry: ModelLibraryEntry): boolean {
@@ -2076,6 +3117,91 @@ function isModelLibraryAdapterEntry(entry: ModelLibraryEntry): boolean {
 
 function isModelLibraryCheckpointEntry(entry: ModelLibraryEntry): boolean {
   return entry.type === 'Checkpoint'
+}
+
+function ModelLibraryRecipeStats({
+  stats,
+  index
+}: {
+  stats: CivitaiCommunityStats
+  index: number
+}): JSX.Element {
+  const t = useT()
+  const topSampler = stats.topSamplers[0]
+  const topSize = stats.topSizes[0]
+  return (
+    <div
+      className="mt-2 rounded-md border border-accent/30 bg-bg-1/65 p-2 text-[10px] space-y-2"
+      data-testid={`model-library-recipe-stats-${index}`}
+    >
+      <div className="flex items-center gap-1.5">
+        <Activity className="h-3 w-3 text-accent" />
+        <span className="font-semibold text-ink-1">{t('tools.library.recipeStatsTitle')}</span>
+        <span className="ml-auto font-mono text-ink-3">{t('tools.library.recipeStatsSamples', { count: stats.sampleCount })}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        <RecipeStatCell
+          label="Sampler"
+          value={topSampler ? `${topSampler.name} (${recipePct(topSampler.freq, stats.sampleCount)}%)` : '-'}
+          testId={`model-library-recipe-sampler-${index}`}
+        />
+        <RecipeStatCell
+          label="Size"
+          value={topSize ? `${topSize.width}×${topSize.height} (${recipePct(topSize.freq, stats.sampleCount)}%)` : '-'}
+          testId={`model-library-recipe-size-${index}`}
+        />
+        <RecipeStatCell label="Steps" value={recipeDistribution(stats.stepsDist)} />
+        <RecipeStatCell label="CFG" value={recipeDistribution(stats.cfgDist)} />
+      </div>
+      {stats.topLoras.length > 0 && (
+        <div className="flex flex-wrap gap-1" data-testid={`model-library-recipe-loras-${index}`}>
+          {stats.topLoras.slice(0, 5).map((lora) => (
+            <span key={lora.name} className="rounded border border-line bg-bg-2 px-1.5 py-0.5 text-ink-2">
+              {lora.name} {recipePct(lora.freq, stats.sampleCount)}%
+            </span>
+          ))}
+        </div>
+      )}
+      {stats.commonPositivePhrases.length > 0 && (
+        <div className="flex flex-wrap gap-1" data-testid={`model-library-recipe-phrases-${index}`}>
+          {stats.commonPositivePhrases.slice(0, 5).map((phrase) => (
+            <span key={phrase.phrase} className="rounded border border-ok/30 bg-ok/10 px-1.5 py-0.5 text-ok">
+              {phrase.phrase}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RecipeStatCell({
+  label,
+  value,
+  testId
+}: {
+  label: string
+  value: string
+  testId?: string
+}): JSX.Element {
+  return (
+    <div className="rounded border border-line bg-bg-2/70 px-1.5 py-1" data-testid={testId}>
+      <div className="text-ink-3">{label}</div>
+      <div className="font-mono text-ink-1">{value}</div>
+    </div>
+  )
+}
+
+function recipeDistribution(dist: CivitaiCommunityStats['stepsDist']): string {
+  if (dist.median == null) return '-'
+  const median = Math.round(dist.median * 10) / 10
+  if (dist.q1 == null || dist.q3 == null || dist.q1 === dist.q3) return String(median)
+  return `${median} (${Math.round(dist.q1 * 10) / 10}-${Math.round(dist.q3 * 10) / 10})`
+}
+
+function recipePct(freq: number, total: number): number {
+  if (!total) return 0
+  return Math.round((freq / total) * 100)
 }
 
 function modelLibraryPromptOverrideDraft(override?: LoraPromptOverride): ModelLibraryPromptOverrideDraft {
@@ -2114,9 +3240,26 @@ function modelLibraryCheckpointProfileDraft(
   return {
     family: fallback.family ?? inferCheckpointPromptFamily(checkpointPromptContextFromLibraryEntry(entry)),
     mode: fallback.mode,
+    baseModel: fallback.baseModel ?? entry.sourceMeta?.baseModel ?? '',
+    promptStyle: fallback.promptStyle ?? 'tag',
+    negativeStrategy: fallback.negativeStrategy ?? 'classic',
     positivePrefix: joinProfileTags(fallback.positivePrefix),
     positiveAppend: joinProfileTags(fallback.positiveAppend),
-    negativeAppend: joinProfileTags(fallback.negativeAppend)
+    negativeAppend: joinProfileTags(fallback.negativeAppend),
+    sampler: fallback.sampler ?? '',
+    steps: fallback.steps != null ? String(fallback.steps) : '',
+    cfgScale: fallback.cfgScale != null ? String(fallback.cfgScale) : '',
+    width: fallback.width != null ? String(fallback.width) : '',
+    height: fallback.height != null ? String(fallback.height) : '',
+    clipSkip: fallback.clipSkip != null ? String(fallback.clipSkip) : '',
+    recommendedAspectRatios: formatAspectRatioDraft(fallback.recommendedAspectRatios),
+    recommendedLoraMin: fallback.recommendedLoraCount?.min != null ? String(fallback.recommendedLoraCount.min) : '',
+    recommendedLoraMax: fallback.recommendedLoraCount?.max != null ? String(fallback.recommendedLoraCount.max) : '',
+    relatedLoras: formatRelatedModelDraft(fallback.relatedModels?.loras),
+    relatedVaes: formatRelatedModelDraft(fallback.relatedModels?.vaes),
+    relatedControlNets: formatRelatedModelDraft(fallback.relatedModels?.controlNets),
+    compatibilityNotes: (fallback.compatibilityNotes ?? []).join('\n'),
+    recipeNotes: (fallback.recipeNotes ?? []).join('\n')
   }
 }
 
@@ -2178,6 +3321,92 @@ function parseOptionalDraftNumber(value: string, min: number, max: number, integ
   return Math.max(min, Math.min(max, rounded))
 }
 
+function parseLoraCountDraft(minValue: string, maxValue: string): CheckpointPromptProfile['recommendedLoraCount'] {
+  const min = parseOptionalDraftNumber(minValue, 0, 12, true)
+  const max = parseOptionalDraftNumber(maxValue, 0, 12, true)
+  if (min == null && max == null) return null
+  const safeMin = min ?? 0
+  const safeMax = max ?? safeMin
+  return { min: Math.min(safeMin, safeMax), max: Math.max(safeMin, safeMax) }
+}
+
+function parseAspectRatioDraft(value: string): CheckpointPromptProfile['recommendedAspectRatios'] {
+  const ratios: NonNullable<CheckpointPromptProfile['recommendedAspectRatios']> = []
+  for (const raw of value.split(/\n+/)) {
+    const line = raw.trim()
+    if (!line) continue
+    const match = line.match(/^(?:(.+?)\s+)?(\d{2,4})\s*[x×]\s*(\d{2,4})$/i)
+    if (!match) continue
+    const label = (match[1] || 'Ratio').trim().slice(0, 80)
+    const width = Math.max(64, Math.min(4096, Number(match[2])))
+    const height = Math.max(64, Math.min(4096, Number(match[3])))
+    ratios.push({ label, width, height })
+    if (ratios.length >= 8) break
+  }
+  return ratios
+}
+
+function formatAspectRatioDraft(ratios: CheckpointPromptProfile['recommendedAspectRatios']): string {
+  return (ratios ?? []).map((ratio) => `${ratio.label} ${ratio.width}x${ratio.height}`).join('\n')
+}
+
+function parseRelatedModelDraft(
+  value: string,
+  kind: NonNullable<CheckpointPromptProfile['relatedModels']>['loras'][number]['kind']
+): NonNullable<CheckpointPromptProfile['relatedModels']>['loras'] {
+  const out: NonNullable<CheckpointPromptProfile['relatedModels']>['loras'] = []
+  const seen = new Set<string>()
+  for (const raw of value.split(/\n+/)) {
+    const line = raw.trim()
+    if (!line) continue
+    const parts = line.split('|').map((part) => part.trim())
+    const name = parts[0]?.replace(/\s+/g, ' ').slice(0, 220)
+    if (!name) continue
+    const role = parts[1]?.replace(/\s+/g, ' ').slice(0, 80) || null
+    const hasWeightColumn = parts.length >= 4 || (parts[2] != null && /^[-+]?\d/.test(parts[2]))
+    const weightCandidate = hasWeightColumn && parts[2] !== '' ? Number(parts[2]) : null
+    const weight = weightCandidate != null && Number.isFinite(weightCandidate)
+      ? Math.max(-2, Math.min(2, Math.round(weightCandidate * 100) / 100))
+      : null
+    const noteStart = hasWeightColumn ? 3 : 2
+    const notes = splitProfileNoteText(parts.slice(noteStart).join(' | ').replace(/;/g, '\n')).slice(0, 6)
+    const key = `${kind}:${name.toLowerCase()}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ kind, name, role, weight, notes, path: null, sha256: null })
+    if (out.length >= 24) break
+  }
+  return out
+}
+
+function formatRelatedModelDraft(
+  items: NonNullable<CheckpointPromptProfile['relatedModels']>['loras'] | undefined
+): string {
+  return (items ?? []).map((item) => {
+    const notes = (item.notes ?? []).join('; ')
+    return [
+      item.name,
+      item.role ?? '',
+      item.weight == null ? '' : String(item.weight),
+      notes
+    ].join(' | ').replace(/\s+\|/g, ' |').replace(/\|\s+$/g, '|')
+  }).join('\n')
+}
+
+function splitProfileNoteText(value: string): string[] {
+  const seen = new Set<string>()
+  const notes: string[] = []
+  for (const raw of value.split(/\n+/)) {
+    const note = raw.trim().replace(/\s+/g, ' ')
+    const key = note.toLowerCase()
+    if (!note || seen.has(key)) continue
+    seen.add(key)
+    notes.push(note)
+    if (notes.length >= 24) break
+  }
+  return notes
+}
+
 function modelPageUrl(entry: ModelLibraryEntry): string | null {
   return entry.sourceMeta?.pageUrl ?? entry.civitai?.url ?? null
 }
@@ -2191,6 +3420,7 @@ function modelPreviewSrc(entry: ModelLibraryEntry): string | null {
 function needsCivitaiInfo(entry: ModelLibraryEntry): boolean {
   if (entry.sourceMeta?.provider !== 'civitai') return true
   if (!entry.sourceMeta.modelId || !entry.sourceMeta.modelVersionId) return true
+  if (isModelLibraryAdapterEntry(entry) && (entry.sourceMeta.trainedWords?.length ?? 0) === 0 && (entry.sourceMeta.recommendedPrompts?.length ?? 0) === 0) return true
   if (!entry.sourceMeta.description && !entry.notes) return true
   if (!entry.previewPath && !entry.sourceMeta.previewPath && !entry.sourceMeta.thumbnailUrl) return true
   return false
@@ -3130,6 +4360,22 @@ function formatDownloadProgress(job: DownloadJob): string {
     return `${formatBytes(job.bytesDownloaded)} / ${formatBytes(job.totalBytes)}`
   }
   return formatBytes(job.bytesDownloaded)
+}
+
+function isStaleDownloadJob(job: DownloadJob): boolean {
+  return job.status === 'running' && Date.now() - job.updatedAt > STALE_DOWNLOAD_MS
+}
+
+function canResumeDownloadJob(job: DownloadJob): boolean {
+  return job.status === 'failed' || job.status === 'canceled' || isStaleDownloadJob(job)
+}
+
+function canDiscardDownloadJob(job: DownloadJob): boolean {
+  return job.status !== 'running' || isStaleDownloadJob(job)
+}
+
+function isOrphanPartialIssue(issue: LibraryIntegrityReport['issues'][number]): boolean {
+  return isPartialIntegrityIssue(issue) && !issue.jobId
 }
 
 function statusColor(status: DownloadJob['status']): string {
