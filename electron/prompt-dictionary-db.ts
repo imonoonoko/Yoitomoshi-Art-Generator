@@ -60,10 +60,12 @@ interface DictionaryRow {
   group_name: string
   polarity: string
   source_kind: string
+  source_id: string
   source_label: string
   ja_label: string
   ja_meaning: string
   post_count: number | null
+  adult_level: number | null
   deprecated: number | null
   aliases: string | null
 }
@@ -71,6 +73,11 @@ interface DictionaryRow {
 interface ScoredRow {
   row: DictionaryRow
   score: number
+}
+
+interface SearchFilters {
+  adult: 'all' | 'safe' | 'adult'
+  sourceIds: string[]
 }
 
 const QUERY_EXPANSIONS: Record<string, QueryAlternative[]> = {
@@ -126,8 +133,10 @@ export function searchPromptDictionaryDatabase(
   }
 
   let aggregate: Map<number, ScoredRow> | null = null
+  const requestedPolarity = normalizeRequestedPolarity(request.polarity)
+  const filters = normalizeSearchFilters(request)
   for (const term of terms) {
-    const termRows = collectTermRows(opened.db, term)
+    const termRows = collectTermRows(opened.db, term, filters)
     if (termRows.size === 0) {
       aggregate = new Map()
       break
@@ -149,10 +158,18 @@ export function searchPromptDictionaryDatabase(
     aggregate = next
   }
 
+  const phraseRows = collectWholeQueryRows(opened.db, query, filters)
+  if (!aggregate) {
+    aggregate = phraseRows
+  } else {
+    mergeScoredRows(aggregate, phraseRows)
+  }
+
+  const normalizedQuery = normalizeLatin(query)
   const scored = [...(aggregate ?? new Map()).values()]
     .map((item) => ({
       ...item,
-      score: item.score + rowQualityScore(item.row)
+      score: item.score + rowQualityScore(item.row, requestedPolarity) + wholeQueryScore(item.row, normalizedQuery)
     }))
     .sort((a, b) =>
       b.score - a.score ||
@@ -212,7 +229,7 @@ function loadDatabaseSync(): DatabaseSyncConstructor {
   return sqlite.DatabaseSync
 }
 
-function collectTermRows(db: SqliteDatabase, term: QueryTerm): Map<number, ScoredRow> {
+function collectTermRows(db: SqliteDatabase, term: QueryTerm, filters: SearchFilters): Map<number, ScoredRow> {
   const rows = new Map<number, ScoredRow>()
   for (const alternative of term.alternatives) {
     const value = alternative.value.trim()
@@ -224,37 +241,71 @@ function collectTermRows(db: SqliteDatabase, term: QueryTerm): Map<number, Score
     const ftsScore = 70 + alternative.weight
     const trigramScore = 44 + alternative.weight
 
-    addRows(rows, queryRows(db, EXACT_SQL, [normalized, value.toLowerCase(), value], 80), exactScore)
+    addRows(rows, queryRows(db, EXACT_SQL, [normalized, value.toLowerCase(), value], 80, filters), exactScore)
     addRows(rows, queryRows(db, PREFIX_SQL, [
       `${escapeLike(normalized)}%`,
       `${escapeLike(value.toLowerCase())}%`,
       `${escapeLike(value)}%`,
       `${escapeLike(value)}%`,
       `${escapeLike(value)}%`
-    ], 120), prefixScore)
+    ], 120, filters), prefixScore)
     addRows(rows, queryRows(db, CONTAINS_SQL, [
       `%${escapeLike(normalized)}%`,
       `%${escapeLike(value.toLowerCase())}%`,
       `%${escapeLike(value)}%`,
       `%${escapeLike(value)}%`,
       `%${escapeLike(value)}%`
-    ], 180), containsScore)
+    ], 180, filters), containsScore)
 
     const ftsQuery = buildFtsQuery(value)
     if (ftsQuery) {
-      addRows(rows, queryRows(db, FTS_SQL, [ftsQuery], 180), ftsScore)
+      addRows(rows, queryRows(db, FTS_SQL, [ftsQuery], 180, filters), ftsScore)
     }
 
     const trigramQuery = buildTrigramQuery(value)
     if (trigramQuery) {
-      addRows(rows, queryRows(db, TRIGRAM_SQL, [trigramQuery], 180), trigramScore)
+      addRows(rows, queryRows(db, TRIGRAM_SQL, [trigramQuery], 180, filters), trigramScore)
     }
   }
   return rows
 }
 
-function queryRows(db: SqliteDatabase, sql: string, values: SqliteBindable[], limit: number): DictionaryRow[] {
-  return db.prepare(sql).all(...values, limit).map(toDictionaryRow).filter((row): row is DictionaryRow => row !== null)
+function collectWholeQueryRows(db: SqliteDatabase, query: string, filters: SearchFilters): Map<number, ScoredRow> {
+  const value = query.trim()
+  const normalized = normalizeLatin(value)
+  if ([...normalized].length < 2) return new Map()
+
+  const rows = new Map<number, ScoredRow>()
+  addRows(rows, queryRows(db, EXACT_SQL, [normalized, value.toLowerCase(), value], 80, filters), 220)
+  addRows(rows, queryRows(db, PREFIX_SQL, [
+    `${escapeLike(normalized)}%`,
+    `${escapeLike(value.toLowerCase())}%`,
+    `${escapeLike(value)}%`,
+    `${escapeLike(value)}%`,
+    `${escapeLike(value)}%`
+  ], 120, filters), 174)
+  addRows(rows, queryRows(db, CONTAINS_SQL, [
+    `%${escapeLike(normalized)}%`,
+    `%${escapeLike(value.toLowerCase())}%`,
+    `%${escapeLike(value)}%`,
+    `%${escapeLike(value)}%`,
+    `%${escapeLike(value)}%`
+  ], 160, filters), 78)
+  return rows
+}
+
+function queryRows(
+  db: SqliteDatabase,
+  sql: string,
+  values: SqliteBindable[],
+  limit: number,
+  filters: SearchFilters
+): DictionaryRow[] {
+  const filtered = applySearchFilters(sql, filters)
+  return db.prepare(filtered.sql)
+    .all(...values, ...filtered.values, limit)
+    .map(toDictionaryRow)
+    .filter((row): row is DictionaryRow => row !== null)
 }
 
 function addRows(target: Map<number, ScoredRow>, rows: DictionaryRow[], score: number): void {
@@ -262,6 +313,15 @@ function addRows(target: Map<number, ScoredRow>, rows: DictionaryRow[], score: n
     const previous = target.get(row.id)
     if (!previous || previous.score < score) {
       target.set(row.id, { row, score })
+    }
+  }
+}
+
+function mergeScoredRows(target: Map<number, ScoredRow>, rows: Map<number, ScoredRow>): void {
+  for (const [id, row] of rows) {
+    const previous = target.get(id)
+    if (!previous || previous.score < row.score) {
+      target.set(id, row)
     }
   }
 }
@@ -283,10 +343,12 @@ function toDictionaryRow(value: unknown): DictionaryRow | null {
     group_name: groupName,
     polarity: asString(row.polarity) || 'positive',
     source_kind: asString(row.source_kind) || 'built-in',
+    source_id: asString(row.source_id) || 'prompt-library-ja',
     source_label: asString(row.source_label) || 'Prompt Dictionary',
     ja_label: asString(row.ja_label),
     ja_meaning: asString(row.ja_meaning),
     post_count: asNullableNumber(row.post_count),
+    adult_level: asNullableNumber(row.adult_level),
     deprecated: asNullableNumber(row.deprecated),
     aliases: asString(row.aliases)
   }
@@ -307,18 +369,46 @@ function rowToEntry(row: DictionaryRow, score: number): PromptDictionaryEntry {
     group: row.group_name,
     polarity,
     sourceKind: row.source_kind === 'custom' ? 'custom' : 'built-in',
+    sourceId: row.source_id,
     sourceLabel: row.source_label,
+    adultLevel: Math.max(0, Math.floor(row.adult_level ?? 0)),
+    postCount: row.post_count,
     score
   }
 }
 
-function rowQualityScore(row: DictionaryRow): number {
+function rowQualityScore(row: DictionaryRow, requestedPolarity: PromptTagPolarity | null): number {
   let score = 0
   const postCount = row.post_count ?? 0
   if (postCount > 0) score += Math.min(12, Math.log10(postCount + 1) * 2)
   if (row.deprecated) score -= 28
-  if (normalizePolarity(row.polarity) === 'positive') score += 2
+  const rowPolarity = normalizePolarity(row.polarity)
+  if (requestedPolarity) {
+    if (rowPolarity === requestedPolarity) score += 18
+    else if (rowPolarity === 'both') score += 10
+    else score -= 8
+  } else if (rowPolarity === 'positive') {
+    score += 2
+  }
   return score
+}
+
+function wholeQueryScore(row: DictionaryRow, normalizedQuery: string): number {
+  if ([...normalizedQuery].length < 2) return 0
+  const normalizedTag = normalizeLatin(row.normalized_tag)
+  const tag = normalizeLatin(row.tag)
+  const aliases = (row.aliases ?? '')
+    .split('\u001f')
+    .map(normalizeLatin)
+    .filter(Boolean)
+
+  if (normalizedTag === normalizedQuery || tag === normalizedQuery) return 90
+  if (normalizedTag.startsWith(normalizedQuery) || tag.startsWith(normalizedQuery)) return 72
+  if (aliases.some((alias) => alias === normalizedQuery)) return 58
+  if (aliases.some((alias) => alias.startsWith(normalizedQuery))) return 46
+  if (normalizedTag.includes(normalizedQuery) || tag.includes(normalizedQuery)) return 32
+  if (aliases.some((alias) => alias.includes(normalizedQuery))) return 22
+  return 0
 }
 
 function tokenizeQuery(query: string): QueryTerm[] {
@@ -387,12 +477,50 @@ function asNullableNumber(value: unknown): number | null {
 }
 
 function normalizeLatin(value: string): string {
-  return value.trim().toLowerCase().replace(/[_-]+/g, ' ')
+  return value.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ')
 }
 
 function normalizePolarity(value: string): PromptTagPolarity {
   if (value === 'negative' || value === 'both') return value
   return 'positive'
+}
+
+function normalizeRequestedPolarity(value: PromptTagPolarity | undefined): PromptTagPolarity | null {
+  if (value === 'positive' || value === 'negative' || value === 'both') return value
+  return null
+}
+
+function normalizeSearchFilters(request: PromptDictionarySearchRequest): SearchFilters {
+  const adult = request.adult === 'safe' || request.adult === 'adult' ? request.adult : 'all'
+  const sourceIds = Array.from(new Set((request.sourceIds ?? [])
+    .map((value) => value.trim())
+    .filter((value) => /^[a-z0-9][a-z0-9-]{1,80}$/.test(value))
+  )).slice(0, 32)
+  return { adult, sourceIds }
+}
+
+function applySearchFilters(sql: string, filters: SearchFilters): { sql: string; values: SqliteBindable[] } {
+  const clauses: string[] = []
+  const values: SqliteBindable[] = []
+  if (filters.adult === 'safe') clauses.push('adult_level <= 0')
+  if (filters.adult === 'adult') clauses.push('adult_level > 0')
+  if (filters.sourceIds.length > 0) {
+    clauses.push(`source_id IN (${filters.sourceIds.map(() => '?').join(', ')})`)
+    values.push(...filters.sourceIds)
+  }
+  if (clauses.length === 0) return { sql, values }
+  const innerSql = sql.replace(/\s+LIMIT \?/u, '')
+  return {
+    sql: `
+      SELECT *
+      FROM (
+        ${innerSql}
+      ) filtered_dictionary_rows
+      WHERE ${clauses.join('\n        AND ')}
+      LIMIT ?
+    `,
+    values
+  }
 }
 
 const SELECT_COLUMNS = `
@@ -403,8 +531,10 @@ const SELECT_COLUMNS = `
   e.group_name,
   e.polarity,
   e.source_kind,
+  e.source_id,
   e.source_label,
   e.post_count,
+  e.adult_level,
   e.deprecated,
   t.ja_label,
   t.ja_meaning,

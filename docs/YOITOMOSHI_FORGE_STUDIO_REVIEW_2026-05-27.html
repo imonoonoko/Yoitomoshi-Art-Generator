@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yoitomoshi Forge Studio Review - 2026-05-27</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d1014;
+      --panel: #151a22;
+      --panel2: #1b222c;
+      --line: #303947;
+      --ink: #eef3f8;
+      --muted: #aab5c2;
+      --weak: #788594;
+      --ok: #74d99f;
+      --warn: #ffd166;
+      --risk: #ff7d8a;
+      --accent: #8cc8ff;
+      --violet: #c7a7ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif;
+      line-height: 1.68;
+    }
+    main { max-width: 1180px; margin: 0 auto; padding: 32px 22px 56px; }
+    header {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #18202b 0%, #11161d 100%);
+      border-radius: 10px;
+      padding: 24px;
+      margin-bottom: 18px;
+    }
+    h1 { margin: 0; font-size: 30px; line-height: 1.18; letter-spacing: 0; }
+    h2 {
+      margin: 28px 0 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--line);
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+    h3 { margin: 18px 0 8px; font-size: 15px; }
+    p { margin: 8px 0; color: var(--muted); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      color: #d6e8ff;
+      background: #0b0f15;
+      border: 1px solid #28313e;
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-family: "Cascadia Mono", Consolas, monospace;
+      font-size: .92em;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 18px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--ink); background: #111821; text-align: left; font-size: 12px; }
+    td { color: var(--muted); font-size: 13px; }
+    tr:last-child td { border-bottom: 0; }
+    ul { margin: 8px 0 18px 22px; padding: 0; color: var(--muted); }
+    li { margin: 6px 0; }
+    .lead { max-width: 900px; color: #c7d1dd; }
+    .grid { display: grid; gap: 12px; }
+    .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 14px;
+      min-width: 0;
+    }
+    .metric { color: var(--weak); font-size: 11px; text-transform: uppercase; }
+    .number { display: block; margin-top: 3px; color: var(--ink); font-size: 24px; font-weight: 700; }
+    .sub { display: block; margin-top: 2px; color: var(--weak); font-size: 12px; }
+    .tag {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      margin: 2px 4px 2px 0;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .risk { color: var(--risk); }
+    .accent { color: var(--accent); }
+    .violet { color: var(--violet); }
+    .finding {
+      display: grid;
+      grid-template-columns: 86px minmax(0, 1fr);
+      gap: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+    }
+    .severity {
+      align-self: start;
+      text-align: center;
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-weight: 700;
+      font-size: 12px;
+      background: #0f141b;
+      border: 1px solid var(--line);
+    }
+    .severity.p1 { color: var(--risk); border-color: rgba(255,125,138,.45); }
+    .severity.p2 { color: var(--warn); border-color: rgba(255,209,102,.45); }
+    .severity.p3 { color: var(--accent); border-color: rgba(140,200,255,.45); }
+    .note {
+      border-left: 3px solid var(--accent);
+      background: #111923;
+      padding: 10px 12px;
+      margin: 14px 0;
+      color: var(--muted);
+    }
+    .small { font-size: 12px; color: var(--weak); }
+    @media (max-width: 900px) {
+      .metrics, .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 640px) {
+      main { padding: 18px 12px 36px; }
+      .metrics, .cards { grid-template-columns: 1fr; }
+      .finding { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="tag ok">reviewed: 2026-05-27</div>
+    <div class="tag">cwd: C:\宵灯工房アート\Yoitomoshi-Art-Generator</div>
+    <h1>Yoitomoshi Forge Studio<br />全体レビュー</h1>
+    <p class="lead">
+      現在のcheckout、docs、runtime metadata、userdata、Model Library、Prompt大辞典、Electron DOM QAを読み合わせたレビュー。
+      結論として、Yoitomoshi Forge Studioは「Forge APIを裏で動かす生成UI」から、Prompt設計、辞書、モデル管理、履歴、Upscale、Video、保守まで持つ
+      <strong>個人制作用ローカル制作環境</strong>に育っている。一方で、現時点は活発な実装途中であり、リリースや長期保管前には変更の束を整理する必要がある。
+    </p>
+  </header>
+
+  <section class="grid metrics">
+    <div class="card"><span class="metric">review verdict</span><span class="number ok">Internal-use Ready</span><span class="sub">配布-readyではなく、自分用制作環境として強い</span></div>
+    <div class="card"><span class="metric">prompt dictionary</span><span class="number">7,667</span><span class="sub">public runtime entries / adult tagged 1,224</span></div>
+    <div class="card"><span class="metric">model library</span><span class="number">45</span><span class="sub">index entries / missing file 0</span></div>
+    <div class="card"><span class="metric">verification</span><span class="number ok">PASS</span><span class="sub">typecheck / build / DOM smoke</span></div>
+  </section>
+
+  <h2>Findings First</h2>
+
+  <div class="finding">
+    <div class="severity p1">P1</div>
+    <div>
+      <h3>作業ツリーが大きくdirtyで、レビュー時点の実装単位がまだ固まっていない</h3>
+      <p>
+        <code>git status --short --branch</code> は modified 23件、untracked 39件、合計62件を示した。
+        Prompt大辞典、source registry、importer、DOM QA、docs、DB生成物が混在している。現在の機能は動くが、
+        後から復元・比較・切り戻しするには変更単位を分けてコミットする必要がある。
+      </p>
+      <p><strong>推奨:</strong> まず「Prompt大辞典source/ingest」「Autocomplete/Dictionary UI」「docs/report」「生成物DB」の4単位に分けて差分を確認する。</p>
+      <p><strong>2026-05-29追記:</strong> GitHub公開用のDBビルドでは、ローカル履歴由来の <code>local-user-prompts</code> を既定で除外するよう整理した。</p>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="severity p1">P1</div>
+    <div>
+      <h3>今回レビューでは実生成のForge core smokeを走らせていない</h3>
+      <p>
+        <code>npm.cmd run typecheck</code>、<code>npm.cmd run build</code>、Selectors、API surface、Prompt大辞典DOM QAはPASS。
+        ただし、画像生成そのものを行う <code>qa:dom:forge-core</code> / <code>qa:dom:forge-controlnet</code> は今回未実行。
+        Generate payloadやForge拡張を触る変更ではないためレビューには十分だが、生成品質保証としては別枠で実行が必要。
+      </p>
+      <p><strong>推奨:</strong> 生成系を触る前後は <code>qa:dom:forge-core -- --port=9338</code> を直列で走らせる。</p>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="severity p2">P2</div>
+    <div>
+      <h3>Forge ready時間は改善済みだが、まだばらつきが大きい</h3>
+      <p>
+        直近50 startup metricsでは Forge ready 平均 23.7秒（23,684ms）、最小 14.8秒、最大 56.7秒。
+        renderer loaded平均は445msなので、体感起動の主コストは依然としてForge/Python/Torch/extension側。
+      </p>
+      <p><strong>推奨:</strong> 遅いサンプル発生時に <code>Tools &gt; 個人環境ヘルスチェック</code> とForge log tailを同時に保存する。</p>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="severity p2">P2</div>
+    <div>
+      <h3>履歴・Pro Recipe・Prompt Composerの「知識化」機能は実装に対してデータ利用が薄い</h3>
+      <p>
+        <code>userdata/history/index.json</code> は500件あるが、現在の集計では <code>tagReview</code> 0件、<code>proRecipeReview</code> 0件、ラベル付きはfavorite 1件のみ。
+        <code>checkpoint-prompt-profiles.json</code> は22件、<code>lora-usage.json</code> は1,061件あり、モデル/LoRA側の蓄積は進んでいる。
+      </p>
+      <p><strong>推奨:</strong> まず直近50件だけに採用理由・失敗理由・用途ラベルを入れる導線を短くする。機能追加よりデータ化の摩擦削減が効く。</p>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="severity p2">P2</div>
+    <div>
+      <h3>Model Libraryは健全だが、重いモデル在庫とunsupported隔離は定期レビュー対象</h3>
+      <p>
+        主要モデルカテゴリ合計は約62.3GB。Model Library indexは45件、missing file 0、SHA既知45件、Civitai/source metadata 43件、preview 38件。
+        <code>Unsupported-StableDiffusion</code> に1件約3.89GBが残っており、通常Forge生成に使わない資産は削除ではなく候補レビュー扱いが妥当。
+      </p>
+      <p><strong>推奨:</strong> 削除は明示指定がある時だけ。通常は「unsupported / Comfy-only候補」としてレポートに残す。</p>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="severity p3">P3</div>
+    <div>
+      <h3>ドキュメントは豊富だが、入口の鮮度と重複が次の保守ポイント</h3>
+      <p>
+        docsは93ファイル。<code>DOCS_INDEX.md</code> は2026-05-27更新済みだが、<code>AI_PROJECT_MAP.md</code> と <code>ROADMAP.md</code> の先頭日付は2026-05-25。
+        直近のPrompt大辞典とAutocomplete実装を、入口ドキュメントにも反映すると次回の探索が速くなる。
+      </p>
+    </div>
+  </div>
+
+  <h2>現在の結論</h2>
+  <div class="note">
+    <strong>このcheckoutは、自分用制作環境としては十分に実用域。</strong>
+    生成UI、Prompt資産、辞書、モデル管理、履歴、Upscale、Video、保守診断が一体化しており、単なるForge launcherではない。
+    ただし「外部配布」「第三者が迷わず再現」「クリーンなリリース」には、dirty差分整理、生成core QA、docs入口更新が必要。
+  </div>
+
+  <h2>全体構成</h2>
+  <table>
+    <thead><tr><th>レイヤ</th><th>現在の役割</th><th>レビュー</th></tr></thead>
+    <tbody>
+      <tr><td>Electron main</td><td><code>forge-manager</code>, <code>forge-api</code>, <code>storage</code>, model/download/tools IPC。</td><td>OS、path、外部API、Forge制御をmain側へ寄せており境界は妥当。</td></tr>
+      <tr><td>Renderer shell</td><td><code>App.tsx</code>, <code>MainTabs</code>, lazy workspace, global autocomplete。</td><td>8トップレベルタブで作業面を切り、重い画面はlazy load。設計は維持すべき。</td></tr>
+      <tr><td>State</td><td><code>src/lib/store.ts</code> のZustand単一store。</td><td>機能量に対してstoreが巨大化している。今は動くが、次の分割候補。</td></tr>
+      <tr><td>Generation contract</td><td><code>generation-utils</code>, <code>extension-payload</code> がForge payloadを作る。</td><td>ADetailer/ControlNet/Upscaleの壊れやすい契約が集約されている。変更時は必ず実生成QA。</td></tr>
+      <tr><td>Local data</td><td><code>userdata/</code>, <code>runtime/</code>, <code>output/</code>。</td><td>Git管理外の巨大/個人データとして正しい。レビューでは件数とサイズのみ確認。</td></tr>
+      <tr><td>Docs / QA</td><td><code>docs/</code>, <code>scripts/dom-qa.cjs</code>。</td><td>DOM QAのカバレッジが広い。表示文言ではなくtestid中心なのは良い。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>既存機能一覧</h2>
+  <table>
+    <thead><tr><th>領域</th><th>機能</th><th>現在評価</th></tr></thead>
+    <tbody>
+      <tr><td>txt2img</td><td>Prompt/Negative、基本params、Preflight、Prompt Composer、Dynamic Prompt、LoRA提案、Generate。</td><td class="ok">主導線。DOM selectors PASS。</td></tr>
+      <tr><td>img2img / Inpaint</td><td>D&amp;D、クリップボード、入力画像、mask editor、Tagger、画像メタデータ読取。</td><td class="ok">制作ループへ統合済み。今回実生成は未確認。</td></tr>
+      <tr><td>Prompt大辞典</td><td>SQLite辞書検索、source/adult表示切替、Autocomplete、Prompt/Negative/Slot挿入、ingest/source status。</td><td class="ok">今回の最も新しい強化点。DOM QA PASS。</td></tr>
+      <tr><td>Tags</td><td>Prompt library編集、recipes、quick add、positive/negative管理、import。</td><td class="ok">辞書とComposerの橋渡し役。</td></tr>
+      <tr><td>Prompt Composer</td><td>slot構成、model tune、翻訳、dictionary連携、template保存。</td><td class="warn">実装は厚いが、現userdataではtemplate 0件。育成が必要。</td></tr>
+      <tr><td>Extensions</td><td>ControlNet Builder/Panel、ADetailer、Regional Prompter、Dynamic Thresholding、FreeU、Fabric。</td><td class="ok">payload契約が集中。変更時はForge実生成QA必須。</td></tr>
+      <tr><td>Models</td><td>Model Library、Civitai metadata/preview、favorites、notes、Prompt Profile、LoRA usage。</td><td class="ok">45件欠損0。preview未取得7件が軽い残件。</td></tr>
+      <tr><td>Civitai / Hugging Face</td><td>検索、download、hash lookup、更新確認、community mining、HF search/download。</td><td class="warn">外部状態依存。API変化時の失敗分類が必要。</td></tr>
+      <tr><td>History</td><td>500件履歴、metadata、labels、Candidate Board、Pro Recipe、Prompt diff、復元。</td><td class="warn">機能はあるが現在の履歴レビュー/レシピデータは薄い。</td></tr>
+      <tr><td>Workspace / Reference</td><td>.yoitoart、embed/references/settings-only、Reference Board、restore。</td><td class="ok">4 workspace files確認。欠落参照UIは今後の余地。</td></tr>
+      <tr><td>Upscale</td><td>Simple/Diffusion/Ultimate、Tile ControlNet、比較保存、仕上げチェック。</td><td class="ok">比較データ8ファイル/2.23MB確認。実素材QAは別枠。</td></tr>
+      <tr><td>Video</td><td>Forge AnimateDiff、FramePack外部連携、runtime diagnostics、source mode。</td><td class="warn">UI surfaceはPASS。実動画生成は今回未確認。</td></tr>
+      <tr><td>Tools</td><td>Personal Health、Model Health、Tagger、auto organize、converter、merger、download/partial整理。</td><td class="ok">保守機能が強い。削除系は明示範囲だけに限定すべき。</td></tr>
+      <tr><td>QA</td><td>selectors、api surface、prompt dictionary、history、candidate、reference、upscale、forge coreなど。</td><td class="ok">今回 selectors/api/dictionary PASS。core生成は未実行。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>棚卸しメトリクス</h2>
+  <section class="grid cards">
+    <div class="card"><span class="metric">source files</span><span class="number">134</span><span class="sub">src/electron/scripts 合計</span></div>
+    <div class="card"><span class="metric">components</span><span class="number">52</span><span class="sub">src/components</span></div>
+    <div class="card"><span class="metric">docs</span><span class="number">93</span><span class="sub">HTML/MD/JSON含む</span></div>
+  </section>
+
+  <table>
+    <thead><tr><th>場所</th><th>ファイル数</th><th>サイズ</th><th>コメント</th></tr></thead>
+    <tbody>
+      <tr><td><code>src</code></td><td>84</td><td>1.73 MB</td><td>Renderer UI/logic。</td></tr>
+      <tr><td><code>electron</code></td><td>18</td><td>0.45 MB</td><td>Main process services。</td></tr>
+      <tr><td><code>scripts</code></td><td>32</td><td>0.49 MB</td><td>DOM QA、辞書import/build、レビュー補助。</td></tr>
+      <tr><td><code>resources</code></td><td>14</td><td>14.41 MB</td><td>Prompt library / dictionary DB / runtime resources。</td></tr>
+      <tr><td><code>docs</code></td><td>93</td><td>2.64 MB</td><td>調査・QA・地図・レポート。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>モデル / Runtime</h2>
+  <table>
+    <thead><tr><th>カテゴリ</th><th>件数</th><th>サイズ</th><th>レビュー</th></tr></thead>
+    <tbody>
+      <tr><td>Stable-diffusion</td><td>6</td><td>38.77 GB</td><td>主要checkpoint。Forge生成の中核。</td></tr>
+      <tr><td>ControlNet</td><td>7</td><td>13.76 GB</td><td>通常ControlNet/Upscale Tileの要。</td></tr>
+      <tr><td>Lora</td><td>15</td><td>2.80 GB</td><td>LoRA usage 1,061件と連動。</td></tr>
+      <tr><td>LyCORIS</td><td>8</td><td>0.57 GB</td><td>独立adapter種別として維持。</td></tr>
+      <tr><td>VAE</td><td>5</td><td>1.33 GB</td><td>checkpoint profileと接続。</td></tr>
+      <tr><td>Tagger</td><td>3</td><td>1.18 GB</td><td>Tagger smoke/Prompt Helperの元。</td></tr>
+      <tr><td>Unsupported-StableDiffusion</td><td>1</td><td>3.89 GB</td><td class="warn">通常Forge外。削除ではなく候補レビュー対象。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Prompt大辞典</h2>
+  <table>
+    <thead><tr><th>Source</th><th>runtime件数</th><th>adult marker</th><th>役割</th></tr></thead>
+    <tbody>
+      <tr><td>prompt-library-ja</td><td>2,602</td><td>0</td><td>既存Prompt Library由来の基礎語彙。</td></tr>
+      <tr><td>danbooru-tag-metadata</td><td>1,947</td><td>100</td><td>一般/メタタグの大規模補強。</td></tr>
+      <tr><td>danbooru-adult-post-tags</td><td>1,077</td><td>1,077</td><td>成人寄り語彙を除外せず、adult marker付きで保持。</td></tr>
+      <tr><td>civitai-red-public-images</td><td>704</td><td>39</td><td>実プロンプト由来の現行語彙。</td></tr>
+      <tr><td>public-web-prompt-pages</td><td>629</td><td>4</td><td>公開プロンプト紹介ページ由来。</td></tr>
+      <tr><td>yoitomoshi-prompt-library</td><td>325</td><td>0</td><td>Yoitomoshi独自レシピ/補助タグ。</td></tr>
+      <tr><td>civitai-public-images</td><td>215</td><td>3</td><td>Civitai本家公開画像メタデータ由来。</td></tr>
+      <tr><td>yoitomoshi-prompt-daijiten-seed</td><td>168</td><td>1</td><td>大辞典seed。</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">2026-05-29現在、<code>local-user-prompts</code> は <code>userdata/prompt-dictionary/</code> のローカル専用sourceとして扱い、public GitHubへ載せる同梱DBには含めない。</p>
+  <p class="small">
+    2026-05-29の公開用DB直接集計では7,667件。DOM QAの <code>searchableCount</code> はCustom Library等とのmerge後で7,718件。
+    adult表示切替はデフォルトで「すべて表示」なので、成人タグは隠していない。
+  </p>
+
+  <h2>Userdata / 制作データ</h2>
+  <table>
+    <thead><tr><th>データ</th><th>現在値</th><th>レビュー</th></tr></thead>
+    <tbody>
+      <tr><td>History</td><td>500件</td><td>履歴量は十分。tagReview/proRecipeReviewが0件なので知識化はこれから。</td></tr>
+      <tr><td>Model Library</td><td>45件 / missing 0 / SHA 45 / preview 38</td><td>保守状態は良い。preview未取得7件は軽微。</td></tr>
+      <tr><td>Checkpoint Prompt Profiles</td><td>22件</td><td>モデル別制作知識の中核として育っている。</td></tr>
+      <tr><td>LoRA usage</td><td>1,061件</td><td>Autocomplete/rank/推薦へもっと使える。</td></tr>
+      <tr><td>Workspaces</td><td>4 files</td><td>.yoitoart運用は存在。用途別template化余地あり。</td></tr>
+      <tr><td>Upscale comparisons</td><td>8 files / 2.23 MB</td><td>仕上げ比較の保存導線は使える状態。</td></tr>
+      <tr><td>Prompt Composer templates</td><td>0件</td><td class="warn">強い機能だが現在は空。最初の3テンプレート作成が効果的。</td></tr>
+      <tr><td>Presets</td><td>0件</td><td class="warn">Quick Presetsは1件。日常制作向けに増やす価値あり。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>検証結果</h2>
+  <table>
+    <thead><tr><th>コマンド / 確認</th><th>結果</th><th>意味</th></tr></thead>
+    <tbody>
+      <tr><td><code>npm.cmd run typecheck</code></td><td class="ok">PASS</td><td>main/web TypeScriptが通る。</td></tr>
+      <tr><td><code>npm.cmd run build</code></td><td class="ok">PASS</td><td>Electron main/preload/renderer production buildが通る。</td></tr>
+      <tr><td><code>node scripts/dom-qa.cjs selectors --port=9338</code></td><td class="ok">PASS</td><td>主要タブ、Prompt、Dictionary、Video、Toolsの安定セレクタを確認。</td></tr>
+      <tr><td><code>node scripts/dom-qa.cjs api-surface --port=9338</code></td><td class="ok">PASS</td><td>Tools、Video、History、Workspace、Prompt大辞典、TranslationのIPC surface確認。</td></tr>
+      <tr><td><code>node scripts/dom-qa.cjs prompt-dictionary-workspace --port=9338</code></td><td class="ok">PASS</td><td>大辞典検索、挿入、source/adult表示切替、ingest/source status確認。</td></tr>
+      <tr><td>Forge startup during DOM QA</td><td class="ok">ready logs observed</td><td><code>--nowebui</code>, <code>--cuda-malloc</code>, RTX 4060 Ti 8GBで起動。</td></tr>
+      <tr><td><code>qa:dom:forge-core</code></td><td class="warn">not run</td><td>今回のレビューでは実画像生成は行っていない。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>次の優先順位</h2>
+  <ol>
+    <li><strong>差分整理:</strong> 現在の62ファイルdirtyを、機能単位に分けて確認・コミット可能な状態へ寄せる。</li>
+    <li><strong>Forge core QA:</strong> 生成payloadや拡張を触る前に、代表checkpointで <code>qa:dom:forge-core</code> を1回通す。</li>
+    <li><strong>履歴の知識化:</strong> 直近50件へ用途ラベル、採用理由、失敗理由を入れ、Prompt大辞典/Autocomplete rankへ戻す。</li>
+    <li><strong>Prompt Composer templates:</strong> 立ち絵、SNS、素材、成人向け、仕上げ検査など最初のテンプレートを3から5個作る。</li>
+    <li><strong>docs入口更新:</strong> <code>AI_PROJECT_MAP.md</code> と <code>ROADMAP.md</code> 先頭に、Dictionary/Autocomplete/ingestの現在地を追記する。</li>
+  </ol>
+
+  <h2>今回確認した主なソース</h2>
+  <p class="small">
+    <code>AGENTS.md</code>,
+    <code>package.json</code>,
+    <code>docs/DOCS_INDEX.md</code>,
+    <code>docs/AI_PROJECT_MAP.md</code>,
+    <code>docs/ROADMAP.md</code>,
+    <code>docs/YOITOMOSHI_FORGE_STUDIO_CURRENT_STATE_REPORT_2026-05-25.html</code>,
+    <code>src/App.tsx</code>,
+    <code>src/components/MainTabs.tsx</code>,
+    <code>src/shared/ipc-channels.ts</code>,
+    <code>scripts/dom-qa.cjs</code>,
+    <code>resources/prompt-dictionary/prompt-dictionary.sqlite</code>,
+    safe metadata under <code>userdata/</code> and file counts under <code>runtime/forge/webui/models</code>.
+  </p>
+</main>
+</body>
+</html>

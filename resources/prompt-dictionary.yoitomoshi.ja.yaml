@@ -4,7 +4,7 @@
 # Prompt Library, Prompt Dictionary panel, autocomplete, and JSON import pipeline
 # can all share one searchable tag source.
 
-- name: "大辞典: 人物"
+- name: 人物
   groups:
     - name: 顔・表情
       color: rgba(238, 126, 153, .35)
@@ -63,7 +63,7 @@
         bouncing breasts: 胸が揺れる表現。動きのあるおっぱい描写、motion linesと相性がよい。
         breast awe: 胸に視線や驚きが向くニュアンス。コミカルな反応や強調表現向け。
 
-- name: "大辞典: ポーズ"
+- name: 表情動作
   groups:
     - name: 基本ポーズ
       color: rgba(133, 199, 255, .35)
@@ -98,7 +98,7 @@
         dramatic pose: 見栄を切るようなポーズ。表紙、宣伝絵、強い印象に向く。
         reaching out: 手を伸ばす。距離感、物語性、奥行きの演出。
 
-- name: "大辞典: 衣装"
+- name: 衣服や装飾品
   groups:
     - name: 日常衣装
       color: rgba(255, 196, 89, .35)
@@ -146,7 +146,7 @@
         transparent sleeves: 透け袖。軽い布感や上品な露出。
         frills: フリル。可愛さ、ドレス、ロリータ調の装飾。
 
-- name: "大辞典: 画面設計"
+- name: 画面
   groups:
     - name: 構図
       color: rgba(124, 140, 255, .35)
@@ -178,7 +178,7 @@
         limited color palette: 色数を絞った画面。統一感を出す。
         complementary colors: 補色配色。印象を強くする色設計。
 
-- name: "大辞典: 背景"
+- name: 環境
   groups:
     - name: 日常
       color: rgba(95, 214, 180, .35)
@@ -208,7 +208,7 @@
         aurora sky: オーロラの空。寒色、幻想、広い風景。
         dreamscape: 夢のような空間。現実感を弱めたい時に使う。
 
-- name: "大辞典: 失敗回避"
+- name: ネガティブなプロンプト
   groups:
     - name: 人体・顔
       color: rgba(255, 96, 96, .35)

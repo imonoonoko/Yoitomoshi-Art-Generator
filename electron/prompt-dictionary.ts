@@ -91,7 +91,10 @@ function searchPromptDictionaryInMemory(
   const query = request.query.trim()
   const limit = clampLimit(request.limit)
   const entries = buildDictionaryEntries(baseLibrary, customLibrary)
+    .filter((entry) => matchesSearchFilters(entry, request))
   const terms = tokenizeQuery(query)
+  const requestedPolarity = normalizeRequestedPolarity(request.polarity)
+  const normalizedQuery = normalizeLatin(query)
 
   if (terms.length === 0 || limit <= 0) {
     return {
@@ -104,7 +107,7 @@ function searchPromptDictionaryInMemory(
   }
 
   const scored = entries
-    .map((entry) => ({ entry, score: scoreEntry(entry, terms) }))
+    .map((entry) => ({ entry, score: scoreEntry(entry, normalizedQuery, terms, requestedPolarity) }))
     .filter((item): item is ScoredEntry => item.score > 0)
     .sort((a, b) =>
       b.score - a.score ||
@@ -121,7 +124,10 @@ function searchPromptDictionaryInMemory(
     group: entry.group,
     polarity: entry.polarity,
     sourceKind: entry.sourceKind,
+    sourceId: entry.sourceId,
     sourceLabel: entry.sourceLabel,
+    adultLevel: entry.adultLevel,
+    postCount: entry.postCount,
     score
   }))
 
@@ -218,7 +224,10 @@ function createEntry(
     group,
     polarity: normalizePolarity(tag.polarity),
     sourceKind,
+    sourceId: sourceKind === 'custom' ? 'custom-library' : 'prompt-library-ja',
     sourceLabel: sourceKind === 'custom' ? 'Custom Library' : 'Prompt Library',
+    adultLevel: 0,
+    postCount: null,
     score: 0
   }
   return indexEntry(entry)
@@ -238,6 +247,7 @@ function mergeEntries(
       group: next.group || previous.group,
       polarity: next.polarity ?? previous.polarity,
       sourceKind: 'custom',
+      sourceId: next.sourceId || previous.sourceId,
       sourceLabel: 'Custom Library'
     })
   }
@@ -266,7 +276,12 @@ function indexEntry(entry: PromptDictionaryEntry): IndexedPromptDictionaryEntry 
   }
 }
 
-function scoreEntry(entry: IndexedPromptDictionaryEntry, terms: QueryTerm[]): number {
+function scoreEntry(
+  entry: IndexedPromptDictionaryEntry,
+  normalizedQuery: string,
+  terms: QueryTerm[],
+  requestedPolarity: PromptTagPolarity | null
+): number {
   let score = 0
   for (const term of terms) {
     const best = Math.max(...term.alternatives.map((alternative) =>
@@ -276,10 +291,31 @@ function scoreEntry(entry: IndexedPromptDictionaryEntry, terms: QueryTerm[]): nu
     score += best
   }
 
+  score += wholeQueryScore(entry, normalizedQuery)
   if (entry.sourceKind === 'custom') score += 6
-  if (entry.polarity === 'positive') score += 2
-  if (entry.polarity === 'negative') score -= 1
+  if (requestedPolarity) {
+    if (entry.polarity === requestedPolarity) score += 18
+    else if (entry.polarity === 'both') score += 10
+    else score -= 8
+  } else {
+    if (entry.polarity === 'positive') score += 2
+    if (entry.polarity === 'negative') score -= 1
+  }
   return score
+}
+
+function wholeQueryScore(entry: IndexedPromptDictionaryEntry, normalizedQuery: string): number {
+  if ([...normalizedQuery].length < 2) return 0
+  const tagKey = normalizeLatin(entry.tagKey)
+  const aliases = entry.aliases.map(normalizeLatin)
+
+  if (entry.normalizedTag === normalizedQuery || tagKey === normalizedQuery) return 90
+  if (entry.normalizedTag.startsWith(normalizedQuery) || tagKey.startsWith(normalizedQuery)) return 72
+  if (aliases.some((alias) => alias === normalizedQuery)) return 58
+  if (aliases.some((alias) => alias.startsWith(normalizedQuery))) return 46
+  if (entry.normalizedTag.includes(normalizedQuery) || tagKey.includes(normalizedQuery)) return 32
+  if (aliases.some((alias) => alias.includes(normalizedQuery))) return 22
+  return 0
 }
 
 function scoreAlternativeWithWeight(
@@ -344,7 +380,7 @@ function normalizeKey(value: string): string {
 }
 
 function normalizeLatin(value: string): string {
-  return value.trim().toLowerCase().replace(/[_-]+/g, ' ')
+  return value.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ')
 }
 
 function normalizePolarity(value: PromptTagPolarity | undefined): PromptTagPolarity {
@@ -354,4 +390,19 @@ function normalizePolarity(value: PromptTagPolarity | undefined): PromptTagPolar
 
 function sourceRank(kind: PromptDictionaryEntry['sourceKind']): number {
   return kind === 'custom' ? 1 : 0
+}
+
+function normalizeRequestedPolarity(value: PromptTagPolarity | undefined): PromptTagPolarity | null {
+  if (value === 'positive' || value === 'negative' || value === 'both') return value
+  return null
+}
+
+function matchesSearchFilters(entry: PromptDictionaryEntry, request: PromptDictionarySearchRequest): boolean {
+  if (request.adult === 'safe' && entry.adultLevel > 0) return false
+  if (request.adult === 'adult' && entry.adultLevel <= 0) return false
+  if (request.sourceIds?.length) {
+    const wanted = new Set(request.sourceIds)
+    if (!wanted.has(entry.sourceId)) return false
+  }
+  return true
 }

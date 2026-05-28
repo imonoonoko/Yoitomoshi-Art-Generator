@@ -178,7 +178,7 @@ npm.cmd run qa:dom:generation-sections -- --port=9338
 
 ## 11. GitHubへ載せる前の確認
 
-公開リポジトリへ切り替える前は、[`OPEN_SOURCE_RELEASE_CHECKLIST.md`](OPEN_SOURCE_RELEASE_CHECKLIST.md) も確認してください。
+このリポジトリは現在 public です。push 前は [`OPEN_SOURCE_RELEASE_CHECKLIST.md`](OPEN_SOURCE_RELEASE_CHECKLIST.md) と [`CLEANUP_RUNBOOK.md`](CLEANUP_RUNBOOK.md) を確認してください。
 
 ```powershell
 git status --short
@@ -187,4 +187,4 @@ npm.cmd run build
 git diff --check
 ```
 
-`runtime/`、`userdata/`、`node_modules/`、`out/`、`dist/`、`output/` が stage されていないことを確認してください。Civitai API key は `userdata/secrets.local.json` に保存されるため、GitHubへ載せません。
+`runtime/`、`userdata/`、`node_modules/`、`out/`、`dist/`、`output/` が stage されていないことを確認してください。Civitai API key は `userdata/secrets.local.json` に保存されるため、GitHubへ載せません。ローカル履歴由来の `promoted-candidates.local.json` も公開用Gitには入れません。

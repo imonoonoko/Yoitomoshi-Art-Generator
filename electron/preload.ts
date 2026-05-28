@@ -54,6 +54,8 @@ import type {
   PersonalEnvironmentHealthReport,
   PersonalEnvironmentRecoveryResult,
   PromptCategory,
+  PromptDictionaryIngestStatus,
+  PromptDictionarySourceRegistryResult,
   PromptDictionarySearchRequest,
   PromptDictionarySearchResult,
   PromptTextTranslationRequest,
@@ -399,7 +401,11 @@ const api = {
   // Prompt dictionary
   promptDictionary: {
     search: (input: PromptDictionarySearchRequest): Promise<PromptDictionarySearchResult> =>
-      ipcRenderer.invoke(IPC.promptDictionarySearch, input)
+      ipcRenderer.invoke(IPC.promptDictionarySearch, input),
+    listSources: (): Promise<PromptDictionarySourceRegistryResult> =>
+      ipcRenderer.invoke(IPC.promptDictionaryListSources),
+    inspectIngest: (): Promise<PromptDictionaryIngestStatus> =>
+      ipcRenderer.invoke(IPC.promptDictionaryInspectIngest)
   },
 
   // Translation

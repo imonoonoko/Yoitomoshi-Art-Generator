@@ -10,6 +10,7 @@ dist/
 runtime/
 userdata/
 output/
+resources/prompt-dictionary/promoted-candidates.local.json
 
 # logs and OS noise
 *.log

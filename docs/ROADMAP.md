@@ -21,6 +21,7 @@
 - [`RECOMMENDATION_VAE_CLIP_SKIP_FIX_2026-05-15.md`](RECOMMENDATION_VAE_CLIP_SKIP_FIX_2026-05-15.md): 推奨VAEの重複download抑止とClip Skip undefined生成失敗の修正記録。
 - [`PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html`](PIXAI_AIPICTORS_BROWSER_API_RECON_REPORT_2026-05-16.html): PixAI / Aipictors の公開read-only通信と公式情報から、外部プリセット、公開レシピ取り込み、LoRA推薦、トレンド分析の実装候補を整理した調査レポート。
 - [`VIDEO_GENERATION_GUIDE_2026-05-17.html`](VIDEO_GENERATION_GUIDE_2026-05-17.html): Videoタブで使うmotion moduleのダウンロード、配置、短尺GIF生成、トラブル確認手順。
+- [`PROMPT_DAIJITEN_BEST_PRACTICES_RESEARCH_2026-05-26.html`](PROMPT_DAIJITEN_BEST_PRACTICES_RESEARCH_2026-05-26.html): Prompt大辞典のsource expansion、意味付け信頼性、source policy、SQLite/IPC設計の追加ベストプラクティス調査。
 - [`../README.md`](../README.md) / `README.{en,ru,pt}.md` / `はじめに.txt`: 利用者向けの起動・運用説明。
 
 ---
@@ -29,7 +30,8 @@
 
 - 2026-05-21時点では、このリポジトリをForge版として整理する。Forge代表経路、package / dist、実インストール/アンインストール、active interruptは確認済み。一般配布は目的外で、GitHubは将来の自分が再利用・復元するためのソース保管先として扱う。コード署名、更新メタデータ、正式アイコン承認は、将来本当に配布が必要になった時だけ検討する。
 - 2026-05-25時点では、用途をゲーム制作に限定せず、「自分が使いやすい Stable Diffusion 利用ツール」を主目的にする。判断軸は生成しやすさ、再利用しやすさ、モデル管理、プロンプト整理、起動/操作の軽さ。
-- トップレベルタブは `txt2img / img2img / Video / Upscale / Models / Tools` を維持する。小さい補助機能は既存タブ内の折りたたみパネルやモーダルで増やし、動画・モデル管理のように作業面が独立する機能だけトップレベルタブに置く。
+- 2026-05-26時点では、Prompt大辞典の拡張は「source-governed corpus」を維持する。API/ライセンス/出典をsource registryで先に固定し、raw promptは`userdata/` stagingに隔離し、意味付けは強い根拠だけ自動適用、弱い根拠はreview待ちにする。
+- トップレベルタブは `txt2img / img2img / Dictionary / Tags / Video / Upscale / Models / Tools` を維持する。小さい補助機能は既存タブ内の折りたたみパネルやモーダルで増やし、Prompt大辞典・動画・モデル管理のように作業面が独立する機能だけトップレベルタブに置く。
 - Forge 拡張は Gradio UI を埋め込まず、Forge 側に拡張を入れて `alwayson_scripts` または `script_name/script_args` を React UI から操作する。
 - `C:\宵灯工房アート` 直下の sibling 構成は解消し、Forge は `Yoitomoshi-Art-Generator\runtime\forge` に統合する。Electron 利用では Gradio UI を開かず、Forge は `--nowebui` API 専用起動を既定にする。ただし Forge/ControlNet 内部が `gradio` Python パッケージを import するため、依存ファイルの物理削除は検証済みの不要物だけに限定する。
 - Stability Matrix は `LykosAI/StabilityMatrix` を機能調査ソースとして扱う。採用するのは「モデル管理 / ダウンロード管理 / package launcher / workspace保存」の考え方で、AGPL-3.0 のソースコードやUI資産はコピーしない。

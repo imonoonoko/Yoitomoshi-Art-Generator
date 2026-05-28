@@ -6,9 +6,16 @@ import { useStore } from '@/lib/store'
 import { promptAppend } from '@/lib/prompt-utils'
 import { useT, t as tStatic } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import type { PromptDictionaryEntry, PromptDictionarySearchResult } from '@shared/types'
+import type {
+  PromptDictionaryEntry,
+  PromptDictionarySearchRequest,
+  PromptDictionarySearchResult,
+  PromptTagPolarity
+} from '@shared/types'
 
 const MAX_RESULTS = 36
+type DictionaryAdultFilter = NonNullable<PromptDictionarySearchRequest['adult']>
+type DictionaryPolarityFilter = 'all' | PromptTagPolarity
 
 export function PromptDictionaryPanel(): JSX.Element {
   const [open, setOpen] = useState(false)
@@ -16,6 +23,8 @@ export function PromptDictionaryPanel(): JSX.Element {
   const [searchResult, setSearchResult] = useState<PromptDictionarySearchResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [adultFilter, setAdultFilter] = useState<DictionaryAdultFilter>('all')
+  const [polarityFilter, setPolarityFilter] = useState<DictionaryPolarityFilter>('all')
   const searchSeq = useRef(0)
   const prompt = useStore((s) => s.prompt)
   const negative = useStore((s) => s.negativePrompt)
@@ -34,7 +43,7 @@ export function PromptDictionaryPanel(): JSX.Element {
       searchSeq.current = seq
       setLoading(true)
       setErrorMessage(null)
-      api.promptDictionary.search({ query, limit: MAX_RESULTS })
+      api.promptDictionary.search(buildSearchRequest(query, adultFilter, polarityFilter))
         .then((result) => {
           if (searchSeq.current !== seq) return
           setSearchResult(result)
@@ -49,7 +58,7 @@ export function PromptDictionaryPanel(): JSX.Element {
         })
     }, query.trim() ? 180 : 0)
     return () => window.clearTimeout(timeout)
-  }, [open, query])
+  }, [open, query, adultFilter, polarityFilter])
 
   const results = searchResult?.entries ?? []
 
@@ -115,8 +124,31 @@ export function PromptDictionaryPanel(): JSX.Element {
                 ? t('promptDictionary.loading')
                 : query.trim()
                   ? t('promptDictionary.count', { count: searchResult?.total ?? 0 })
-                  : t('promptDictionary.ready', { count: searchResult?.searchableCount ?? 0 })}
+              : t('promptDictionary.ready', { count: searchResult?.searchableCount ?? 0 })}
             </span>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5" data-testid="prompt-dictionary-panel-filters">
+            <select
+              className="input h-7 text-[11px]"
+              value={adultFilter}
+              onChange={(event) => setAdultFilter(event.target.value as DictionaryAdultFilter)}
+              data-testid="prompt-dictionary-adult-filter"
+            >
+              <option value="all">adult表示: すべて</option>
+              <option value="safe">adult以外</option>
+              <option value="adult">adultだけ確認</option>
+            </select>
+            <select
+              className="input h-7 text-[11px]"
+              value={polarityFilter}
+              onChange={(event) => setPolarityFilter(event.target.value as DictionaryPolarityFilter)}
+              data-testid="prompt-dictionary-polarity-filter"
+            >
+              <option value="all">用途: all</option>
+              <option value="positive">Prompt</option>
+              <option value="negative">Negative</option>
+              <option value="both">Both</option>
+            </select>
           </div>
           <div className="max-h-80 overflow-y-auto rounded border border-line bg-bg-1" data-testid="prompt-dictionary-results">
             {errorMessage ? (
@@ -146,6 +178,19 @@ export function PromptDictionaryPanel(): JSX.Element {
   )
 }
 
+function buildSearchRequest(
+  query: string,
+  adultFilter: DictionaryAdultFilter,
+  polarityFilter: DictionaryPolarityFilter
+): PromptDictionarySearchRequest {
+  return {
+    query,
+    limit: MAX_RESULTS,
+    adult: adultFilter,
+    ...(polarityFilter === 'all' ? {} : { polarity: polarityFilter })
+  }
+}
+
 function DictionaryRow({
   entry,
   slotInsertEnabled,
@@ -161,6 +206,7 @@ function DictionaryRow({
 }): JSX.Element {
   const t = useT()
   const isNegative = entry.polarity === 'negative'
+  const isAdult = entry.adultLevel > 0
   return (
     <div className="p-2.5 space-y-1.5" data-testid={`prompt-dictionary-row-${tagTestId(entry.en)}`}>
       <div className="flex items-start gap-2">
@@ -171,6 +217,9 @@ function DictionaryRow({
             <span className="rounded border border-line px-1 py-0.5">{entry.category}</span>
             <span className="rounded border border-line px-1 py-0.5">{entry.group}</span>
             <span className="rounded border border-line px-1 py-0.5">{entry.sourceLabel}</span>
+            {formatPostCount(entry.postCount) && (
+              <span className="rounded border border-line px-1 py-0.5">{formatPostCount(entry.postCount)}</span>
+            )}
             {entry.aliases.slice(0, 2).map((alias) => (
               <span key={alias} className="rounded border border-line px-1 py-0.5">{alias}</span>
             ))}
@@ -182,6 +231,11 @@ function DictionaryRow({
         )}>
           {entry.polarity}
         </span>
+        {isAdult && (
+          <span className="rounded border border-danger/40 px-1.5 py-0.5 text-[10px] text-danger">
+            adult
+          </span>
+        )}
       </div>
       <div className="flex flex-wrap gap-1.5">
         <button
@@ -218,4 +272,12 @@ function DictionaryRow({
 
 function tagTestId(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'tag'
+}
+
+function formatPostCount(value: number | null | undefined): string {
+  if (!Number.isFinite(value ?? NaN) || (value ?? 0) <= 0) return ''
+  const count = Number(value)
+  if (count >= 1000000) return `${Math.round(count / 100000) / 10}M`
+  if (count >= 1000) return `${Math.round(count / 100) / 10}k`
+  return `${count}`
 }

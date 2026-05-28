@@ -32,6 +32,8 @@ import {
   translatePromptText
 } from './prompt-translation-runtime.js'
 import { searchPromptDictionary } from './prompt-dictionary.js'
+import { inspectPromptDictionaryIngestDatabase } from './prompt-dictionary-ingest.js'
+import { loadPromptDictionarySourceRegistry } from './prompt-dictionary-source-registry.js'
 import type { PromptLibrary } from './prompt-library.js'
 import type {
   AppSettings,
@@ -1361,7 +1363,19 @@ function validatePromptDictionarySearchRequest(input: unknown): PromptDictionary
     allowWhitespace: true
   }) ?? ''
   const limit = boundedInteger(input.limit, 'prompt dictionary limit', 0, 120) ?? 36
-  return { query, limit }
+  const polarity = input.polarity === 'positive' || input.polarity === 'negative' || input.polarity === 'both'
+    ? input.polarity
+    : undefined
+  const adult = input.adult === 'safe' || input.adult === 'adult' || input.adult === 'all'
+    ? input.adult
+    : undefined
+  const sourceIds = Array.isArray(input.sourceIds)
+    ? Array.from(new Set(input.sourceIds
+      .map((value) => typeof value === 'string' ? value.trim() : '')
+      .filter((value) => /^[a-z0-9][a-z0-9-]{1,80}$/.test(value))
+    )).slice(0, 32)
+    : undefined
+  return { query, limit, polarity, adult, sourceIds }
 }
 
 function validateUpscaleComparisonSaveRequest(input: unknown): UpscaleComparisonSaveRequest {
@@ -4923,6 +4937,12 @@ export function registerIpcHandlers(deps: {
       resourcesDir,
       dataRoot
     })
+  )
+  ipcMain.handle(IPC.promptDictionaryListSources, () =>
+    loadPromptDictionarySourceRegistry(resourcesDir)
+  )
+  ipcMain.handle(IPC.promptDictionaryInspectIngest, () =>
+    inspectPromptDictionaryIngestDatabase({ resourcesDir, dataRoot })
   )
 
   // Translation ----------------------------------------------------------

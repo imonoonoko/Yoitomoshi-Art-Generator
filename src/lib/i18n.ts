@@ -45,6 +45,7 @@ const ja: Dict = {
   // ---- workspace tabs ---------------------------------------------------
   'tab.txt2img': 'txt2img',
   'tab.img2img': 'img2img',
+  'tab.dictionary': '大辞典',
   'tab.tags': 'タグ管理',
   'tab.video': '動画',
   'tab.upscale': 'アップスケール',
@@ -52,6 +53,7 @@ const ja: Dict = {
   'tab.tools': 'ツール',
   'tab.txt2img.hint': 'テキストから画像を生成',
   'tab.img2img.hint': '入力画像を元に再生成 / Inpaint',
+  'tab.dictionary.hint': 'Prompt大辞典を検索し、既存の制作導線へ挿入',
   'tab.tags.hint': 'Promptタグを追加、整理、プリセット化',
   'tab.video.hint': 'AnimateDiffで短い動画を生成',
   'tab.upscale.hint': 'タイル分割で高解像度化(MultiDiffusion / Ultimate Upscale)',
@@ -1834,6 +1836,7 @@ const en: Dict = {
 
   'tab.txt2img': 'txt2img',
   'tab.img2img': 'img2img',
+  'tab.dictionary': 'Dictionary',
   'tab.tags': 'Tags',
   'tab.video': 'Video',
   'tab.upscale': 'Upscale',
@@ -1841,6 +1844,7 @@ const en: Dict = {
   'tab.tools': 'Tools',
   'tab.txt2img.hint': 'Generate images from text',
   'tab.img2img.hint': 'Regenerate from an input image / Inpaint',
+  'tab.dictionary.hint': 'Search Prompt Dictionary and insert tags into existing workflows',
   'tab.tags.hint': 'Add, organize, and save prompt tags',
   'tab.video.hint': 'Generate short clips with AnimateDiff',
   'tab.upscale.hint': 'High-res via tiled generation (MultiDiffusion / Ultimate Upscale)',
@@ -3602,6 +3606,7 @@ const ru: Dict = {
 
   'tab.txt2img': 'txt2img',
   'tab.img2img': 'img2img',
+  'tab.dictionary': 'Dictionary',
   'tab.tags': 'Теги',
   'tab.video': 'Видео',
   'tab.upscale': 'Апскейл',
@@ -3609,6 +3614,7 @@ const ru: Dict = {
   'tab.tools': 'Инструменты',
   'tab.txt2img.hint': 'Генерация изображений из текста',
   'tab.img2img.hint': 'Перегенерация из входного изображения / Inpaint',
+  'tab.dictionary.hint': 'Search Prompt Dictionary and insert tags into existing workflows',
   'tab.tags.hint': 'Добавлять, упорядочивать и сохранять prompt tags',
   'tab.video.hint': 'Генерация коротких клипов через AnimateDiff',
   'tab.upscale.hint': 'Высокое разрешение через тайлы (MultiDiffusion / Ultimate Upscale)',
@@ -5193,6 +5199,7 @@ const pt: Dict = {
 
   'tab.txt2img': 'txt2img',
   'tab.img2img': 'img2img',
+  'tab.dictionary': 'Dictionary',
   'tab.tags': 'Tags',
   'tab.video': 'Vídeo',
   'tab.upscale': 'Upscale',
@@ -5200,6 +5207,7 @@ const pt: Dict = {
   'tab.tools': 'Ferramentas',
   'tab.txt2img.hint': 'Gerar imagens a partir de texto',
   'tab.img2img.hint': 'Regerar a partir de imagem de entrada / Inpaint',
+  'tab.dictionary.hint': 'Search Prompt Dictionary and insert tags into existing workflows',
   'tab.tags.hint': 'Adicionar, organizar e salvar tags do prompt',
   'tab.video.hint': 'Gerar clipes curtos com AnimateDiff',
   'tab.upscale.hint': 'Alta resolução via tiles (MultiDiffusion / Ultimate Upscale)',

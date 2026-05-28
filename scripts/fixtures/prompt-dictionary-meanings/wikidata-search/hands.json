@@ -1,0 +1,12 @@
+{
+  "search": [
+    {
+      "id": "Q33767",
+      "label": "hands",
+      "description": "body part at the end of the arm",
+      "match": {
+        "text": "hands"
+      }
+    }
+  ]
+}

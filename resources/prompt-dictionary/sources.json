@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-05-26T00:00:00.000Z",
+  "sources": [
+    {
+      "sourceId": "local-user-prompts",
+      "displayName": "Local user prompts",
+      "sourceType": "local",
+      "allowedMode": "enabled",
+      "baseUrl": "",
+      "termsUrl": "",
+      "licenseNote": "User-owned local generation history, PNG metadata, or manually imported prompt files. Do not commit imported records.",
+      "rateLimitRps": 0,
+      "storesRawPrompts": true,
+      "storesImages": false,
+      "adultPolicy": "inherits source metadata; keep adult_level on every record",
+      "checkedAt": "2026-05-26T00:00:00.000Z"
+    },
+    {
+      "sourceId": "civitai-public-images",
+      "displayName": "Civitai public image metadata",
+      "sourceType": "api",
+      "allowedMode": "enabled",
+      "baseUrl": "https://civitai.com/api/v1/images",
+      "termsUrl": "https://civitai.com/content/tos",
+      "licenseNote": "Use the public API only. Store image generation metadata and provenance; do not scrape HTML pages or store image bytes.",
+      "rateLimitRps": 0.2,
+      "storesRawPrompts": false,
+      "storesImages": false,
+      "adultPolicy": "default nsfw=false; preserve nsfwLevel/adult flags when imported",
+      "checkedAt": "2026-05-26T00:00:00.000Z",
+      "defaultQuery": {
+        "limit": 100,
+        "nsfw": false,
+        "withMeta": true,
+        "sort": "Newest",
+        "period": "Month"
+      }
+    },
+    {
+      "sourceId": "civitai-red-public-images",
+      "displayName": "Civitai Red public image metadata",
+      "sourceType": "api",
+      "allowedMode": "enabled",
+      "baseUrl": "https://civitai.red/api/v1/images",
+      "termsUrl": "https://civitai.com/content/tos",
+      "licenseNote": "Use the public API only. Store image generation metadata and provenance; do not scrape HTML pages or store image bytes.",
+      "rateLimitRps": 0.2,
+      "storesRawPrompts": false,
+      "storesImages": false,
+      "adultPolicy": "preserve nsfwLevel/adult flags; adult-leaning tags may be promoted with adult_level metadata",
+      "checkedAt": "2026-05-27T00:00:00.000Z",
+      "defaultQuery": {
+        "limit": 100,
+        "nsfw": true,
+        "withMeta": true,
+        "sort": "Newest",
+        "period": "Month"
+      }
+    },
+    {
+      "sourceId": "public-web-prompt-pages",
+      "displayName": "Public web prompt pages",
+      "sourceType": "manual",
+      "allowedMode": "enabled",
+      "baseUrl": "",
+      "termsUrl": "",
+      "licenseNote": "Fetch only allow-listed public prompt pages. Store staging provenance and parsed tag candidates; do not commit raw page text or image bytes.",
+      "rateLimitRps": 0.2,
+      "storesRawPrompts": false,
+      "storesImages": false,
+      "adultPolicy": "preserve adult_level on candidates; do not exclude adult-leaning terms during promotion",
+      "checkedAt": "2026-05-27T00:00:00.000Z"
+    },
+    {
+      "sourceId": "hf-diffusiondb",
+      "displayName": "Hugging Face DiffusionDB metadata",
+      "sourceType": "dataset",
+      "allowedMode": "manual-only",
+      "baseUrl": "https://huggingface.co/datasets/poloclub/diffusiondb",
+      "termsUrl": "https://huggingface.co/datasets/poloclub/diffusiondb",
+      "licenseNote": "CC0 dataset candidate. Import text metadata columns only after explicit user action; avoid downloading image archives.",
+      "rateLimitRps": 0.2,
+      "storesRawPrompts": false,
+      "storesImages": false,
+      "adultPolicy": "requires dataset-level filtering and review before promotion",
+      "checkedAt": "2026-05-26T00:00:00.000Z"
+    },
+    {
+      "sourceId": "danbooru-adult-post-tags",
+      "displayName": "Danbooru adult post tags",
+      "sourceType": "api",
+      "allowedMode": "enabled",
+      "baseUrl": "https://danbooru.donmai.us",
+      "termsUrl": "https://danbooru.donmai.us/terms_of_service",
+      "licenseNote": "Use documented public JSON endpoints for tag vocabulary evidence only. Store no image bytes and do not commit raw post tag strings.",
+      "rateLimitRps": 0.2,
+      "storesRawPrompts": false,
+      "storesImages": false,
+      "adultPolicy": "collect adult-leaning vocabulary evidence from explicit/questionable public metadata; preserve adult_level during promotion",
+      "checkedAt": "2026-05-27T00:00:00.000Z",
+      "defaultQuery": {
+        "ratings": [
+          "e",
+          "q"
+        ],
+        "limit": 100,
+        "pages": 8,
+        "tagSearchLimit": 100
+      }
+    },
+    {
+      "sourceId": "danbooru-tag-metadata",
+      "displayName": "Danbooru-style tag metadata",
+      "sourceType": "api",
+      "allowedMode": "enabled",
+      "baseUrl": "https://danbooru.donmai.us",
+      "termsUrl": "https://danbooru.donmai.us/terms_of_service",
+      "licenseNote": "Use public JSON tag metadata endpoints for vocabulary evidence. Store no image bytes and no raw post prompt dumps.",
+      "rateLimitRps": 0.2,
+      "storesRawPrompts": false,
+      "storesImages": false,
+      "adultPolicy": "mark sensitive categories and adult_level during promotion",
+      "checkedAt": "2026-05-27T00:00:00.000Z",
+      "defaultQuery": {
+        "categories": [
+          0,
+          5
+        ],
+        "pages": 18,
+        "limit": 100
+      }
+    },
+    {
+      "sourceId": "gelbooru-bulk-posts",
+      "displayName": "Gelbooru bulk post tags",
+      "sourceType": "blocked",
+      "allowedMode": "disabled",
+      "baseUrl": "https://gelbooru.com/index.php?page=dapi&s=post&q=index",
+      "termsUrl": "https://gelbooru.com/tos.php",
+      "licenseNote": "Disabled for MVP because current terms prohibit automated retrieval or indexing of site contents except public search engines.",
+      "rateLimitRps": 0,
+      "storesRawPrompts": false,
+      "storesImages": false,
+      "adultPolicy": "disabled",
+      "checkedAt": "2026-05-26T00:00:00.000Z"
+    }
+  ]
+}

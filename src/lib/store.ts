@@ -34,7 +34,7 @@ import type { PromptComposerSlotKey, PromptComposerSlots } from './prompt-compos
  * collapsible feature panels (ControlNet, adetailer, FreeU, etc.) rather
  * than splitting into many tabs.
  */
-export type WorkspaceTab = 'txt2img' | 'img2img' | 'tags' | 'video' | 'upscale' | 'models' | 'tools'
+export type WorkspaceTab = 'txt2img' | 'img2img' | 'dictionary' | 'tags' | 'video' | 'upscale' | 'models' | 'tools'
 export type SidePanelTab = 'library' | 'lora' | 'board' | 'history' | 'presets'
 export type GenerationWorkspaceMode = 'create' | 'refine' | 'advanced'
 

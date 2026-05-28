@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prompt Daijiten Best Practices Research - 2026-05-26</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d1014;
+      --panel: #151a21;
+      --panel-2: #1d242d;
+      --line: #303946;
+      --line-soft: #252d38;
+      --ink: #eef3f8;
+      --muted: #b3bdca;
+      --soft: #8390a2;
+      --blue: #8bbcff;
+      --teal: #70d1c5;
+      --green: #76d98d;
+      --amber: #efc866;
+      --rose: #ff8f9c;
+      --violet: #baa7ff;
+      --code: #10151c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.72 "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif;
+    }
+    main {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 36px 0 58px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 22px;
+      margin-bottom: 28px;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.28; letter-spacing: 0; }
+    h1 { font-size: clamp(28px, 4vw, 46px); }
+    h2 {
+      margin: 34px 0 12px;
+      border-left: 4px solid var(--teal);
+      padding-left: 10px;
+      font-size: 21px;
+    }
+    h3 {
+      margin: 22px 0 8px;
+      color: #e4ebf5;
+      font-size: 16px;
+    }
+    p { margin: 8px 0; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      border: 1px solid var(--line-soft);
+      background: var(--code);
+      border-radius: 5px;
+      padding: 1px 5px;
+      color: #e6f0fb;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+    }
+    th {
+      background: #1e2631;
+      color: #f3f7fc;
+      text-align: left;
+      white-space: nowrap;
+    }
+    td { background: var(--panel); }
+    ul, ol { margin: 8px 0 16px; padding-left: 22px; }
+    li { margin: 4px 0; }
+    .lead {
+      max-width: 940px;
+      margin-top: 13px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel-2);
+      padding: 4px 9px;
+      color: #d8e1ed;
+      font-size: 12px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin: 14px 0;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+    .card h3 { margin-top: 0; }
+    .callout {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--blue);
+      border-radius: 8px;
+      background: #121821;
+      padding: 12px 14px;
+      margin: 14px 0;
+    }
+    .callout.good { border-left-color: var(--green); }
+    .callout.warn { border-left-color: var(--amber); }
+    .callout.risk { border-left-color: var(--rose); }
+    .small { color: var(--soft); font-size: 12px; }
+    .tag {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: #111720;
+      color: #dce7f4;
+      padding: 1px 6px;
+      margin: 1px 3px 1px 0;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .priority { color: var(--green); font-weight: 700; }
+    .priority.mid { color: var(--amber); }
+    .priority.low { color: var(--blue); }
+    @media (max-width: 760px) {
+      main { width: min(100% - 22px, 1180px); padding-top: 24px; }
+      th { white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Prompt大辞典 ベストプラクティス追加調査</h1>
+    <p class="lead">
+      Prompt Daijiten のソース拡張、意味付け、レビュー導線を大規模化する前に、2026-05-26時点の一次情報と現在の実装状態を照合した調査メモ。
+      結論は「API/ライセンス/出典をsource registryで先に固定し、raw promptはstagingに隔離し、意味付けは強い根拠だけ自動適用、弱い根拠はレビュー待ちにする」。
+    </p>
+    <div class="meta">
+      <span class="pill">確認日: 2026-05-26</span>
+      <span class="pill">対象: Prompt Daijiten / source expansion / meaning enrichment</span>
+      <span class="pill">依頼ID: 019e5fb4-9667-7b83-98b8-9129df21e5fe</span>
+      <span class="pill">一次情報優先</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Executive Verdict</h2>
+    <div class="grid">
+      <article class="card">
+        <h3>今の土台は正しい</h3>
+        <p>
+          `resources/prompt-dictionary/sources.json`、`userdata/prompt-dictionary/ingest.sqlite`、
+          `promotion_decisions`、`meaning_lookup_cache`、SQLite FTS5 runtime DBという分離は、大規模化に向いた方向。
+          特にCivitai由来raw promptを同梱DBへ入れず、昇格済みタグだけをruntime辞書へ渡す設計は維持する。
+        </p>
+      </article>
+      <article class="card">
+        <h3>次の弱点は自動意味付け</h3>
+        <p>
+          現状の `dictionary:enrich:meanings` は provider evidence を集められるが、閾値、skip reason、ambiguous判定、curated保護、fixture回帰がまだ薄い。
+          ここを先に固めないと、数万語化した時に「もっともらしい誤訳」が辞書品質を下げる。
+        </p>
+      </article>
+      <article class="card">
+        <h3>自動収集先は増やしすぎない</h3>
+        <p>
+          追加すべき順は `local-user-prompts`、Civitai public API、Danbooru系tag/wiki metadata、DiffusionDB text-only。
+          Gelbooru bulk post importやHTML scraping系サイトは、APIがあっても利用条件が弱いのでMVPではdisabledのままにする。
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>Source Policy Matrix</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th>Recommended Mode</th>
+          <th>根拠</th>
+          <th>Yoitomoshiでの扱い</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Civitai public REST API</td>
+          <td><span class="tag">enabled but conservative</span></td>
+          <td>
+            公式/準公式のREST APIは `GET /api/v1/images` があり、responseに `meta`、`nsfw`、`nsfwLevel`、pagination metadataがある。
+            一方でToSは無断のcrawler/data mining系利用や統計操作botを禁じ、ユーザーコンテンツ利用責任も利用者側へ置いている。
+          </td>
+          <td>
+            APIだけを使う。HTML scrapingしない。`nsfw=false`を既定にし、image bytesは保存しない。
+            raw promptはrepo管理DBへ入れず、token化・集計・source provenanceだけ昇格する。
+            `withMeta=true` はAPI driftに備えて任意扱いにし、`meta`欠落時はskipする。
+          </td>
+        </tr>
+        <tr>
+          <td>Danbooru tag/wiki metadata</td>
+          <td><span class="tag">manual-only to selective</span></td>
+          <td>
+            Danbooru API docsはread requestのglobal limitと、clientごとの識別可能なUser-Agent利用を明記している。
+            tag APIはcategory、post_count、wiki_pageなどを返し、General/Artist/Copyright/Character/Metaを区別できる。
+          </td>
+          <td>
+            vocabulary evidenceとして使う。post importではなくtag/wiki lookupに限定。
+            `General`だけ自動意味付け候補にし、Artist/Copyright/Characterはreview待ちまたは隠し候補に寄せる。
+            wiki本文をそのまま同梱せず、source URL、category、post_count、短い要約だけ保存する。
+          </td>
+        </tr>
+        <tr>
+          <td>Gelbooru bulk posts</td>
+          <td><span class="tag">disabled</span></td>
+          <td>
+            GelbooruにはDAPI documentationがあるが、ToSはpublic search engine以外の automated retrieve/index を禁止している。
+          </td>
+          <td>
+            現在の `gelbooru-bulk-posts` disabled判断を維持する。
+            ユーザーが自分で用意したexportをlocal importする場合だけ、sourceを`local-user-prompts`または別sourceとして扱う。
+          </td>
+        </tr>
+        <tr>
+          <td>Hugging Face DiffusionDB</td>
+          <td><span class="tag">manual text-only</span></td>
+          <td>
+            Dataset cardはCC0-1.0を示し、データはStable Diffusion Discord由来で、NSFWや個人情報ルールについて説明している。
+            ただしサイズが巨大で、SD一般promptのノイズも多い。
+          </td>
+          <td>
+            image archiveは落とさない。`*_text_only`相当またはmetadata parquetだけを対象にする。
+            AIイラストタグ辞典の正本ではなく、phrase候補、negative候補、co-occurrence候補の参考としてreview queueへ入れる。
+          </td>
+        </tr>
+        <tr>
+          <td>Wikidata / Wiktionary</td>
+          <td><span class="tag">low-volume evidence</span></td>
+          <td>
+            Wikimedia REST/API policyはUser-Agent必須、User-Agent policyは識別子と連絡先つきagentを求める。reuse条件はprojectごとに確認が必要。
+          </td>
+          <td>
+            generic visual conceptだけを低頻度lookupする。作品名、曲名、人物、band、fictional characterはskip。
+            `contact:local`だけのUser-Agentは高頻度実行前に改善する。要約は引用ではなくYoitomoshi側の短い説明に変換する。
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout warn">
+      <strong>Civitai補足:</strong>
+      Civitai REST API自体は公開されているが、ToSは自動アクセス、第三者権利、ユーザーコンテンツ責任の境界を強く置いている。
+      したがってYoitomoshiでは「公開APIを低頻度で読む個人用metadata補助」に限定し、第三者prompt corpusを再配布するような同梱物は作らない。
+    </div>
+  </section>
+
+  <section>
+    <h2>Evidence Ranking</h2>
+    <p>
+      自動意味付けはproviderを横並びにせず、下の優先順位で決める。重要なのは「最も情報量が多いsource」ではなく「このtagの意味として誤適用しにくいsource」を勝たせること。
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Evidence</th>
+          <th>Auto Policy</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>curated / user override</td>
+          <td>never overwrite</td>
+          <td>既存の日本語label/meaningがcuratedならprovider結果は補足表示だけ。</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Danbooru exact tag + non-redirect wiki</td>
+          <td>apply if safe</td>
+          <td>`General`かつadult_level 0を優先。redirect-onlyはskipまたはreview。</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>Danbooru exact tag without useful wiki</td>
+          <td>preview / review</td>
+          <td>categoryとpost_countは強いが、意味説明としては薄い。</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>Wikidata exact generic concept</td>
+          <td>apply only above threshold</td>
+          <td>garment、body part、material、objectなどは有効。work-title-likeはskip。</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>Wiktionary definition</td>
+          <td>machine-draft only</td>
+          <td>一般語確認には使えるが、画像生成タグの意味とはズレやすい。</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>Civitai tag search</td>
+          <td>evidence-only</td>
+          <td>モデル/LoRA探索の手掛かり。タグ意味の正本にはしない。</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>Local/user prompt frequency</td>
+          <td>rank / review</td>
+          <td>「自分が使う語」として重要だが、意味説明は自動で断定しない。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Implementation Best Practices</h2>
+
+    <h3>1. Meaning enrichment should return a decision object</h3>
+    <p>
+      `buildSuggestion()` は `suggestion | null` ではなく、必ずdecisionを返す形にする。
+      これによりdry-run、apply、Workbench UI、fixture regressionが同じ説明を使える。
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Field</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>decision</code></td><td><code>apply</code> / <code>skip</code> / <code>preview-only</code></td></tr>
+        <tr><td><code>reason</code></td><td><code>high-confidence</code>、<code>low-confidence</code>、<code>ambiguous-provider-result</code>、<code>curated-protected</code>、<code>redirect-only</code>、<code>provider-error</code>、<code>no-candidate</code></td></tr>
+        <tr><td><code>confidence</code></td><td>provider固有scoreではなく、最終decision用のnormalized score</td></tr>
+        <tr><td><code>winningEvidence</code></td><td>provider、sourceUrl、providerKey、category、postCount、entityIdなど</td></tr>
+        <tr><td><code>audit</code></td><td>採用しなかったevidenceと理由。後からUIで説明できるように残す</td></tr>
+      </tbody>
+    </table>
+
+    <h3>2. Provider thresholds should be asymmetric</h3>
+    <p>
+      Danbooru exact wikiとWikidata entity searchは同じconfidenceで扱わない。
+      Wikidataは一般概念に強いが、同名の作品・曲・人物へ吸われやすい。Civitai tagsは使用例の存在確認であって意味説明ではない。
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Provider Case</th>
+          <th>Suggested threshold</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Danbooru exact wiki, non-redirect, General</td><td>0.90+</td><td>auto apply if uncurated and SFW</td></tr>
+        <tr><td>Danbooru redirect-only</td><td>0.55</td><td>skip with <code>redirect-only</code> until target resolution exists</td></tr>
+        <tr><td>Wikidata exact generic concept with useful JA/EN description</td><td>0.75+</td><td>preview/apply only if no stronger evidence</td></tr>
+        <tr><td>Wikidata likely work/person/fictional character</td><td>negative score</td><td>skip with <code>ambiguous-provider-result</code></td></tr>
+        <tr><td>Wiktionary noun/adjective definition</td><td>0.45-0.55</td><td>machine-draft only</td></tr>
+        <tr><td>Civitai tag match</td><td>0.30</td><td>rank/search evidence only; no automatic meaning overwrite</td></tr>
+      </tbody>
+    </table>
+
+    <h3>3. Importers need source snapshots and kill switches</h3>
+    <p>
+      `source_registry_snapshot` はすでに良い。次は各runに「実行時のterms URL、checkedAt、rateLimit、raw storage policy、query defaults」を残し、
+      source側の規約やAPIが変わった時に過去のimportを無効化できるようにする。
+    </p>
+    <ul>
+      <li>source registryに <code>policyStatus</code>: <code>enabled</code> / <code>manual-only</code> / <code>disabled</code> / <code>needs-review</code> を持たせる。</li>
+      <li>CLIは <code>disabled</code> sourceを即error、<code>manual-only</code> は <code>--confirm-source-policy</code> がない限りerrorにする。</li>
+      <li>Workbenchでは sourceごとの「最近のimport」「error」「terms checked date」「raw prompt保存可否」を見せる。</li>
+      <li>sourceをdisabledにしても過去のruntime辞書から該当sourceだけ除外してrebuildできるようにする。</li>
+    </ul>
+
+    <h3>4. Keep raw/staging and shipped/runtime databases separate</h3>
+    <p>
+      現在の設計通り、raw prompt、source payload、cache、review queueは `userdata/` に置く。
+      `resources/prompt-dictionary/prompt-dictionary.sqlite` は検索に必要な正規化済みtag、短い日本語説明、provenanceだけを含める。
+    </p>
+    <div class="callout good">
+      <strong>維持する境界:</strong>
+      `raw_prompt_records.raw_json` と `meaning_lookup_cache.payload_json` はstaging側。
+      runtime側へ入れるのは `dictionary_entries`、`dictionary_text`、`dictionary_aliases`、`dictionary_sources`、FTS index。
+      第三者のprompt本文やwiki本文をそのまま同梱しない。
+    </div>
+
+    <h3>5. SQLite search should stay rebuild-first</h3>
+    <p>
+      SQLite FTS5のexternal-content tableは容量を節約できるが、content tableとの同期責任が増える。
+      Yoitomoshiのruntime辞書はbuild scriptで一括生成するので、当面はcontentful FTS + trigram FTSでよい。
+      数十万語まで増えた時だけ、external-content化またはsearch shard化を検討する。
+    </p>
+    <ul>
+      <li>英語tag検索: `unicode61 remove_diacritics 1 tokenchars '_-'` とprefix searchを維持。</li>
+      <li>日本語検索: CJK segmentationに頼らず、現在のtrigram FTSを維持。label/meaning/aliasをまとめたsearch_textを正規化する。</li>
+      <li>staging DB: WALでよいが、backupやcopy時は `.db` だけでなくWAL状態に注意。runtime build artifactはDELETE journalで配布向き。</li>
+      <li>`node:sqlite` は公式Nodeでもrelease candidate扱いなので、Electron同梱Nodeのversion固定と `ELECTRON_RUN_AS_NODE=1` 経由の回帰を続ける。</li>
+    </ul>
+
+    <h3>6. Electron IPC must remain narrow</h3>
+    <p>
+      Dictionary Workbenchが増えてもrendererからDB pathやSQLを直接渡さない。
+      Electron公式docsはcontext isolationと安全なcontextBridge wrapperを推奨しているため、今の `api.promptDictionary.*` のような狭いIPCを維持する。
+    </p>
+    <ul>
+      <li>rendererは `listCandidates(filters)`、`savePromotionDecision(payload)`、`inspectIngest()` のような意図ベースAPIだけ呼ぶ。</li>
+      <li>main側でfilter enum、limit上限、source id、decision enumを検証する。</li>
+      <li>Workbenchからimport/rebuildを実行する場合はpreview countを表示し、明示buttonで開始する。</li>
+      <li>外部URLを開く導線は `shell.openExternal` へ集約し、source URLをallowlistまたはURL parserで検証する。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Current Implementation Gaps</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Priority</th>
+          <th>Gap</th>
+          <th>Recommended Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="priority">P0</span></td>
+          <td>`enrich-prompt-dictionary-meanings.cjs` がtop evidenceをそのままsuggestion化しやすい。</td>
+          <td>decision object、provider-specific threshold、skip reason、curated protectionを追加する。</td>
+        </tr>
+        <tr>
+          <td><span class="priority">P0</span></td>
+          <td>Wikimedia向けUser-Agentが `contact:local` で、公式policyが求める連絡先として弱い。</td>
+          <td>低頻度手元実行は許容しつつ、高頻度前に `YOITOMOSHI_HTTP_USER_AGENT` などでURL/emailつきagentを設定可能にする。</td>
+        </tr>
+        <tr>
+          <td><span class="priority">P0</span></td>
+          <td>Civitai tag lookupが意味説明sourceとして扱われ得る。</td>
+          <td>Civitaiは `usage-evidence` としてrankだけに使い、meaning overwriteはしない。</td>
+        </tr>
+        <tr>
+          <td><span class="priority mid">P1</span></td>
+          <td>source registryのDanbooru terms/API URLが空。</td>
+          <td>API docs/TOS確認日、read limit、tag/wikiだけ使う方針を `sources.json` に保存する。</td>
+        </tr>
+        <tr>
+          <td><span class="priority mid">P1</span></td>
+          <td>fixture regressionがまだないため、API driftやfalse positiveに弱い。</td>
+          <td>`bad_hands`、`hand`、`kimono`、`newest`、内部QA tagでoffline fixtureを作る。</td>
+        </tr>
+        <tr>
+          <td><span class="priority low">P2</span></td>
+          <td>DiffusionDB import方針はあるが未実装。</td>
+          <td>text-only/manual importerとして別sliceにし、no image downloadをCLIとdocsで固定する。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Recommended Next Slices</h2>
+    <ol>
+      <li>
+        <strong>P0: Meaning Enrichment Reliability</strong><br />
+        `dictionary:enrich:meanings:test`、fixture mode、`--json-out`、provider thresholds、batch transaction、audit countersを実装する。
+        既存の `.agent/requirements/20260526-1346-prompt-meaning-enrichment-reliability/` と一致。
+      </li>
+      <li>
+        <strong>P1: Source Policy Registry Hardening</strong><br />
+        `sources.json` にterms/API URL、policyStatus、lastCheckedAt、policyNote、requiresManualConfirmを追加。
+        Danbooruはmanual-only、Gelbooruはdisabled維持、CivitaiはAPI-only enabledに明記。
+      </li>
+      <li>
+        <strong>P1: Prompt Knowledge Workbench MVP</strong><br />
+        staging DB候補をUIで検索・filter・accept/hide/reject・日本語編集・rebuild previewできるようにする。
+        自動昇格より先にレビュー導線を作る。
+      </li>
+      <li>
+        <strong>P2: DiffusionDB Text-only Importer</strong><br />
+        HF dataset license確認済みsourceとして、metadata-onlyからphrase候補だけ抽出。
+        anime tag正本ではなく、negative/quality/natural phrase候補の補助に限定する。
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Primary Sources Checked</h2>
+    <ul>
+      <li><a href="https://developer.civitai.com/docs/api/public-rest">Civitai Developer Portal - Public REST API</a> / <a href="https://github.com/civitai/civitai/wiki/REST-API-Reference">Civitai GitHub REST API Reference mirror</a></li>
+      <li><a href="https://civitai.com/content/tos">Civitai Terms of Service</a></li>
+      <li><a href="https://danbooru.donmai.us/wiki_pages/help:api">Danbooru API help</a> and tag API wiki pages</li>
+      <li><a href="https://gelbooru.com/tos.php">Gelbooru Terms of Service</a> and <a href="https://gelbooru.com/index.php?page=help&amp;topic=dapi">DAPI help</a></li>
+      <li><a href="https://huggingface.co/datasets/poloclub/diffusiondb">Hugging Face - poloclub/diffusiondb dataset card</a></li>
+      <li><a href="https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_User-Agent_Policy/en">Wikimedia Foundation User-Agent Policy</a> and <a href="https://www.mediawiki.org/wiki/API:REST_API/Policies">MediaWiki REST API policies</a></li>
+      <li><a href="https://www.sqlite.org/fts5.html">SQLite FTS5 documentation</a>, <a href="https://www.sqlite.org/wal.html">SQLite WAL documentation</a>, <a href="https://nodejs.org/api/sqlite.html">Node.js node:sqlite documentation</a></li>
+      <li><a href="https://www.electronjs.org/docs/latest/tutorial/context-isolation">Electron context isolation</a> and <a href="https://www.electronjs.org/docs/latest/api/context-bridge">contextBridge documentation</a></li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

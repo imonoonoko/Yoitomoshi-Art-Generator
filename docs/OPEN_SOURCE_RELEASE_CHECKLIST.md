@@ -1,79 +1,103 @@
-# Open Source Release Checklist
+# Open Source Maintenance Checklist
 
-最終更新: 2026-05-16
+最終更新: 2026-05-29
 
-このチェックリストは、`imonoonoko/Yoitomoshi-Art-Generator` を private から public に切り替える前の確認用です。公開切替は不可逆に近い影響があるため、最後に明示確認してから実行します。
+`imonoonoko/Yoitomoshi-Art-Generator` は現在 public repository として運用する。
+このチェックリストは private から public へ切り替える前の資料ではなく、公開後に GitHub へ push / release / 設定変更する前の保守確認として使う。
 
 ## 現在の判断
 
 | 項目 | 判断 |
 |---|---|
+| Repository visibility | `PUBLIC` |
 | 推奨ライセンス | MIT |
-| package.json | `private: true` は維持し、npm誤公開を防ぐ。`license: MIT` を追加する |
+| package.json | `private: true` は維持し、npm 誤公開を防ぐ |
 | Forge runtime | 同梱しない |
 | モデル / LoRA / ControlNet | 同梱しない |
 | 生成画像 / 履歴 / Civitai cache | 同梱しない |
-| Civitai API key | `userdata/secrets.local.json` に保存し、Git管理しない |
-| visibility切替 | このチェックリスト完了後、ユーザー確認を取ってから実行 |
+| Civitai API key | `userdata/secrets.local.json` に保存し、Git 管理しない |
+| Local prompt history | `userdata/prompt-dictionary/` に置き、公開用DBビルドには既定で含めない |
+| GitHub用途 | 一般配布ではなく、将来の自分が復元・再利用しやすい source repository |
 
-## 根拠メモ
-
-- GitHub Docs は、公開リポジトリを本当にopen sourceにするには、利用・変更・配布を許可するライセンスが必要だと説明している。
-- MIT License は短く、著作権表示とライセンス表示の保持を主条件にした permissive license として扱われる。
-- GitHub Docs は、private から public にするとコードが全員に見え、誰でもforkでき、Actions履歴とログも見えると説明している。
-- GitHub Docs は、secretが履歴に入った場合は履歴削除より先にsecretを revoke / rotate する必要があると説明している。
-
-参考:
-
-- https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository
-- https://choosealicense.com/licenses/mit/
-- https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility
-- https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository
-- https://spdx.org/licenses/
-
-## 実施済みのローカル棚卸し
-
-2026-05-16 時点で確認した内容:
-
-- `gh repo view` で現在の visibility は `PRIVATE`。
-- `git log --all --name-only` で `runtime/`, `userdata/`, `node_modules/`, `dist/`, `out/`, `output/`, model weight, generated image の履歴混入は検出されなかった。
-- 履歴内の大きなblob上位は `package-lock.json`, `src/lib/i18n.ts`, `resources/prompt-library.ja.yaml`, `electron/ipc-handlers.ts` で、モデルや画像の巨大blobは検出されなかった。
-- trackedファイルの簡易secret文字列検索では、実キー値ではなく `Authorization` header組み立てや `civitaiApiKey` 変数名のみ検出された。
-- 直接npm依存は MIT / ISC / Apache-2.0 が中心。
-- `resources/prompt-library.ja.yaml` は `Physton/sd-webui-prompt-all-in-one` 由来でMITとしてNOTICEに明記する。
-
-## 公開前に確認するコマンド
+## Push 前チェック
 
 ```powershell
 git status --short
-git log --all --name-only --format= | Sort-Object -Unique | Select-String -Pattern '(^|/)(userdata|runtime|node_modules|dist|out|output)/|secrets\.local\.json|settings\.json|\.env|\.pem|\.key|\.safetensors$|\.ckpt$|\.onnx$|\.png$|\.jpg$|\.jpeg$|\.webp$' -CaseSensitive:$false
-git rev-list --objects --all | git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)'
-npm.cmd run typecheck
-npm.cmd run build
 git diff --check
+npm.cmd run typecheck
 ```
 
-## 公開切替直前の人間確認
-
-以下を確認してから公開する。
-
-- GitHub Actionsログに非公開情報がない。
-- issue / PR / commit message に公開したくない個人情報がない。
-- docs内のローカルパスや検証ログを公開してよい。
-- Civitai API keyなどのsecretが一度でも混入した疑いがない。疑いがある場合は先にrotateする。
-- `runtime/` と `userdata/` はローカルに残っていても Git に入っていない。
-- LICENSE / THIRD_PARTY_NOTICES / SECURITY / CONTRIBUTING が含まれている。
-
-## visibility切替コマンド
-
-最終確認後にのみ実行する。
+必要に応じて追加:
 
 ```powershell
-gh repo edit imonoonoko/Yoitomoshi-Art-Generator --visibility public --accept-visibility-change-consequences
+npm.cmd run build
+npm.cmd run dictionary:enrich:meanings:test
+npm.cmd run qa:dom:prompt-dictionary-workspace
 ```
 
-実行後:
+## Git に入れてよいもの
 
-```powershell
-gh repo view imonoonoko/Yoitomoshi-Art-Generator --json visibility,isPrivate,url
+- `electron/`, `src/`, `scripts/` のアプリ/検証/保守コード
+- `resources/` の同梱静的資産と、公開可能な prompt dictionary source snapshots
+- `docs/` のセットアップ、構造、ロードマップ、調査、QA 証跡
+- `.agent/requirements/` の公開して問題ない実装要件・引き継ぎ
+- `README*.md`, `はじめに.txt`, `LICENSE`, `SECURITY.md`, `CONTRIBUTING.md`, `THIRD_PARTY_NOTICES.md`
+
+## Git に入れないもの
+
+- `runtime/`
+- `userdata/`
+- `node_modules/`
+- `out/`, `dist/`, `.vite/`
+- `output/`
+- `.env`, `.env.*`, `*.local`
+- `resources/prompt-dictionary/promoted-candidates.local.json`
+- model weight files: `.safetensors`, `.ckpt`, `.pt`, `.pth`, `.onnx`, `.bin`
+- generated private images: `.png`, `.jpg`, `.jpeg`, `.webp` unless they are intentional docs screenshots
+
+## Prompt Dictionary Data Policy
+
+- Public source snapshots may store normalized tag candidates, counts, adult level, curation status, Japanese labels, and source identifiers.
+- Public snapshots must not store raw prompt dumps, image bytes, browser traces, user IDs, cookies, API keys, or local filesystem paths.
+- `local-user-prompts` is a local-only source. It may read `userdata/history/`, presets, local prompt libraries, and LoRA/checkpoint profiles, so its promoted snapshot stays under `userdata/prompt-dictionary/` and is ignored by Git.
+- Public DB builds exclude local user prompts by default. To intentionally include them for a local-only build, set `YOITOMOSHI_INCLUDE_LOCAL_PROMPT_DICTIONARY=1` before running the dictionary build.
+
+## GitHub Settings Check
+
+Current desired baseline:
+
+- Issues: enabled
+- Wiki: disabled
+- Discussions: disabled
+- Projects: optional; disable if not used as a roadmap
+- Delete branch on merge: recommended if PR workflow continues
+- Branch protection: optional for personal repo; enable if using PR-only changes
+- Releases: add only when a packaged build is stable enough to restore from
+
+Suggested repository description:
+
+```text
+Personal Windows Electron UI for Stable Diffusion WebUI Forge with prompt, model, Civitai, and workflow tools.
 ```
+
+Suggested topics:
+
+```text
+stable-diffusion, forge, electron, react, windows, civitai, prompt-engineering, ai-art
+```
+
+## Secret / Private Data Response
+
+If a secret or private local artifact is ever committed:
+
+1. Revoke or rotate the secret first.
+2. Remove the file or value from the current tree.
+3. Decide whether Git history rewrite is necessary.
+4. Re-check GitHub Actions logs, issues, PRs, releases, and tags for the same value.
+
+## Reference
+
+- https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository
+- https://choosealicense.com/licenses/mit/
+- https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository
+- https://spdx.org/licenses/

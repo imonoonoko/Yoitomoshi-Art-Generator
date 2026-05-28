@@ -1,10 +1,23 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/lib/ipc'
 import { useStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import { adjustTokenWeight } from '@/lib/prompt-utils'
 import { useT } from '@/lib/i18n'
-import type { PromptDictionaryEntry } from '@shared/types'
+import {
+  currentAutocompleteRange,
+  autocompleteSuggestionBadge,
+  autocompleteSuggestionSubtext,
+  buildAutocompleteUsageHints,
+  findLocalAutocompleteSuggestions,
+  insertAutocompleteSuggestion,
+  mergeAutocompleteSuggestions,
+  PROMPT_DICTIONARY_AUTOCOMPLETE_DELAY_MS,
+  PROMPT_DICTIONARY_AUTOCOMPLETE_LIMIT,
+  shouldSearchAutocompleteQuery,
+  suggestionFromDictionary,
+  type PromptDictionaryAutocompleteSuggestion
+} from '@/lib/prompt-dictionary-autocomplete'
 
 interface Props {
   value: string
@@ -18,17 +31,7 @@ interface Props {
   testId?: string
 }
 
-interface Suggestion {
-  en: string
-  ja: string
-  meaning?: string
-  category?: string
-  group?: string
-  sourceLabel?: string
-}
-
-const MAX_SUGGESTIONS = 8
-const AUTOCOMPLETE_DELAY_MS = 140
+type Suggestion = PromptDictionaryAutocompleteSuggestion
 
 /**
  * Textarea with autocomplete fed by the main-process Prompt Daijiten service.
@@ -46,6 +49,8 @@ export function PromptEditor({
 }: Props): JSX.Element {
   const ref = useRef<HTMLTextAreaElement>(null)
   const autocomplete = useStore((s) => s.autocomplete)
+  const recentTags = useStore((s) => s.recentTags)
+  const history = useStore((s) => s.history)
   const searchSeq = useRef(0)
   const searchTimer = useRef<number | null>(null)
 
@@ -55,58 +60,16 @@ export function PromptEditor({
   const [loading, setLoading] = useState(false)
   const [activeQuery, setActiveQuery] = useState('')
   const t = useT()
-
-  function currentToken(text: string, caret: number): string {
-    const before = text.slice(0, caret)
-    // Last token = portion after the most recent boundary char.
-    const m = before.match(/([^\s,()\n]+)$/)
-    return m?.[1] ?? ''
-  }
+  const usageHints = useMemo(
+    () => buildAutocompleteUsageHints(
+      recentTags,
+      history.slice(0, 80).map((item) => item.tagReview?.acceptedTags ?? [])
+    ),
+    [history, recentTags]
+  )
 
   function findLocalSuggestions(token: string): Suggestion[] {
-    if (token.length < 2 || autocomplete.size === 0) return []
-
-    const lc = token.toLowerCase()
-    const out: Suggestion[] = []
-    for (const [en, ja] of autocomplete.entries()) {
-      const enLower = en.toLowerCase()
-      const jaLower = ja.toLowerCase()
-      if (enLower.startsWith(lc) || jaLower.startsWith(lc)) {
-        out.push({ en, ja })
-        if (out.length >= MAX_SUGGESTIONS) break
-      }
-    }
-    if (out.length === 0) {
-      // Fallback: substring search.
-      for (const [en, ja] of autocomplete.entries()) {
-        const enLower = en.toLowerCase()
-        const jaLower = ja.toLowerCase()
-        if (enLower.includes(lc) || jaLower.includes(lc)) {
-          out.push({ en, ja })
-          if (out.length >= MAX_SUGGESTIONS) break
-        }
-      }
-    }
-    return out
-  }
-
-  function suggestionFromDictionary(entry: PromptDictionaryEntry): Suggestion {
-    return {
-      en: entry.en,
-      ja: entry.ja,
-      meaning: entry.meaning,
-      category: entry.category,
-      group: entry.group,
-      sourceLabel: entry.sourceLabel
-    }
-  }
-
-  function shouldSearchToken(token: string, forced: boolean): boolean {
-    if (forced) return token.trim().length > 0
-    const length = [...token.trim()].length
-    if (length === 0) return false
-    if (/[\u3040-\u30ff\u3400-\u9fff]/.test(token)) return length >= 1
-    return length >= 2
+    return findLocalAutocompleteSuggestions(autocomplete, token, PROMPT_DICTIONARY_AUTOCOMPLETE_LIMIT)
   }
 
   function clearSearchTimer(): void {
@@ -117,9 +80,10 @@ export function PromptEditor({
   }
 
   function searchSuggestions(text: string, caret: number, forced = false): void {
-    const token = currentToken(text, caret).trim()
+    const range = currentAutocompleteRange(text, caret)
+    const token = range.query
     clearSearchTimer()
-    if (!shouldSearchToken(token, forced)) {
+    if (!shouldSearchAutocompleteQuery(token, forced)) {
       setSuggestions([])
       setOpen(false)
       setLoading(false)
@@ -134,13 +98,22 @@ export function PromptEditor({
     setOpen(true)
 
     searchTimer.current = window.setTimeout(() => {
-      api.promptDictionary.search({ query: token, limit: MAX_SUGGESTIONS })
+      api.promptDictionary.search({
+        query: token,
+        limit: PROMPT_DICTIONARY_AUTOCOMPLETE_LIMIT,
+        polarity: tone === 'negative' ? 'negative' : 'positive'
+      })
         .then((result) => {
           if (searchSeq.current !== seq) return
           const dictionarySuggestions = result.entries.map(suggestionFromDictionary)
           const seen = new Set(dictionarySuggestions.map((item) => item.en.toLowerCase()))
           const localSuggestions = findLocalSuggestions(token).filter((item) => !seen.has(item.en.toLowerCase()))
-          const next = [...dictionarySuggestions, ...localSuggestions].slice(0, MAX_SUGGESTIONS)
+          const next = mergeAutocompleteSuggestions(
+            dictionarySuggestions,
+            localSuggestions,
+            PROMPT_DICTIONARY_AUTOCOMPLETE_LIMIT,
+            usageHints
+          )
           setSuggestions(next)
           setHighlighted(0)
           setOpen(next.length > 0)
@@ -155,7 +128,7 @@ export function PromptEditor({
         .finally(() => {
           if (searchSeq.current === seq) setLoading(false)
         })
-    }, forced ? 0 : AUTOCOMPLETE_DELAY_MS)
+    }, forced ? 0 : PROMPT_DICTIONARY_AUTOCOMPLETE_DELAY_MS)
   }
 
   function showAutocomplete(): void {
@@ -173,19 +146,16 @@ export function PromptEditor({
     if (!s) return
     const ta = ref.current
     if (!ta) return
-    const caret = ta.selectionStart
-    const before = value.slice(0, caret)
-    const after = value.slice(caret)
-    const tokenStart = before.search(/[^\s,()\n]+$/)
-    const replaced =
-      (tokenStart >= 0 ? before.slice(0, tokenStart) : before) + s.en + ', '
-    const newValue = replaced + after
-    onChange(newValue)
+    const inserted = insertAutocompleteSuggestion(
+      value,
+      currentAutocompleteRange(value, ta.selectionStart, ta.selectionEnd),
+      s
+    )
+    onChange(inserted.value)
     setOpen(false)
     requestAnimationFrame(() => {
       ta.focus()
-      const pos = replaced.length
-      ta.setSelectionRange(pos, pos)
+      ta.setSelectionRange(inserted.caret, inserted.caret)
     })
   }
 
@@ -297,13 +267,16 @@ export function PromptEditor({
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-mono text-[13px]">{s.en}</span>
-                {(s.ja || s.meaning) && (
-                  <span className="block truncate text-[11px] text-ink-3">{s.ja || s.meaning}</span>
+                {autocompleteSuggestionSubtext(s) && (
+                  <span className="block truncate text-[11px] text-ink-3">{autocompleteSuggestionSubtext(s)}</span>
                 )}
               </span>
-              {(s.category || s.group) && (
-                <span className="max-w-[96px] shrink-0 truncate rounded border border-line px-1 py-0.5 text-[10px] text-ink-3">
-                  {s.group || s.category}
+              {autocompleteSuggestionBadge(s) && (
+                <span className={cn(
+                  'max-w-[110px] shrink-0 truncate rounded border px-1 py-0.5 text-[10px]',
+                  (s.adultLevel ?? 0) > 0 ? 'border-danger/40 text-danger' : 'border-line text-ink-3'
+                )}>
+                  {autocompleteSuggestionBadge(s)}
                 </span>
               )}
             </button>

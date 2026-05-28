@@ -713,6 +713,9 @@ export interface PromptLibraryDocumentV2 {
 export interface PromptDictionarySearchRequest {
   query: string
   limit?: number
+  polarity?: PromptTagPolarity
+  adult?: 'all' | 'safe' | 'adult'
+  sourceIds?: string[]
 }
 
 export interface PromptDictionaryEntry {
@@ -724,7 +727,10 @@ export interface PromptDictionaryEntry {
   group: string
   polarity: PromptTagPolarity
   sourceKind: 'built-in' | 'custom'
+  sourceId: string
   sourceLabel: string
+  adultLevel: number
+  postCount?: number | null
   score: number
 }
 
@@ -734,6 +740,55 @@ export interface PromptDictionarySearchResult {
   returned: number
   searchableCount: number
   entries: PromptDictionaryEntry[]
+}
+
+export type PromptDictionarySourceType = 'api' | 'dataset' | 'local' | 'manual' | 'blocked'
+export type PromptDictionarySourceAllowedMode = 'enabled' | 'manual-only' | 'disabled'
+export type PromptDictionarySourceQueryValue =
+  | string
+  | number
+  | boolean
+  | Array<string | number | boolean>
+
+export interface PromptDictionarySourceDefinition {
+  sourceId: string
+  displayName: string
+  sourceType: PromptDictionarySourceType
+  allowedMode: PromptDictionarySourceAllowedMode
+  baseUrl: string
+  termsUrl: string
+  licenseNote: string
+  rateLimitRps: number
+  storesRawPrompts: boolean
+  storesImages: boolean
+  adultPolicy: string
+  checkedAt: string
+  defaultQuery?: Record<string, PromptDictionarySourceQueryValue>
+}
+
+export interface PromptDictionarySourceRegistryResult {
+  schemaVersion: number
+  updatedAt: string
+  registryPath: string
+  sources: PromptDictionarySourceDefinition[]
+  warnings: string[]
+}
+
+export interface PromptDictionaryIngestStatus {
+  dbPath: string
+  schemaVersion: number
+  initializedAt: string
+  registrySourceCount: number
+  enabledSourceCount: number
+  disabledSourceCount: number
+  rawPromptRecordCount: number
+  candidateTagCount: number
+  translationJobCount: number
+  meaningDecisionCount: number
+  meaningReviewableCount: number
+  latestMeaningDecisionAt: string | null
+  lastRunAt: string | null
+  warnings: string[]
 }
 
 export type PromptTagTranslationProvider = 'google' | 'mymemory'
@@ -1411,7 +1466,7 @@ export interface WorkspaceImageReferences {
 export interface WorkspaceSnapshot {
   imageSaveMode?: WorkspaceImageSaveMode
   imageReferences?: WorkspaceImageReferences
-  currentTab: 'txt2img' | 'img2img' | 'tags' | 'video' | 'upscale' | 'models' | 'tools'
+  currentTab: 'txt2img' | 'img2img' | 'dictionary' | 'tags' | 'video' | 'upscale' | 'models' | 'tools'
   prompt: string
   negativePrompt: string
   params: {

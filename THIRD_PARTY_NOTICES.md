@@ -12,6 +12,22 @@ This project is distributed under the MIT License. Some files and dependencies a
 
 `resources/prompt-library.yoitomoshi.ja.yaml` contains Yoitomoshi-specific additions and is covered by this repository's MIT License.
 
+## Prompt Dictionary Source Snapshots
+
+`resources/prompt-dictionary/` may include normalized prompt/tag vocabulary snapshots generated from public metadata sources. These snapshots are used as search vocabulary evidence for Prompt Daijiten.
+
+Current public snapshot sources include:
+
+| Source | Repository Treatment |
+|---|---|
+| Civitai public image metadata | Stores normalized tag candidates and counts only. Does not store image bytes or raw prompt dumps. |
+| Civitai Red public image metadata | Stores normalized tag candidates, counts, and adult-level metadata only. |
+| Danbooru public tag metadata | Stores public tag vocabulary candidates and counts only. |
+| Danbooru adult post tag aggregates | Stores tag vocabulary aggregates only. |
+| Public web prompt pages | Stores allow-listed parsed tag candidates only. |
+
+Local user prompt history is intentionally excluded from Git. Local snapshots belong under `userdata/prompt-dictionary/` and are not part of the public source distribution.
+
 ## npm Dependencies
 
 The application uses npm packages listed in `package.json` and locked in `package-lock.json`.

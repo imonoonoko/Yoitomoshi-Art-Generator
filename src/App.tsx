@@ -42,6 +42,9 @@ const VideoWorkspace = lazy(() =>
 const PromptTagsWorkspace = lazy(() =>
   import('./components/PromptTagsWorkspace').then((m) => ({ default: m.PromptTagsWorkspace }))
 )
+const PromptDictionaryWorkspace = lazy(() =>
+  import('./components/PromptDictionaryWorkspace').then((m) => ({ default: m.PromptDictionaryWorkspace }))
+)
 const ModelLibraryWorkspace = lazy(() =>
   import('./components/ModelLibraryWorkspace').then((m) => ({ default: m.ModelLibraryWorkspace }))
 )
@@ -564,6 +567,11 @@ export default function App(): JSX.Element {
         {currentTab === 'tags' && (
           <Suspense fallback={<WorkspaceLoading />}>
             <PromptTagsWorkspace />
+          </Suspense>
+        )}
+        {currentTab === 'dictionary' && (
+          <Suspense fallback={<WorkspaceLoading />}>
+            <PromptDictionaryWorkspace />
           </Suspense>
         )}
         {currentTab === 'models' && (

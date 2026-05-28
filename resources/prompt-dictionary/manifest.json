@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "builtAt": "2026-05-25T16:47:25.517Z",
+  "builtAt": "2026-05-28T18:20:29.904Z",
   "generator": "scripts/build-prompt-dictionary-db.cjs",
   "electron": "42.1.0",
   "node": "24.15.0",
   "sqlite": "3.51.3",
-  "entryCount": 4007,
+  "entryCount": 7667,
   "sources": [
     {
       "sourceId": "prompt-library-ja",
@@ -24,6 +24,46 @@
       "file": "prompt-dictionary.yoitomoshi.ja.yaml",
       "label": "Yoitomoshi Daijiten",
       "exists": true
+    },
+    {
+      "sourceId": "civitai-public-images",
+      "file": "resources/prompt-dictionary/promoted-candidates.civitai.json",
+      "label": "Civitai public image metadata",
+      "exists": true,
+      "importedRecords": 183,
+      "promotedEntries": 464
+    },
+    {
+      "sourceId": "civitai-red-public-images",
+      "file": "resources/prompt-dictionary/promoted-candidates.civitai-red-public-images.json",
+      "label": "Civitai Red public image metadata",
+      "exists": true,
+      "importedRecords": 193,
+      "promotedEntries": 1062
+    },
+    {
+      "sourceId": "danbooru-adult-post-tags",
+      "file": "resources/prompt-dictionary/promoted-candidates.danbooru-adult-tags.json",
+      "label": "Danbooru adult post tags",
+      "exists": true,
+      "importedRecords": 1237,
+      "promotedEntries": 1172
+    },
+    {
+      "sourceId": "danbooru-tag-metadata",
+      "file": "resources/prompt-dictionary/promoted-candidates.danbooru-tag-metadata.json",
+      "label": "Danbooru-style tag metadata",
+      "exists": true,
+      "importedRecords": 2207,
+      "promotedEntries": 2207
+    },
+    {
+      "sourceId": "public-web-prompt-pages",
+      "file": "resources/prompt-dictionary/promoted-candidates.web.json",
+      "label": "Public web prompt pages",
+      "exists": true,
+      "importedRecords": 307,
+      "promotedEntries": 657
     }
   ]
 }

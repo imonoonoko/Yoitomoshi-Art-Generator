@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prompt大辞典 拡充・Autocomplete・既存機能シナジーレポート - 2026-05-27</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d1014;
+      --panel: #151a21;
+      --panel-2: #1d242d;
+      --line: #303946;
+      --line-soft: #252d38;
+      --ink: #eef3f8;
+      --muted: #b3bdca;
+      --soft: #8390a2;
+      --blue: #8bbcff;
+      --teal: #70d1c5;
+      --green: #76d98d;
+      --amber: #efc866;
+      --rose: #ff8f9c;
+      --violet: #baa7ff;
+      --code: #10151c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.72 "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif;
+    }
+    main {
+      width: min(1220px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 36px 0 58px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 22px;
+      margin-bottom: 28px;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.28; letter-spacing: 0; }
+    h1 { font-size: clamp(28px, 4vw, 44px); }
+    h2 {
+      margin: 34px 0 12px;
+      border-left: 4px solid var(--teal);
+      padding-left: 10px;
+      font-size: 21px;
+    }
+    h3 { margin: 22px 0 8px; color: #e4ebf5; font-size: 16px; }
+    p { margin: 8px 0; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      border: 1px solid var(--line-soft);
+      background: var(--code);
+      border-radius: 5px;
+      padding: 1px 5px;
+      color: #e6f0fb;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+    }
+    th { background: #1e2631; color: #f3f7fc; text-align: left; }
+    td { background: rgba(21, 26, 33, .72); }
+    ul { margin: 8px 0 14px 20px; padding: 0; }
+    li { margin: 4px 0; }
+    .lede { max-width: 940px; color: var(--muted); font-size: 15px; }
+    .meta { margin-top: 12px; color: var(--soft); font-size: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+    .card {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .card h3 { margin-top: 0; }
+    .metric { color: var(--soft); font-size: 12px; }
+    .number { display: block; margin-top: 4px; color: var(--ink); font-size: 26px; font-weight: 700; }
+    .delta { color: var(--green); font-size: 12px; }
+    .warn { color: var(--amber); }
+    .risk { color: var(--rose); }
+    .ok { color: var(--green); }
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      margin: 2px 4px 2px 0;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .pill.good { border-color: rgba(118, 217, 141, .45); color: var(--green); }
+    .pill.hot { border-color: rgba(255, 143, 156, .45); color: var(--rose); }
+    .pill.info { border-color: rgba(139, 188, 255, .45); color: var(--blue); }
+    .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+    .note {
+      border: 1px solid var(--line-soft);
+      background: var(--panel-2);
+      border-radius: 8px;
+      padding: 12px 14px;
+      color: var(--muted);
+    }
+    @media (max-width: 860px) {
+      .grid, .two { grid-template-columns: 1fr; }
+      main { width: min(100% - 24px, 1220px); padding-top: 24px; }
+      table { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Prompt大辞典 拡充・Autocomplete・既存機能シナジーレポート</h1>
+    <p class="lede">
+      2026-05-27時点の実装状態を確認し、Prompt大辞典のタグ拡充、Autocompleteの使用感強化、
+      既存機能の棚卸し、機能間シナジーをまとめた作業レポート。結論として、Prompt大辞典は
+      「タグ検索」から「生成作業全体へ送る語彙ハブ」へ移行できる状態に近づいた。
+    </p>
+    <div class="meta">
+      対象: <code>C:\宵灯工房アート\Yoitomoshi-Art-Generator</code> /
+      生成: Codex / 参照ソース: repo current state, Danbooru JSON API, Civitai Red API
+    </div>
+  </header>
+
+  <section class="grid">
+    <div class="card">
+      <span class="metric">大辞典タグ数</span>
+      <span class="number">7,878</span>
+      <span class="delta">今回 +1,070 / 初期比 +3,239</span>
+    </div>
+    <div class="card">
+      <span class="metric">adult_level付き</span>
+      <span class="number">1,235</span>
+      <span class="delta">今回 +2 / 初期比 +1,172</span>
+    </div>
+    <div class="card">
+      <span class="metric">新規Danbooru一般/メタ候補</span>
+      <span class="number">2,207</span>
+      <span class="delta">runtime採用 1,694</span>
+    </div>
+    <div class="card">
+      <span class="metric">Autocomplete判断材料</span>
+      <span class="number">4種</span>
+      <span class="delta">tag / meaning / source / adult-popularity</span>
+    </div>
+  </section>
+
+  <h2>今回実装したこと</h2>
+  <table>
+    <thead>
+      <tr><th>領域</th><th>変更</th><th>意図</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>タグ拡充</td>
+        <td><code>danbooru-tag-metadata</code> を有効化し、一般タグ(category 0)とメタタグ(category 5)を公開JSONから収集。</td>
+        <td>服装、髪、表情、構図、画面品質など、プロンプト実用語彙を大量に増やす。</td>
+      </tr>
+      <tr>
+        <td>タグ拡充</td>
+        <td><code>scripts/import-danbooru-tag-metadata.cjs</code> とPowerShellラッパーを追加。</td>
+        <td>既存のstaging/runtime境界を守ったまま、再実行可能なインポート経路にする。</td>
+      </tr>
+      <tr>
+        <td>Source Registry</td>
+        <td><code>defaultQuery</code> の複数値を正式対応し、Danbooruの <code>ratings</code> / <code>categories</code> 配列をUI側で扱えるようにした。</td>
+        <td>Source一覧、ingest状態、再収集条件がElectron実行時にも落ちないようにする。</td>
+      </tr>
+      <tr>
+        <td>Autocomplete</td>
+        <td><code>PromptDictionaryEntry</code> に <code>adultLevel</code> と <code>postCount</code> を追加し、SQLite検索結果から返す。</td>
+        <td>候補の安全区分、人気度、ソースの判断材料を挿入前に見せる。</td>
+      </tr>
+      <tr>
+        <td>Autocomplete UI</td>
+        <td>PromptEditorとグローバルAutocomplete候補に <code>adult</code> バッジ、post count、source/category/groupを表示。</td>
+        <td>候補が多い状態でも「今入れるべき語」か判断しやすくする。</td>
+      </tr>
+      <tr>
+        <td>Dictionary UI</td>
+        <td>Dictionaryワークスペース/サイドパネルの検索結果に成人フラグとpost countを表示。</td>
+        <td>大辞典を検索確認面としても使いやすくする。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>タグ数の変化</h2>
+  <table>
+    <thead>
+      <tr><th>比較点</th><th>総タグ数</th><th>adult_level付き</th><th>備考</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>初期基準</td>
+        <td>4,639</td>
+        <td>63</td>
+        <td>外部プロンプト大量収集前のruntime辞書。</td>
+      </tr>
+      <tr>
+        <td>成人タグ大量収集後</td>
+        <td>6,808</td>
+        <td>1,233</td>
+        <td>Danbooru成人タグとCivitai Redの追加後。</td>
+      </tr>
+      <tr>
+        <td>今回作業後</td>
+        <td><strong>7,878</strong></td>
+        <td><strong>1,235</strong></td>
+        <td>Danbooru一般/メタタグとCivitai Red追加取得を反映。重複タグはcanonical mergeされる。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Source別 runtime 採用数</h2>
+  <table>
+    <thead>
+      <tr><th>Source</th><th>runtime件数</th><th>adult件数</th><th>役割</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>prompt-library-ja</td><td>2,602</td><td>0</td><td>既存Prompt Library由来の基礎語彙。</td></tr>
+      <tr><td>danbooru-tag-metadata</td><td>1,947</td><td>100</td><td>一般/メタタグの大規模補強。服装、髪、構図、画面品質に効く。</td></tr>
+      <tr><td>danbooru-adult-post-tags</td><td>1,077</td><td>1,077</td><td>成人向け語彙の明示的補強。成人語は除外せずadult markerで扱う。</td></tr>
+      <tr><td>civitai-red-public-images</td><td>704</td><td>39</td><td>実プロンプト由来の現行語彙。Red側で成人寄りプロンプトも保持。</td></tr>
+      <tr><td>public-web-prompt-pages</td><td>629</td><td>4</td><td>公開プロンプト紹介ページ由来。説明文ノイズは除去済み。</td></tr>
+      <tr><td>yoitomoshi-prompt-library</td><td>325</td><td>0</td><td>Yoitomoshi独自の制作レシピ/補助タグ。</td></tr>
+      <tr><td>civitai-public-images</td><td>215</td><td>3</td><td>Civitai本家公開画像メタデータ由来。</td></tr>
+      <tr><td>yoitomoshi-prompt-daijiten-seed</td><td>168</td><td>1</td><td>大辞典 seed。</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">2026-05-29追記: GitHub公開用DBでは、ローカル履歴由来の <code>local-user-prompts</code> を既定で除外する。ローカル辞書へ反映したい場合だけ <code>YOITOMOSHI_INCLUDE_LOCAL_PROMPT_DICTIONARY=1</code> を指定してビルドする。</p>
+
+  <h2>既存機能一覧</h2>
+  <table>
+    <thead>
+      <tr><th>領域</th><th>主な機能</th><th>シナジー観点</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>txt2img</td>
+        <td>Prompt/Negative編集、パラメータ設定、Generate、Preflight、Prompt Helper、Prompt Composer、Dynamic Prompt、Quick Preset。</td>
+        <td>大辞典Autocompleteから直接タグを入れ、Composer SlotやPreflightで破綻を抑える。</td>
+      </tr>
+      <tr>
+        <td>img2img / Inpaint</td>
+        <td>D&amp;D入力、クリップボード、画像メタデータ読取、マスク、入力画像から連続編集。</td>
+        <td>画像由来タグを大辞典で補正し、Reference Board/ControlNetへ渡す。</td>
+      </tr>
+      <tr>
+        <td>Dictionary</td>
+        <td>SQLite大辞典検索、source/ingest確認、Prompt/Negative/Slot挿入、意味レビューコマンド、staging DB確認。</td>
+        <td>全Prompt資産の中心ハブ。タグ、履歴、Civitai、Composerを横断する。</td>
+      </tr>
+      <tr>
+        <td>Tags</td>
+        <td>Prompt Library、Custom Library、Quick Add、用途別レシピ、positive/negative管理。</td>
+        <td>大辞典で見つけた語をCustom Libraryへ昇格し、よく使う語彙セットに育てる。</td>
+      </tr>
+      <tr>
+        <td>Video</td>
+        <td>Video Workspace、FramePack、AnimateDiff系導入確認、生成動画保存。</td>
+        <td>動画向け動作/カメラ/時間表現タグを大辞典カテゴリ化すると、静止画から動画への導線が短くなる。</td>
+      </tr>
+      <tr>
+        <td>Upscale</td>
+        <td>Diffusion/Ultimate比較、Tile、denoise比較、採用設定、仕上げチェック、Pro Recipe保存。</td>
+        <td>破綻タグ/Negativeタグを大辞典から選び、仕上げ判断をPro Recipeへ戻す。</td>
+      </tr>
+      <tr>
+        <td>Models</td>
+        <td>Model Library、Civitai/Hugging Face検索、metadata/preview/SHA、関連モデル情報、download job。</td>
+        <td>モデル別に効くタグ、LoRA trigger、避けるNegativeを大辞典/Composer Slotへ接続する。</td>
+      </tr>
+      <tr>
+        <td>Tools</td>
+        <td>Model Inspector、Tagger、Workspace保存、Reference Board、Personal Health、Format Converter、Model Merger、Character Composite。</td>
+        <td>Tagger/History/Referenceの出力を大辞典候補へ戻すことで、使うほど語彙が育つ。</td>
+      </tr>
+      <tr>
+        <td>Side Panel / History</td>
+        <td>履歴検索、タグレビュー、Pro Recipe、候補/素材/SNS/参考用ラベル、prompt diff。</td>
+        <td>成功履歴のタグを大辞典と照合し、成功パターンをSlotテンプレートへ戻す。</td>
+      </tr>
+      <tr>
+        <td>Forge / Extensions</td>
+        <td>Forge API起動、ControlNet、ADetailer、Regional Prompter、FreeU、Dynamic Thresholding、FABRIC。</td>
+        <td>拡張ごとに必要なタグ群をDictionaryカテゴリ/レシピ化し、設定と語彙を同時に呼び出す。</td>
+      </tr>
+      <tr>
+        <td>Storage / IPC</td>
+        <td>settings、history、presets、favorites、workspace、prompt composer templates、model library、translation runtime。</td>
+        <td>蓄積データをsource-governed ingestへ流し、個人向け辞書の精度を継続的に上げる。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>シナジー発見</h2>
+  <div class="two">
+    <div class="card">
+      <h3>1. 大辞典 x Prompt Composer Slot</h3>
+      <p>検索候補を単発挿入で終わらせず、Slotテンプレートへ保存すると「モデル別に効く構成」を再利用できる。</p>
+      <span class="pill good">実装済み: Slot挿入</span>
+      <span class="pill info">次: source別Slot候補</span>
+    </div>
+    <div class="card">
+      <h3>2. 大辞典 x History Tag Review</h3>
+      <p>生成後のaccepted/rejectedタグを大辞典候補と突き合わせると、個人環境で本当に効いた語だけを昇格できる。</p>
+      <span class="pill good">履歴レビューあり</span>
+      <span class="pill info">次: 成功頻度でrank補正</span>
+    </div>
+    <div class="card">
+      <h3>3. 大辞典 x Model Library</h3>
+      <p>checkpoint/LoRAごとのtrigger、避けるNegative、関連ControlNetを大辞典カテゴリに接続すると、モデル選択がprompt構成まで連動する。</p>
+      <span class="pill good">Prompt Profileあり</span>
+      <span class="pill info">次: モデル別候補フィルタ</span>
+    </div>
+    <div class="card">
+      <h3>4. 大辞典 x Upscale Pro Recipe</h3>
+      <p>Upscaleで顔崩れや衣装driftが出た時のNegative/補正タグを保存し、次回のAutocomplete上位へ出せる。</p>
+      <span class="pill good">Pro Recipe保存あり</span>
+      <span class="pill info">次: 失敗理由タグ候補</span>
+    </div>
+    <div class="card">
+      <h3>5. 大辞典 x Tagger</h3>
+      <p>Tagger結果をそのまま使わず、大辞典で正規化・日本語確認・adult marker確認を挟むとノイズを減らせる。</p>
+      <span class="pill good">Tagger QAあり</span>
+      <span class="pill info">次: Tagger→Dictionary確認面</span>
+    </div>
+    <div class="card">
+      <h3>6. 大辞典 x Reference Board</h3>
+      <p>参照画像の用途ラベルとタグ候補を一緒に保存すると、構図・衣装・色味の再利用が速くなる。</p>
+      <span class="pill good">Reference Boardあり</span>
+      <span class="pill info">次: 参照ごとのタグメモ</span>
+    </div>
+  </div>
+
+  <h2>Autocomplete使用感の改善点</h2>
+  <ul>
+    <li>候補の2行目に日本語ラベル/意味とpost countを出すことで、同名に近いタグの判断を速くした。</li>
+    <li>候補右側のbadgeに <code>adult</code> を出すことで、成人語彙を除外せず、挿入前に明示できるようにした。</li>
+    <li>Dictionary画面でも同じ成人/人気度情報を表示し、Autocomplete候補の確認面として使えるようにした。</li>
+    <li>検索結果型に <code>adultLevel</code> と <code>postCount</code> を追加したため、今後はモデル別rankや履歴rankにも流用できる。</li>
+  </ul>
+
+  <h2>外部ソースと境界</h2>
+  <table>
+    <thead>
+      <tr><th>ソース</th><th>今回の扱い</th><th>保存境界</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="https://danbooru.donmai.us/tags.json">Danbooru tags JSON</a></td>
+        <td>一般/メタタグの語彙メタデータ。category 0/5、count order、上位ページのみ。</td>
+        <td>raw画像なし。runtimeへはpromoted tag candidateのみ。</td>
+      </tr>
+      <tr>
+        <td><a href="https://danbooru.donmai.us/posts.json">Danbooru posts JSON</a></td>
+        <td>前回追加済みの成人向け語彙 evidence。未成年/非合意などは成人語彙として昇格しない。</td>
+        <td>raw post tag stringはcommitせず、candidate evidenceに集計。</td>
+      </tr>
+      <tr>
+        <td><a href="https://civitai.red/api/v1/images">Civitai Red images API</a></td>
+        <td>公開画像メタデータのprompt/negativePromptから候補化。成人寄り語もadult marker付きで保持。</td>
+        <td>画像なし。prompt本文はstaging側、runtimeは昇格候補だけ。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>検証</h2>
+  <table>
+    <thead>
+      <tr><th>コマンド</th><th>結果</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>node --check scripts/import-danbooru-tag-metadata.cjs</code></td><td class="ok">PASS</td></tr>
+      <tr><td><code>npm.cmd run dictionary:import:danbooru-tags -- --reset-source ...</code></td><td class="ok">PASS: 2,207 promoted entries</td></tr>
+      <tr><td><code>npm.cmd run dictionary:build</code></td><td class="ok">PASS: 7,878 entries</td></tr>
+      <tr><td><code>npm.cmd run typecheck</code></td><td class="ok">PASS</td></tr>
+      <tr><td><code>node scripts/dom-qa.cjs prompt-dictionary-workspace --port=9338</code></td><td class="ok">PASS: source registry / ingest / rows / insert確認</td></tr>
+      <tr><td><code>node scripts/dom-qa.cjs prompt-global-autocomplete --port=9338</code></td><td class="ok">PASS: layer表示、post count表示、挿入確認</td></tr>
+      <tr><td>HTML structure check</td><td class="ok">PASS: title / counts / synergy / docs index link確認</td></tr>
+    </tbody>
+  </table>
+
+  <h2>残るリスクと次アクション</h2>
+  <ul>
+    <li><span class="warn">意味付け:</span> Danbooru由来の新規語は日本語意味が未レビューのものが多い。意味レビュー/自動curationを次に回す。</li>
+    <li><span class="warn">rank:</span> post countが高いタグは一般的すぎることがある。履歴成功率やモデル別プロファイルでrank補正したい。</li>
+    <li><span class="warn">UI:</span> Autocompleteは候補表示を強化したが、source表示切替やadult表示切替のさらなるrank連動は次スライス。</li>
+    <li><span class="risk">外部API:</span> Danbooru/Civitaiは外部状態に依存する。再実行時はrate limitとレスポンス変化を確認する。</li>
+  </ul>
+
+  <div class="note">
+    次の最小スライスは、Dictionary画面に「source / adult / モデル用途」表示切替を置き、Autocomplete rankに
+    History成功タグ、Prompt Composer Slotテンプレート、Checkpoint Prompt Profileを軽く加点すること。
+  </div>
+</main>
+</body>
+</html>

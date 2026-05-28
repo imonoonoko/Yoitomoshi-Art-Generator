@@ -138,6 +138,8 @@ export const IPC = {
 
   // Prompt dictionary
   promptDictionarySearch: 'prompt-dictionary:search',
+  promptDictionaryListSources: 'prompt-dictionary:list-sources',
+  promptDictionaryInspectIngest: 'prompt-dictionary:inspect-ingest',
 
   // Translation
   translationPromptTag: 'translation:prompt-tag',

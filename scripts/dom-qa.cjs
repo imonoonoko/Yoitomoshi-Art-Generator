@@ -24,6 +24,7 @@ const COMMANDS = new Set([
   'candidate-board',
   'reference-board',
   'upscale-finish',
+  'prompt-dictionary-workspace',
   'prompt-dictionary-search',
   'prompt-editor-dictionary',
   'prompt-global-autocomplete',
@@ -191,6 +192,11 @@ async function main() {
       printResult(result)
       return
     }
+    if (command === 'prompt-dictionary-workspace') {
+      const result = await evaluate(cdp, promptDictionaryWorkspaceExpression())
+      printResult(result)
+      return
+    }
     if (command === 'prompt-editor-dictionary') {
       const result = await evaluate(cdp, promptEditorDictionaryExpression())
       printResult(result)
@@ -339,6 +345,7 @@ function printUsage() {
   node scripts/dom-qa.cjs candidate-board [--port=9338]
   node scripts/dom-qa.cjs reference-board [--port=9338]
   node scripts/dom-qa.cjs upscale-finish [--port=9338]
+  node scripts/dom-qa.cjs prompt-dictionary-workspace [--port=9338]
   node scripts/dom-qa.cjs prompt-dictionary-search [--port=9338]
   node scripts/dom-qa.cjs prompt-editor-dictionary [--port=9338]
   node scripts/dom-qa.cjs prompt-global-autocomplete [--port=9338]
@@ -600,10 +607,20 @@ function printResult(result) {
 function selectorsExpression() {
   return `(async () => {
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const waitUntil = async (predicate, timeoutMs, label) => {
+      const start = Date.now()
+      while (Date.now() - start < timeoutMs) {
+        const value = await predicate()
+        if (value) return value
+        await sleep(100)
+      }
+      throw new Error('Timed out waiting for ' + label)
+    }
     document.querySelector('[data-testid="main-tab-txt2img"]')?.click()
     await sleep(100)
     const baseIds = [
       'main-tab-txt2img',
+      'main-tab-dictionary',
       'main-tab-tags',
       'main-tab-video',
       'main-tab-models',
@@ -637,8 +654,22 @@ function selectorsExpression() {
     ]
     const requiredSelectorIds = [...baseIds]
     const selectors = Object.fromEntries(baseIds.map((id) => [id, Boolean(document.querySelector('[data-testid="' + id + '"]'))]))
+    document.querySelector('[data-testid="main-tab-dictionary"]')?.click()
+    await waitUntil(() => document.querySelector('[data-testid="prompt-dictionary-workspace"]'), 10000, 'dictionary workspace')
+    const dictionaryIds = [
+      'prompt-dictionary-workspace',
+      'prompt-dictionary-workspace-search',
+      'prompt-dictionary-workspace-stats',
+      'prompt-dictionary-synergy-panel',
+      'prompt-dictionary-meaning-review-panel',
+      'prompt-dictionary-source-panel',
+    ]
+    for (const id of dictionaryIds) {
+      selectors[id] = Boolean(document.querySelector('[data-testid="' + id + '"]'))
+      requiredSelectorIds.push(id)
+    }
     document.querySelector('[data-testid="main-tab-tags"]')?.click()
-    await sleep(1000)
+    await waitUntil(() => document.querySelector('[data-testid="tags-workspace-library"]'), 10000, 'tags workspace')
     const tagIds = [
       'tags-workspace-library',
       'tags-workspace-composer',
@@ -734,6 +765,8 @@ function apiSurfaceExpression() {
       saveWorkspace: typeof window.api?.storage?.saveWorkspace === 'function',
       saveGeneratedVideo: typeof window.api?.storage?.saveGeneratedVideo === 'function',
       promptDictionarySearch: typeof window.api?.promptDictionary?.search === 'function',
+      promptDictionaryListSources: typeof window.api?.promptDictionary?.listSources === 'function',
+      promptDictionaryInspectIngest: typeof window.api?.promptDictionary?.inspectIngest === 'function',
       promptTextTranslation: typeof window.api?.translation?.promptText === 'function',
       promptRuntimeStatus: typeof window.api?.translation?.promptRuntimeStatus === 'function'
     }
@@ -2740,6 +2773,101 @@ function promptDictionarySearchExpression() {
       uiCountText: testId('prompt-dictionary-result-count')?.textContent?.trim() || '',
       uiRowCount: rows.length,
       uiFirstTags: firstTags
+    }
+  })()`
+}
+
+function promptDictionaryWorkspaceExpression() {
+  return `(async () => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const testId = (id) => document.querySelector('[data-testid="' + id + '"]')
+    const waitUntil = async (predicate, timeoutMs, label) => {
+      const start = Date.now()
+      while (Date.now() - start < timeoutMs) {
+        const value = await predicate()
+        if (value) return value
+        await sleep(100)
+      }
+      throw new Error('Timed out waiting for ' + label)
+    }
+    const setValue = (element, value) => {
+      const descriptor = Object.getOwnPropertyDescriptor(element.constructor.prototype, 'value')
+      descriptor?.set?.call(element, value)
+      element.dispatchEvent(new Event('input', { bubbles: true }))
+      element.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+    testId('main-tab-txt2img')?.click()
+    await sleep(300)
+    const promptEditor = await waitUntil(() => testId('prompt-positive-editor'), 10000, 'prompt editor')
+    const previousPrompt = promptEditor.value
+    const apiSearch = await window.api.promptDictionary.search({ query: '\\u624b', limit: 8 })
+    const sources = await window.api.promptDictionary.listSources()
+    const adultSearch = await window.api.promptDictionary.search({ query: 'hand', limit: 8, adult: 'adult' })
+    const safeSearch = await window.api.promptDictionary.search({ query: 'hand', limit: 8, adult: 'safe' })
+    const danbooruSource = sources.sources.find((source) => source.sourceId === 'danbooru-tag-metadata')?.sourceId
+    const sourceSearch = danbooruSource
+      ? await window.api.promptDictionary.search({ query: 'hand', limit: 8, sourceIds: [danbooruSource] })
+      : { entries: [] }
+    const ingest = await window.api.promptDictionary.inspectIngest()
+    testId('main-tab-dictionary')?.click()
+    const workspace = await waitUntil(() => testId('prompt-dictionary-workspace'), 10000, 'dictionary workspace')
+    const search = await waitUntil(() => testId('prompt-dictionary-workspace-search'), 10000, 'dictionary workspace search')
+    const sourceFilter = await waitUntil(() => testId('prompt-dictionary-workspace-source-filter'), 10000, 'dictionary source filter')
+    const adultFilter = await waitUntil(() => testId('prompt-dictionary-workspace-adult-filter'), 10000, 'dictionary adult filter')
+    const polarityFilter = await waitUntil(() => testId('prompt-dictionary-workspace-polarity-filter'), 10000, 'dictionary polarity filter')
+    setValue(search, '\\u624b')
+    await waitUntil(() => document.querySelectorAll('[data-testid^="prompt-dictionary-workspace-row-"]').length > 0, 10000, 'dictionary workspace rows')
+    const rows = Array.from(document.querySelectorAll('[data-testid^="prompt-dictionary-workspace-row-"]'))
+    const firstTags = rows.slice(0, 8).map((row) => row.querySelector('.font-mono')?.textContent?.trim()).filter(Boolean)
+    const firstInsert = document.querySelector('[data-testid^="prompt-dictionary-workspace-insert-"]')
+    if (!firstInsert) throw new Error('missing workspace insert action')
+    const insertedTag = firstTags[0] || ''
+    firstInsert.click()
+    await sleep(250)
+    testId('main-tab-txt2img')?.click()
+    const promptAfter = await waitUntil(() => testId('prompt-positive-editor'), 10000, 'prompt editor after insert')
+    const inserted = insertedTag && promptAfter.value.includes(insertedTag)
+    setValue(promptAfter, previousPrompt)
+    testId('main-tab-dictionary')?.click()
+    await waitUntil(() => testId('prompt-dictionary-synergy-panel'), 10000, 'synergy panel')
+    await waitUntil(() => testId('prompt-dictionary-meaning-review-panel'), 10000, 'meaning review panel')
+    await waitUntil(() => testId('prompt-dictionary-source-panel'), 10000, 'source panel')
+    const reviewCopyExport = document.querySelector('[data-testid="prompt-dictionary-meaning-review-copy-export"]')
+    const reviewCopyImport = document.querySelector('[data-testid="prompt-dictionary-meaning-review-copy-import"]')
+    const reviewRevealDb = document.querySelector('[data-testid="prompt-dictionary-meaning-review-reveal-db"]')
+    return {
+      ok: Boolean(workspace) &&
+        apiSearch.total > 0 &&
+        apiSearch.searchableCount > apiSearch.total &&
+        rows.length > 0 &&
+        inserted &&
+        sources.sources.length >= 3 &&
+        ingest.registrySourceCount >= sources.sources.length &&
+        Number.isFinite(Number(ingest.meaningReviewableCount)) &&
+        Boolean(reviewCopyExport) &&
+        Boolean(reviewCopyImport) &&
+        Boolean(reviewRevealDb) &&
+        Boolean(sourceFilter) &&
+        Boolean(adultFilter) &&
+        Boolean(polarityFilter) &&
+        adultSearch.entries.length > 0 &&
+        adultSearch.entries.every((entry) => entry.adultLevel > 0) &&
+        safeSearch.entries.length > 0 &&
+        safeSearch.entries.every((entry) => entry.adultLevel <= 0) &&
+        (!danbooruSource || (
+          sourceSearch.entries.length > 0 &&
+          sourceSearch.entries.every((entry) => entry.sourceId === danbooruSource)
+        )),
+      apiTotal: apiSearch.total,
+      searchableCount: apiSearch.searchableCount,
+      rowCount: rows.length,
+      firstTags,
+      insertedTag,
+      sourceCount: sources.sources.length,
+      adultFirstTags: adultSearch.entries.slice(0, 3).map((entry) => [entry.en, entry.adultLevel, entry.sourceId]),
+      safeFirstTags: safeSearch.entries.slice(0, 3).map((entry) => [entry.en, entry.adultLevel, entry.sourceId]),
+      sourceFirstTags: sourceSearch.entries.slice(0, 3).map((entry) => [entry.en, entry.adultLevel, entry.sourceId]),
+      ingest
     }
   })()`
 }

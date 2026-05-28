@@ -1,0 +1,22 @@
+{
+  "entities": {
+    "Q33767": {
+      "labels": {
+        "ja": {
+          "value": "手"
+        },
+        "en": {
+          "value": "hand"
+        }
+      },
+      "descriptions": {
+        "ja": {
+          "value": "腕の先にある体の部位"
+        },
+        "en": {
+          "value": "body part at the end of the arm"
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import { useStore, type WorkspaceTab } from '@/lib/store'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { Clapperboard, Database, Tags, Type, Image as ImageIcon, Maximize2, Wrench } from 'lucide-react'
+import { BookOpenText, Clapperboard, Database, Tags, Type, Image as ImageIcon, Maximize2, Wrench } from 'lucide-react'
 
 /**
  * Top-level workspace tab strip. Sits between the title bar and the main
@@ -14,9 +14,10 @@ import { Clapperboard, Database, Tags, Type, Image as ImageIcon, Maximize2, Wren
  * different content node. A simple controlled button strip backed by the
  * store gives us full layout control in App.tsx without contortion.
  */
-const TABS: { id: WorkspaceTab; iconKey: 'txt' | 'img' | 'tags' | 'video' | 'up' | 'models' | 'tool' }[] = [
+const TABS: { id: WorkspaceTab; iconKey: 'txt' | 'img' | 'dict' | 'tags' | 'video' | 'up' | 'models' | 'tool' }[] = [
   { id: 'txt2img', iconKey: 'txt' },
   { id: 'img2img', iconKey: 'img' },
+  { id: 'dictionary', iconKey: 'dict' },
   { id: 'tags', iconKey: 'tags' },
   { id: 'video', iconKey: 'video' },
   { id: 'upscale', iconKey: 'up' },
@@ -27,6 +28,7 @@ const TABS: { id: WorkspaceTab; iconKey: 'txt' | 'img' | 'tags' | 'video' | 'up'
 const ICON_BY_KEY = {
   txt:  Type,
   img:  ImageIcon,
+  dict: BookOpenText,
   tags: Tags,
   video: Clapperboard,
   up:   Maximize2,
